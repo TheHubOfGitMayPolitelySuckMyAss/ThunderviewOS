@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -6,7 +7,26 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
 
   if (code) {
-    const supabase = await createClient();
+    const cookieStore = await cookies();
+    const redirectUrl = new URL("/admin", origin);
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
@@ -16,7 +36,7 @@ export async function GET(request: Request) {
       const email = user?.email;
 
       if (email === "eric@marcoullier.com") {
-        return NextResponse.redirect(`${origin}/admin`);
+        return NextResponse.redirect(redirectUrl);
       }
 
       const { data: member } = await supabase
@@ -26,11 +46,10 @@ export async function GET(request: Request) {
         .single();
 
       const isTeam = member?.is_team === true && member?.kicked_out === false;
-      return NextResponse.redirect(
-        `${origin}${isTeam ? "/admin" : "/portal"}`
-      );
+      redirectUrl.pathname = isTeam ? "/admin" : "/portal";
+      return NextResponse.redirect(redirectUrl);
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(new URL("/login?error=auth", new URL(request.url).origin));
 }
