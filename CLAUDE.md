@@ -118,8 +118,12 @@ These are configured in the Supabase dashboard, not in the codebase:
 - **Site URL:** `https://thunderview-os.vercel.app`
 - **Redirect URLs allowlist:** `https://thunderview-os.vercel.app/**` and `http://localhost:3000/**`
 - **SMTP:** Currently using Supabase's built-in dev SMTP (rate-limited, has injected unsubscribe footer). Pre-launch must-do: switch to Resend custom SMTP.
-- **Email templates:** Currently default Supabase templates. Pre-launch must-do: customize magic link template with Thunderview branding.
+- **Email templates:** Customized via Management API. See "Email template requirements" below.
 - **Magic link rate limits:** Default — 1 request per 60 seconds per email, hourly cap on built-in SMTP.
+
+### Email template requirements
+
+Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` as the link target — NOT the default `{{ .ConfirmationURL }}`. The default generates a URL that verifies at Supabase's endpoint and redirects to the bare site root, which never establishes a session. The PKCE flow (used by `@supabase/ssr`) requires the token_hash format hitting our `/auth/confirm` route.
 
 ## What's done (Phase 1)
 
@@ -152,7 +156,8 @@ Phase 1 deliberately excluded these. Don't build them without an explicit prompt
 
 - [ ] Switch Supabase SMTP from built-in to Resend
 - [ ] Verify Thunderview sending domain in Resend (SPF, DKIM, DMARC)
-- [ ] Customize magic link email template (subject, body, branding)
+- [ ] Customize magic link email template (subject, body, branding) — link format already fixed, but copy/styling still default
+- [ ] Verified all Supabase auth email templates use the `/auth/confirm?token_hash=...&type=email` pattern (not `{{ .ConfirmationURL }}`)
 - [ ] Confirm From address is a Thunderview domain (no `noreply@mail.app.supabase.io`)
 - [ ] Confirm injected unsubscribe footer is gone
 - [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
