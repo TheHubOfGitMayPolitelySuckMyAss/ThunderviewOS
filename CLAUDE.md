@@ -51,7 +51,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql`.
 ## Auth flow
 
 1. User enters email at `/login`
-2. Client calls `supabase.auth.signInWithOtp` with `emailRedirectTo` set to `NEXT_PUBLIC_SITE_URL` (falls back to `window.location.origin`)
+2. Client calls `supabase.auth.signInWithOtp` with `emailRedirectTo` set to `${NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`
 3. Supabase sends magic link email (PKCE flow)
 4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
 5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
@@ -107,7 +107,7 @@ Required in `.env.local` (see `.env.local.example` at repo root):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (server-side only)
 - `NEXT_PUBLIC_SITE_URL` — App origin URL (`http://localhost:3000` for dev, `https://thunderview-os.vercel.app` for production)
-- `RESEND_API_KEY` — TBD, not yet wired
+- `RESEND_API_KEY` — TBD, not yet wired. Not yet in `.env.local.example`; add when Resend is integrated.
 
 Production values are set in Vercel dashboard. Preview scope is missing anon key and service role key (Vercel CLI plugin bug — add manually in dashboard if needed).
 
