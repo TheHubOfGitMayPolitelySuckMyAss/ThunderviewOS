@@ -37,16 +37,20 @@ The v3 handoff doc is the source of truth for product decisions. It lives outsid
 - **No row deletions.** Soft-delete via `kicked_out` flag on members. Rejected applications stay in the applications table — that table IS the rejection/suppression list.
 - **Demographics (gender, race, orientation) live on `applications` only.** Never copied to `members`.
 - **One Ask per member.** `members.current_ask` is overwritten on save. Prefill logic: `ask_updated_at > last_dinner_attended`.
+- **Multi-email members.** Members can have multiple email addresses via the `member_emails` table. Lookups (auth, ticket matching, application matching) check against ALL of a member's emails. Primary email = the email on the member's most recent approved application; this is what's used for outbound communication. Primary flips automatically when a new application is approved with a different email. Tickets do NOT change primary email (Stripe autofill is noisy).
+  - TODO: When an application is approved with a different email than primary, flip primary to the application email (add to approve action in Phase 3).
+  - TODO: When a ticket is fulfilled with an unrecognized email, insert a new `member_emails` row with `is_primary = false`, `source = 'ticket'` (add to fulfill action in Phase 3).
 
 ## Data model
 
-Full schema in `supabase/migrations/20260415000000_initial_schema.sql`.
+Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`.
 
 - `dinners` — first-Thursday-of-month events, auto-generated 12 months out, skipping Jan/Jul. Date is UNIQUE.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `member_id` is NULL until approved.
 - `members` — approved people, soft-deletable via `kicked_out`. `has_attended` is sticky (never flips back to false). `updated_at` auto-set by trigger.
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (pending/fulfilled/refunded/credited). Tracks payment source and match confidence.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
+- `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual).
 
 ## Auth flow
 
@@ -130,8 +134,8 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Project scaffolded (Next.js 16, TypeScript, Tailwind CSS 4)
 - Supabase clients: browser (`createBrowserClient`), server (`createServerClient` with cookies), admin (service role)
 - Proxy (`src/proxy.ts`) for session refresh + `/admin` route protection
-- Database schema: 5 tables, 9 indexes, `updated_at` trigger on members
-- RLS enabled on all tables with `is_admin_or_team()` function + "members can view own row" policy
+- Database schema: 6 tables (dinners, members, applications, tickets, credits, member_emails), indexes, `updated_at` trigger on members, primary-email constraint trigger on member_emails
+- RLS enabled on all tables with `is_admin_or_team()` function (joins through `member_emails`) + "members can view own row" policy
 - Magic link auth: login page, `/auth/confirm` (PKCE token hash), `/auth/callback` (code exchange), role-based redirect
 - Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
 - 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter)

@@ -2,10 +2,17 @@
 
 import { useState } from "react";
 
+type MemberEmail = {
+  id: string;
+  email: string;
+  is_primary: boolean;
+  source: string;
+};
+
 type Member = {
   id: string;
   name: string;
-  email: string;
+  member_emails: MemberEmail[];
   contact_preference: string;
   linkedin_profile: string | null;
   company_name: string | null;
@@ -23,6 +30,14 @@ type Member = {
   updated_at: string;
 };
 
+function getPrimaryEmail(member: Member): string {
+  return (
+    member.member_emails.find((e) => e.is_primary)?.email ??
+    member.member_emails[0]?.email ??
+    "-"
+  );
+}
+
 export default function MembersTable({ members }: { members: Member[] }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Member | null>(null);
@@ -31,11 +46,14 @@ export default function MembersTable({ members }: { members: Member[] }) {
     ? members.filter(
         (m) =>
           m.name.toLowerCase().includes(search.toLowerCase()) ||
-          m.email.toLowerCase().includes(search.toLowerCase())
+          m.member_emails.some((e) =>
+            e.email.toLowerCase().includes(search.toLowerCase())
+          )
       )
     : members;
 
   if (selected) {
+    const primaryEmail = getPrimaryEmail(selected);
     return (
       <div className="rounded-lg bg-white p-6 shadow">
         <button
@@ -49,7 +67,7 @@ export default function MembersTable({ members }: { members: Member[] }) {
         </h3>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
           {[
-            ["Email", selected.email],
+            ["Primary Email", primaryEmail],
             ["Contact Preference", selected.contact_preference],
             ["LinkedIn", selected.linkedin_profile || "N/A"],
             ["Company", selected.company_name || "N/A"],
@@ -86,6 +104,29 @@ export default function MembersTable({ members }: { members: Member[] }) {
             </div>
           ))}
         </dl>
+
+        {/* Multi-email list */}
+        <div className="mt-6">
+          <h4 className="mb-2 text-sm font-medium uppercase text-gray-500">
+            Email Addresses
+          </h4>
+          <div className="rounded-md border border-gray-200">
+            {selected.member_emails.map((me) => (
+              <div
+                key={me.id}
+                className="flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0"
+              >
+                <span className="text-sm text-gray-900">{me.email}</span>
+                <span className="text-xs text-gray-400">{me.source}</span>
+                {me.is_primary && (
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    primary
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -143,7 +184,7 @@ export default function MembersTable({ members }: { members: Member[] }) {
                   {member.name}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {member.email}
+                  {getPrimaryEmail(member)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {member.company_name || "-"}

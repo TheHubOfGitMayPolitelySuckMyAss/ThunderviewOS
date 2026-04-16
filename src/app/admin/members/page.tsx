@@ -5,7 +5,7 @@ export default async function MembersPage() {
   const supabase = await createClient();
   const { data: members } = await supabase
     .from("members")
-    .select("*")
+    .select("*, member_emails(id, email, is_primary, source)")
     .order("name", { ascending: true });
 
   return (

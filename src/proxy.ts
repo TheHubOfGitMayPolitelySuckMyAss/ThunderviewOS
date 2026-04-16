@@ -41,17 +41,18 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Check admin/team status
     const email = user.email;
     const isAdmin = email === "eric@marcoullier.com";
 
     if (!isAdmin) {
-      const { data: member } = await supabase
-        .from("members")
-        .select("is_team, kicked_out")
+      const { data: memberRow } = await supabase
+        .from("member_emails")
+        .select("members!inner(is_team, kicked_out)")
         .eq("email", email!)
+        .limit(1)
         .single();
 
+      const member = (memberRow?.members as unknown as { is_team: boolean; kicked_out: boolean }) ?? null;
       const isTeam = member?.is_team === true && member?.kicked_out === false;
 
       if (!isTeam) {
@@ -73,12 +74,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    const { data: member } = await supabase
-      .from("members")
-      .select("is_team, kicked_out")
+    const { data: memberRow } = await supabase
+      .from("member_emails")
+      .select("members!inner(is_team, kicked_out)")
       .eq("email", email!)
+      .limit(1)
       .single();
 
+    const member = (memberRow?.members as unknown as { is_team: boolean; kicked_out: boolean }) ?? null;
     const isTeam = member?.is_team === true && member?.kicked_out === false;
     url.pathname = isTeam ? "/admin" : "/portal";
     return NextResponse.redirect(url);

@@ -52,7 +52,7 @@ export default async function DinnerDetailPage({
 
   const { data: tickets } = await supabase
     .from("tickets")
-    .select("*, members(name, email, current_intro, current_ask, ask_updated_at, last_dinner_attended)")
+    .select("*, members(name, current_intro, current_ask, ask_updated_at, last_dinner_attended, member_emails(email, is_primary))")
     .eq("dinner_id", id)
     .order("purchased_at", { ascending: false });
 
@@ -130,14 +130,16 @@ export default async function DinnerDetailPage({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {tickets?.map((ticket) => {
-                const member = ticket.members as {
+                const member = ticket.members as unknown as {
                   name: string;
-                  email: string;
                   current_intro: string | null;
                   current_ask: string | null;
                   ask_updated_at: string | null;
                   last_dinner_attended: string | null;
+                  member_emails: { email: string; is_primary: boolean }[];
                 } | null;
+                const primaryEmail = member?.member_emails?.find((e) => e.is_primary)?.email
+                  ?? member?.member_emails?.[0]?.email ?? "-";
                 const displayStatus = deriveTicketStatus(
                   ticket.fulfillment_status,
                   member
@@ -148,7 +150,7 @@ export default async function DinnerDetailPage({
                       {member?.name}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {member?.email}
+                      {primaryEmail}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {ticket.ticket_type}

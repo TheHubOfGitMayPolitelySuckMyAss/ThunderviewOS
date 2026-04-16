@@ -15,7 +15,8 @@ export default async function DinnersPage() {
 
   const { data: tickets } = await supabase
     .from("tickets")
-    .select("dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)");
+    .select("dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)")
+
 
   const dinnerStats = (dinners || []).map((dinner) => {
     const dinnerApps = (applications || []).filter(

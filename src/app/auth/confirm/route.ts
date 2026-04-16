@@ -42,12 +42,14 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/admin`);
       }
 
-      const { data: member } = await supabase
-        .from("members")
-        .select("is_team, kicked_out")
+      const { data: memberRow } = await supabase
+        .from("member_emails")
+        .select("members!inner(is_team, kicked_out)")
         .eq("email", email!)
+        .limit(1)
         .single();
 
+      const member = (memberRow?.members as unknown as { is_team: boolean; kicked_out: boolean }) ?? null;
       const isTeam = member?.is_team === true && member?.kicked_out === false;
       return NextResponse.redirect(
         `${origin}${isTeam ? "/admin" : "/portal"}`

@@ -10,7 +10,7 @@ type Credit = {
   redeemed_ticket_id: string | null;
   created_at: string;
   redeemed_at: string | null;
-  members: { name: string; email: string } | null;
+  members: { name: string; member_emails: { email: string; is_primary: boolean }[] } | null;
   source_ticket: { dinner_id: string; dinners: { date: string } | null } | null;
   redeemed_ticket: {
     dinner_id: string;
@@ -79,7 +79,7 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
                   {credit.members?.name || "-"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {credit.members?.email || "-"}
+                  {credit.members?.member_emails?.find((e) => e.is_primary)?.email ?? credit.members?.member_emails?.[0]?.email ?? "-"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {credit.source_ticket?.dinners?.date
