@@ -68,16 +68,16 @@ export default async function DinnersPage() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                 Date
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
                 Applied
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
                 Approved
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
                 Paid
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
                 Intro/Ask
               </th>
             </tr>
@@ -101,16 +101,16 @@ export default async function DinnersPage() {
                     )}
                   </Link>
                 </td>
-                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
                   {dinner.applied}
                 </td>
-                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
                   {dinner.approved}
                 </td>
-                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
                   {dinner.paid}
                 </td>
-                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
                   {dinner.introAsk}
                 </td>
               </tr>
