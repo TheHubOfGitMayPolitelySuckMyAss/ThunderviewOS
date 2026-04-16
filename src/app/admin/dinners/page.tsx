@@ -1,6 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
+// PostgREST on Supabase caps responses at 1000 rows server-side, so .limit()
+// above that is silently clamped. Paginate with .range() until drained.
+async function fetchAll<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
+): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data } = await build(from, from + PAGE - 1);
+    if (!data?.length) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
+
 export default async function DinnersPage() {
   const supabase = await createClient();
 
@@ -9,16 +25,30 @@ export default async function DinnersPage() {
     .select("*")
     .order("date", { ascending: true });
 
-  const { data: applications } = await supabase
-    .from("applications")
-    .select("preferred_dinner_date, status, member_id")
-    .limit(2000);
+  const applications = await fetchAll<{
+    preferred_dinner_date: string;
+    status: string;
+    member_id: string | null;
+  }>((from, to) =>
+    supabase
+      .from("applications")
+      .select("preferred_dinner_date, status, member_id")
+      .range(from, to),
+  );
 
-  const { data: tickets } = await supabase
-    .from("tickets")
-    .select("dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)")
-    .limit(2000);
-
+  const tickets = await fetchAll<{
+    dinner_id: string;
+    fulfillment_status: string;
+    member_id: string;
+    members: unknown;
+  }>((from, to) =>
+    supabase
+      .from("tickets")
+      .select(
+        "dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)",
+      )
+      .range(from, to),
+  );
 
   const dinnerStats = (dinners || []).map((dinner) => {
     const dinnerApps = (applications || []).filter(
