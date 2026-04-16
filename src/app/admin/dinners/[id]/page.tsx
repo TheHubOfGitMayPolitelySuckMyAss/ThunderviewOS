@@ -1,6 +1,37 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
+function hasFreshIntroAsk(member: {
+  current_intro: string | null;
+  current_ask: string | null;
+  ask_updated_at: string | null;
+  last_dinner_attended: string | null;
+} | null): boolean {
+  if (!member) return false;
+  if (!member.current_intro || !member.current_ask) return false;
+  if (!member.last_dinner_attended) return true;
+  if (!member.ask_updated_at) return false;
+  return member.ask_updated_at > member.last_dinner_attended;
+}
+
+function deriveTicketStatus(
+  fulfillmentStatus: string,
+  member: {
+    current_intro: string | null;
+    current_ask: string | null;
+    ask_updated_at: string | null;
+    last_dinner_attended: string | null;
+  } | null
+): string {
+  if (fulfillmentStatus === "refunded") return "Refunded";
+  if (fulfillmentStatus === "credited") return "Credited";
+  if (fulfillmentStatus === "pending") return "Pending";
+  if (fulfillmentStatus === "fulfilled" && hasFreshIntroAsk(member))
+    return "Intro/Ask";
+  if (fulfillmentStatus === "fulfilled") return "Fulfilled";
+  return fulfillmentStatus;
+}
+
 export default async function DinnerDetailPage({
   params,
 }: {
@@ -21,7 +52,7 @@ export default async function DinnerDetailPage({
 
   const { data: tickets } = await supabase
     .from("tickets")
-    .select("*, members(name, email)")
+    .select("*, members(name, email, current_intro, current_ask, ask_updated_at, last_dinner_attended)")
     .eq("dinner_id", id)
     .order("purchased_at", { ascending: false });
 
@@ -98,28 +129,42 @@ export default async function DinnerDetailPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {tickets?.map((ticket) => (
-                <tr key={ticket.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900">
-                    {(ticket.members as { name: string })?.name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {(ticket.members as { email: string })?.email}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {ticket.ticket_type}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    ${Number(ticket.amount_paid).toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <StatusBadge status={ticket.fulfillment_status} />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {new Date(ticket.purchased_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
+              {tickets?.map((ticket) => {
+                const member = ticket.members as {
+                  name: string;
+                  email: string;
+                  current_intro: string | null;
+                  current_ask: string | null;
+                  ask_updated_at: string | null;
+                  last_dinner_attended: string | null;
+                } | null;
+                const displayStatus = deriveTicketStatus(
+                  ticket.fulfillment_status,
+                  member
+                );
+                return (
+                  <tr key={ticket.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {member?.name}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {member?.email}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {ticket.ticket_type}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      ${Number(ticket.amount_paid).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <StatusBadge status={displayStatus} />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {new Date(ticket.purchased_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                );
+              })}
               {(!tickets || tickets.length === 0) && (
                 <tr>
                   <td
@@ -201,12 +246,14 @@ export default async function DinnerDetailPage({
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
+    Pending: "bg-yellow-100 text-yellow-800",
     pending: "bg-yellow-100 text-yellow-800",
     approved: "bg-green-100 text-green-800",
-    fulfilled: "bg-green-100 text-green-800",
+    Fulfilled: "bg-green-100 text-green-800",
+    "Intro/Ask": "bg-purple-100 text-purple-700",
     rejected: "bg-red-100 text-red-800",
-    refunded: "bg-gray-100 text-gray-800",
-    credited: "bg-blue-100 text-blue-800",
+    Refunded: "bg-gray-100 text-gray-800",
+    Credited: "bg-blue-100 text-blue-800",
   };
   return (
     <span

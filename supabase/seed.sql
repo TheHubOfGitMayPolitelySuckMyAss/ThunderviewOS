@@ -25,9 +25,9 @@ ON CONFLICT (date) DO NOTHING;
 -- MEMBERS
 -- ============================================================
 
-INSERT INTO members (id, name, email, company_name, company_website, attendee_stagetype, is_team, linkedin_profile, marketing_opted_in, kicked_out, has_attended) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'Eric Marcoullier', 'eric@marcoullier.com', 'Thunderview', 'https://thunderview.com', 'Guest (Speaker/Press/Etc)', true, 'https://linkedin.com/in/ericmarcoullier', true, false, true),
-  ('a0000000-0000-0000-0000-000000000002', 'Sarah Chen', 'sarah@example.com', 'TeamCo', 'https://teamco.example.com', 'Active CEO (Bootstrapping or VC-Backed)', true, 'https://linkedin.com/in/sarachen', true, false, true),
+INSERT INTO members (id, name, email, company_name, company_website, attendee_stagetype, is_team, linkedin_profile, marketing_opted_in, kicked_out, has_attended, current_intro, current_ask, ask_updated_at) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 'Eric Marcoullier', 'eric@marcoullier.com', 'Thunderview', 'https://thunderview.com', 'Guest (Speaker/Press/Etc)', true, 'https://linkedin.com/in/ericmarcoullier', true, false, true, 'I run Thunderview CEO Dinners', 'Looking for speakers for upcoming dinners', now()),
+  ('a0000000-0000-0000-0000-000000000002', 'Sarah Chen', 'sarah@example.com', 'TeamCo', 'https://teamco.example.com', 'Active CEO (Bootstrapping or VC-Backed)', true, 'https://linkedin.com/in/sarachen', true, false, true, 'CEO of TeamCo, Series A startup', NULL, now()),
   ('a0000000-0000-0000-0000-000000000003', 'Mike Johnson', 'mike@example.com', 'StartupX', 'https://startupx.example.com', 'Active CEO (Bootstrapping or VC-Backed)', false, 'https://linkedin.com/in/mikejohnson', true, false, true),
   ('a0000000-0000-0000-0000-000000000004', 'Lisa Park', 'lisa@example.com', 'OldCo', 'https://oldco.example.com', 'Exited CEO (Acquisition or IPO)', false, 'https://linkedin.com/in/lisapark', true, true, true),
   ('a0000000-0000-0000-0000-000000000005', 'Dave Wilson', 'dave@example.com', 'FundCap', 'https://fundcap.example.com', 'Investor', false, 'https://linkedin.com/in/davewilson', false, false, false);

@@ -3,10 +3,60 @@ import Link from "next/link";
 
 export default async function DinnersPage() {
   const supabase = await createClient();
+
   const { data: dinners } = await supabase
     .from("dinners")
     .select("*")
     .order("date", { ascending: true });
+
+  const { data: applications } = await supabase
+    .from("applications")
+    .select("preferred_dinner_date, status, member_id");
+
+  const { data: tickets } = await supabase
+    .from("tickets")
+    .select("dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)");
+
+  const dinnerStats = (dinners || []).map((dinner) => {
+    const dinnerApps = (applications || []).filter(
+      (a) => a.preferred_dinner_date === dinner.date
+    );
+    const dinnerTickets = (tickets || []).filter(
+      (t) => t.dinner_id === dinner.id
+    );
+
+    const applied = dinnerApps.filter((a) => a.status === "pending").length;
+
+    const fulfilledMemberIds = new Set(
+      dinnerTickets
+        .filter((t) => t.fulfillment_status === "fulfilled")
+        .map((t) => t.member_id)
+    );
+    const approved = dinnerApps.filter(
+      (a) => a.status === "approved" && a.member_id && !fulfilledMemberIds.has(a.member_id)
+    ).length;
+
+    const paid = dinnerTickets.filter(
+      (t) => t.fulfillment_status === "fulfilled"
+    ).length;
+
+    const introAsk = dinnerTickets.filter((t) => {
+      if (t.fulfillment_status !== "fulfilled") return false;
+      const m = t.members as unknown as {
+        current_intro: string | null;
+        current_ask: string | null;
+        ask_updated_at: string | null;
+        last_dinner_attended: string | null;
+      } | null;
+      if (!m) return false;
+      if (!m.current_intro || !m.current_ask) return false;
+      if (!m.last_dinner_attended) return true;
+      if (!m.ask_updated_at) return false;
+      return m.ask_updated_at > m.last_dinner_attended;
+    }).length;
+
+    return { ...dinner, applied, approved, paid, introAsk };
+  });
 
   return (
     <div>
@@ -18,45 +68,57 @@ export default async function DinnersPage() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                 Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Venue
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                Applied
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Actions
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                Approved
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                Paid
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                Intro/Ask
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {dinners?.map((dinner) => (
-              <tr key={dinner.id} className="hover:bg-gray-50">
+            {dinnerStats.map((dinner) => (
+              <tr key={dinner.id} className="group relative hover:bg-gray-50">
                 <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                  {new Date(dinner.date + "T00:00:00").toLocaleDateString(
-                    "en-US",
-                    {
-                      weekday: "short",
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    }
-                  )}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
-                  {dinner.venue}
-                </td>
-                <td className="px-6 py-4 text-sm">
                   <Link
                     href={`/admin/dinners/${dinner.id}`}
-                    className="text-blue-600 hover:text-blue-800"
+                    className="after:absolute after:inset-0"
                   >
-                    View
+                    {new Date(dinner.date + "T00:00:00").toLocaleDateString(
+                      "en-US",
+                      {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      }
+                    )}
                   </Link>
+                </td>
+                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                  {dinner.applied}
+                </td>
+                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                  {dinner.approved}
+                </td>
+                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                  {dinner.paid}
+                </td>
+                <td className="px-6 py-4 text-right text-sm tabular-nums text-gray-500">
+                  {dinner.introAsk}
                 </td>
               </tr>
             ))}
             {(!dinners || dinners.length === 0) && (
               <tr>
                 <td
-                  colSpan={3}
+                  colSpan={5}
                   className="px-6 py-8 text-center text-sm text-gray-400"
                 >
                   No dinners found. Run the seed script to generate dinner
