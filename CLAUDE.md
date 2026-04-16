@@ -12,6 +12,7 @@ Thunderview OS is the management system for Thunderview CEO Dinners — monthly 
 - Prefer omission over inference. If information is uncertain, say so explicitly.
 - Don't validate, praise, or smooth ambiguity. Disagree when warranted.
 - Workflow: Eric writes prompts, Claude Code executes. Default assumption: Claude Code does it unless stated otherwise.
+- When Eric asks you to find a resource (token, file, config value) for a specific task, finding it is implicit authorization to use it for that task. Don't ask for permission to proceed.
 
 ## Canonical spec
 
@@ -59,7 +60,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 3. Supabase sends magic link email (PKCE flow)
 4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
 5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
-6. Route checks admin/team status and redirects to `/admin` or `/portal`
+6. Route checks admin/team status and redirects to `/admin` or `/portal`. Team lookup joins `members` to `member_emails` on `auth.jwt() ->> 'email'` (checks ALL of a member's emails, not a single `members.email` column — that column no longer exists).
 7. Proxy (`src/proxy.ts`) refreshes session on every request and protects `/admin/*` routes — unauthenticated users go to `/login`, non-admin/non-team users go to `/portal`
 
 **Gotcha:** `/auth/callback` (code exchange flow) also exists but the primary magic link flow uses `/auth/confirm` (token hash flow). Both are needed. The PKCE flow via `@supabase/ssr` generates email templates that use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`.
@@ -86,8 +87,8 @@ src/
 │       ├── admin-shell.tsx             # Sidebar nav, header, sign-out (client component)
 │       ├── page.tsx                    # Redirects to /admin/dinners
 │       ├── dinners/
-│       │   ├── page.tsx                # Dinner list table
-│       │   └── [id]/page.tsx           # Dinner detail: tickets + applications for that date
+│       │   ├── page.tsx                # Dinner list with funnel columns (Applied/Approved/Paid/Intro-Ask); rows link to detail
+│       │   └── [id]/page.tsx           # Dinner detail: tickets (with derived Intro/Ask status) + applications for that date
 │       ├── applications/
 │       │   ├── page.tsx                # Server wrapper
 │       │   └── applications-table.tsx  # Filter tabs (pending/approved/rejected/all), click-to-detail
@@ -99,7 +100,8 @@ src/
 │           └── credits-table.tsx       # Filter (outstanding/redeemed/all)
 supabase/
 ├── migrations/
-│   └── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
+│   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
+│   └── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
 └── seed.sql                                # Test data: 10 dinners, 5 members, 3 applications, 5 tickets, 1 credit
 ```
 
@@ -135,10 +137,14 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Supabase clients: browser (`createBrowserClient`), server (`createServerClient` with cookies), admin (service role)
 - Proxy (`src/proxy.ts`) for session refresh + `/admin` route protection
 - Database schema: 6 tables (dinners, members, applications, tickets, credits, member_emails), indexes, `updated_at` trigger on members, primary-email constraint trigger on member_emails
+- Multi-email support: `member_emails` table migration applied; `members.email` column dropped; `is_admin_or_team()` and "members can view own row" RLS policy rewritten to join through `member_emails`; admin pages (members, dinner detail, credits) read primary email via `member_emails`
 - RLS enabled on all tables with `is_admin_or_team()` function (joins through `member_emails`) + "members can view own row" policy
 - Magic link auth: login page, `/auth/confirm` (PKCE token hash), `/auth/callback` (code exchange), role-based redirect
+- Supabase auth email templates updated to use PKCE token hash pattern (`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`)
 - Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
 - 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter)
+- Admin dinners list funnel columns (Applied, Approved, Paid, Intro/Ask) with clickable rows linking to dinner detail
+- Derived "Intro/Ask" ticket status on dinner detail page: shown when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance)
 - Portal placeholder ("Portal Coming Soon")
 - Seed data applied to Supabase (10 dinners, 5 members, 3 applications, 5 tickets, 1 credit)
 
@@ -156,12 +162,21 @@ Phase 1 deliberately excluded these. Don't build them without an explicit prompt
 - CoachingOS sync — Phase 6
 - Historical data migration from Google Sheets — Phase 2 (next up)
 
+## Upcoming work
+
+**Phase 2: Data migration (next up)**
+
+Historical data is being migrated from Google Sheets, Squarespace Orders CSV, and Streak CRM export. This is script-based, not LLM-based. Do not build migration tooling without an explicit prompt.
+
+**Historical ticket backfill (decision locked, not yet implemented):**
+Historical attendance records will be imported into the `tickets` table as lightweight rows. Two new enum values will be added: `payment_source = 'historical'` and `ticket_type = 'historical'`. Historical tickets get `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`. This requires adding the new enum values to the CHECK constraints on `tickets.payment_source` and `tickets.ticket_type`.
+
 ## Pre-launch checklist (before real users hit this)
 
 - [ ] Switch Supabase SMTP from built-in to Resend
 - [ ] Verify Thunderview sending domain in Resend (SPF, DKIM, DMARC)
 - [ ] Customize magic link email template (subject, body, branding) — link format already fixed, but copy/styling still default
-- [ ] Verified all Supabase auth email templates use the `/auth/confirm?token_hash=...&type=email` pattern (not `{{ .ConfirmationURL }}`)
+- [x] Verified all Supabase auth email templates use the `/auth/confirm?token_hash=...&type=email` pattern (not `{{ .ConfirmationURL }}`)
 - [ ] Confirm From address is a Thunderview domain (no `noreply@mail.app.supabase.io`)
 - [ ] Confirm injected unsubscribe footer is gone
 - [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
