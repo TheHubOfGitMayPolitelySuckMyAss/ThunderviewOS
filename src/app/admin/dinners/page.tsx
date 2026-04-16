@@ -11,11 +11,13 @@ export default async function DinnersPage() {
 
   const { data: applications } = await supabase
     .from("applications")
-    .select("preferred_dinner_date, status, member_id");
+    .select("preferred_dinner_date, status, member_id")
+    .limit(2000);
 
   const { data: tickets } = await supabase
     .from("tickets")
     .select("dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)")
+    .limit(2000);
 
 
   const dinnerStats = (dinners || []).map((dinner) => {
