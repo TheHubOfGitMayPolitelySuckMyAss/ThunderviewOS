@@ -187,7 +187,3 @@ Historical attendance records will be imported into the `tickets` table as light
 - **Next.js 16 uses `proxy.ts` instead of `middleware.ts`.** The file is `src/proxy.ts` with `export async function proxy(request)`. The `middleware` convention is deprecated.
 - **Vercel preview env vars partially missing.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are not set for the preview environment due to a Vercel CLI plugin bug. Add manually in Vercel dashboard if branch deploys are needed.
 - **Supabase built-in SMTP is rate-limited.** Magic link requests are capped at 1 per 60 seconds per email, with an hourly sending cap. Must switch to Resend before launch.
-
-## Next phase
-
-Phase 2 is data migration from Google Sheets. ~705 unique emails across 35+ tabs, three header eras, ~308 people in 2+ sheets. Eric will provide the migration prompt when ready.
