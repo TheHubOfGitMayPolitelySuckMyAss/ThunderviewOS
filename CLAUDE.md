@@ -44,14 +44,15 @@ The v3 handoff doc is the source of truth for product decisions. It lives outsid
 
 ## Data model
 
-Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`.
+Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`. Phase 2 schema additions (`email_status`, historical enum values) applied via `tmp/import.sql`.
 
 - `dinners` — first-Thursday-of-month events, auto-generated 12 months out, skipping Jan/Jul. Date is UNIQUE.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `member_id` is NULL until approved.
 - `members` — approved people, soft-deletable via `kicked_out`. `has_attended` is sticky (never flips back to false). `updated_at` auto-set by trigger.
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (pending/fulfilled/refunded/credited). Tracks payment source and match confidence.
+- `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
-- `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual).
+- `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default) or `'bounced'`.
 
 ## Auth flow
 
@@ -102,7 +103,11 @@ supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
 │   └── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
-└── seed.sql                                # Test data: 10 dinners, 5 members, 3 applications, 5 tickets, 1 credit
+└── seed.sql                                # Original test data (replaced by Phase 2 import)
+tmp/
+├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
+├── import_summary.txt                      # Import counts and flags
+└── import_validation.txt                   # Cross-check audit results
 ```
 
 ## Environment variables
@@ -146,7 +151,15 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Admin dinners list funnel columns (Applied, Approved, Paid, Intro/Ask) with clickable rows linking to dinner detail
 - Derived "Intro/Ask" ticket status on dinner detail page: shown when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance)
 - Portal placeholder ("Portal Coming Soon")
-- Seed data applied to Supabase (10 dinners, 5 members, 3 applications, 5 tickets, 1 credit)
+- Seed data applied to Supabase (10 dinners, 5 members, 3 applications, 5 tickets, 1 credit — replaced by Phase 2 import)
+
+## What's done (Phase 2)
+
+- Data migration from Google Sheets, Squarespace Orders, Squarespace Contacts, and Streak CRM. 632 members, 825 member_emails, 706 applications, 1,253 historical tickets, 32 dinners imported. 0 credits (none in historical data).
+- Schema additions applied inline via `tmp/import.sql`: `member_emails.email_status` column (`active`/`bounced`), `'historical'` added to `tickets.payment_source` and `tickets.ticket_type` CHECK constraints.
+- Import audit passed: FK integrity, primary email uniqueness, has_attended/ticket consistency, marketing opt-out verification all clean.
+- 65 bounced emails flagged via Squarespace cleaned export. 81 members opted out via Squarespace unsubscribed export.
+- Import artifacts in `tmp/`: `import.sql` (generated SQL), `import_summary.txt`, `import_validation.txt`.
 
 ## What's NOT done
 
@@ -160,16 +173,17 @@ Phase 1 deliberately excluded these. Don't build them without an explicit prompt
 - Bulk email templates — Phase 4
 - Streak API integration — Phase 5
 - CoachingOS sync — Phase 6
-- Historical data migration from Google Sheets — Phase 2 (next up)
 
 ## Upcoming work
 
-**Phase 2: Data migration (next up)**
+**Phase 3: Admin actions + application form + transactional emails (next up)**
 
-Historical data is being migrated from Google Sheets, Squarespace Orders CSV, and Streak CRM export. This is script-based, not LLM-based. Do not build migration tooling without an explicit prompt.
-
-**Historical ticket backfill (decision locked, not yet implemented):**
-Historical attendance records will be imported into the `tickets` table as lightweight rows. Two new enum values will be added: `payment_source = 'historical'` and `ticket_type = 'historical'`. Historical tickets get `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`. This requires adding the new enum values to the CHECK constraints on `tickets.payment_source` and `tickets.ticket_type`.
+Immediate priority is making the admin UI functional with CRUD actions:
+- Approve/reject applications
+- Fulfill/refund/credit tickets
+- Edit members
+- Application form (hosted on Thunderview OS, replacing Squarespace)
+- Transactional emails via Resend (approval notifications, magic links with custom branding)
 
 ## Pre-launch checklist (before real users hit this)
 
