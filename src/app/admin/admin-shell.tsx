@@ -8,9 +8,9 @@ import { useRouter } from "next/navigation";
 const navItems = [
   { href: "/admin", label: "Dashboard", exact: true },
   { href: "/admin/dinners", label: "Dinners" },
+  { href: "/admin/tickets", label: "Tickets" },
   { href: "/admin/applications", label: "Applications" },
   { href: "/admin/members", label: "Members" },
-  { href: "/admin/credits", label: "Credits" },
 ];
 
 export default function AdminShell({

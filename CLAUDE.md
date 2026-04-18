@@ -128,6 +128,9 @@ src/
 │       │       ├── page.tsx            # Server wrapper: fetches application
 │       │       ├── application-detail.tsx  # Client component: detail layout, approve/reject/link actions
 │       │       └── actions.ts          # Server actions: approveApplication, rejectApplication, linkApplicationToMember, searchMembers
+│       ├── tickets/
+│       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
+│       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
@@ -137,9 +140,6 @@ src/
 │       │       ├── page.tsx            # Server wrapper: fetches member + determines admin role
 │       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management
-│       └── credits/
-│           ├── page.tsx                # Server wrapper
-│           └── credits-table.tsx       # Filter, sortable columns, sticky header
 ├── lib/
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
 │   └── ticket-assignment.ts            # Target dinner logic (getTargetDinner) + ticket type/price mapping (getTicketInfo)
@@ -201,7 +201,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Magic link auth: login page, `/auth/confirm` (PKCE token hash), `/auth/callback` (code exchange), role-based redirect
 - Supabase auth email templates updated to use PKCE token hash pattern (`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`)
 - Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
-- 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter)
+- 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter — later removed in Phase 3)
 - Admin dinners list funnel columns (Applied, Approved, Paid, Intro/Ask) with clickable rows linking to dinner detail
 - Derived "Intro/Ask" ticket status on dinner detail page: shown when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance)
 - Portal placeholder ("Portal Coming Soon")
@@ -244,6 +244,8 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Credit flow: sets ticket `fulfillment_status = 'credited'`, creates a `credits` row with `source_ticket_id` and `status = 'outstanding'`. Confirmation modal.
 - Apply Credit on member detail page: "Apply Credit" button shown at top of column two when member has unredeemed credits (`credits.status = 'outstanding'` AND `redeemed_ticket_id IS NULL`). On confirm: computes target dinner via `getTargetDinner()`, inserts ticket as pending then updates to fulfilled (fires both insert and fulfillment triggers), sets `payment_source = 'credit'`, `amount_paid = 0`, marks oldest unredeemed credit as redeemed. Button stays visible if multiple credits remain.
 - Kicked-out member exclusion from dinner views: approved applications whose linked member has `kicked_out = true` are excluded from dinner funnel counts (Applied/Approved columns on dinners list) and "Approved Without Ticket" lists on dinner detail pages. Applications inbox and tickets are unaffected.
+- `/admin/tickets` page: cross-dinner ticket list with all 1,350+ tickets (paginated past the 1,000-row PostgREST cap). Columns: Purchased, Member (strikethrough if kicked out), Dinner (formatted "May 7th, 2026"), Qty, Amount, Type, Source, Status (colored pills). All columns sortable, default reverse-chron by purchased_at. Search by member name. Row click navigates to dinner detail.
+- `/admin/credits` page removed. Credits now surface contextually: "Credit" button on dinner ticket rows, "Apply Credit" button on member detail. Nav updated: Tickets added between Dinners and Applications, Credits removed.
 
 ## What's NOT done
 
