@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDate, formatStageType } from "@/lib/format";
-import { approveApplication, rejectApplication } from "./actions";
+import {
+  approveApplication,
+  rejectApplication,
+  linkApplicationToMember,
+  searchMembers,
+} from "./actions";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -43,16 +48,34 @@ export default function ApplicationDetail({
   const router = useRouter();
   const [app, setApp] = useState(application);
   const [toast, setToast] = useState<string | null>(null);
+  const [kickedOutWarning, setKickedOutWarning] = useState<{
+    name: string;
+    memberId: string;
+  } | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Re-sync when server refreshes
+  useEffect(() => {
+    setApp(application);
+  }, [application]);
 
   const heading = `${app.name} at ${app.company_name}`;
   const isActiveCEO =
     app.attendee_stagetype === "Active CEO (Bootstrapping or VC-Backed)";
 
   function handleApprove() {
+    setKickedOutWarning(null);
     startTransition(async () => {
       const result = await approveApplication(app.id);
+      if (result.isKickedOut) {
+        setKickedOutWarning({
+          name: result.kickedOutName || "This member",
+          memberId: result.memberId!,
+        });
+        return;
+      }
       if (result.success) {
         if (result.isExisting) {
           setToast(`${app.name} is already a member — application linked.`);
@@ -63,12 +86,38 @@ export default function ApplicationDetail({
     });
   }
 
+  function handleLinked(memberName: string) {
+    setShowLinkModal(false);
+    setToast(`${memberName} linked — application approved.`);
+    setTimeout(() => setToast(null), 4000);
+    router.refresh();
+  }
+
+  const showApprove = app.status === "pending" || app.status === "rejected";
+  const showReject = app.status === "pending";
+  const showLink =
+    app.status === "pending" && !app.member_id;
+
   return (
     <div className="rounded-lg bg-white p-6 shadow">
       {/* Toast */}
       {toast && (
         <div className="mb-4 rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800">
           {toast}
+        </div>
+      )}
+
+      {/* Kicked-out warning */}
+      {kickedOutWarning && (
+        <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
+          <Link
+            href={`/admin/members/${kickedOutWarning.memberId}`}
+            className="font-medium underline"
+          >
+            {kickedOutWarning.name}
+          </Link>{" "}
+          was removed from Thunderview. Reinstate them from their member page
+          before approving this application.
         </div>
       )}
 
@@ -93,16 +142,24 @@ export default function ApplicationDetail({
 
         {/* Action buttons */}
         <div className="mt-3 flex gap-3">
-          {(app.status === "pending" || app.status === "rejected") && (
+          {showApprove && (
             <button
               onClick={handleApprove}
-              disabled={isPending}
+              disabled={isPending || !!kickedOutWarning}
               className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
             >
               {isPending ? "Approving..." : "Approve"}
             </button>
           )}
-          {app.status === "pending" && (
+          {showLink && (
+            <button
+              onClick={() => setShowLinkModal(true)}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Link to existing member
+            </button>
+          )}
+          {showReject && (
             <button
               onClick={() => setShowRejectModal(true)}
               className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -201,9 +258,24 @@ export default function ApplicationDetail({
           }}
         />
       )}
+
+      {/* Link to existing member modal */}
+      {showLinkModal && (
+        <LinkMemberModal
+          applicationId={app.id}
+          onClose={() => setShowLinkModal(false)}
+          onLinked={handleLinked}
+          onKickedOut={(name, memberId) => {
+            setShowLinkModal(false);
+            setKickedOutWarning({ name, memberId });
+          }}
+        />
+      )}
     </div>
   );
 }
+
+// ── Reject Modal ──
 
 function RejectModal({
   applicationId,
@@ -290,6 +362,155 @@ function RejectModal({
     </div>
   );
 }
+
+// ── Link Member Modal ──
+
+function LinkMemberModal({
+  applicationId,
+  onClose,
+  onLinked,
+  onKickedOut,
+}: {
+  applicationId: string;
+  onClose: () => void;
+  onLinked: (memberName: string) => void;
+  onKickedOut: (name: string, memberId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<
+    { id: string; name: string; company_name: string | null; primary_email: string }[]
+  >([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  const doSearch = useCallback((q: string) => {
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    searchMembers(q).then((r) => {
+      setResults(r);
+      setSearching(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => doSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search, doSearch]);
+
+  function handleConfirm() {
+    if (!selected) return;
+    setError("");
+    startTransition(async () => {
+      const result = await linkApplicationToMember(applicationId, selected);
+      if (result.isKickedOut) {
+        onKickedOut(result.memberName || "This member", result.memberId!);
+        return;
+      }
+      if (result.success) {
+        onLinked(result.memberName || "Member");
+      } else {
+        setError(result.error || "Failed to link");
+      }
+    });
+  }
+
+  const inputClass =
+    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Link to Existing Member
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            &times;
+          </button>
+        </div>
+
+        <input
+          type="text"
+          placeholder="Search members by name..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setSelected(null);
+          }}
+          className={inputClass}
+        />
+
+        {searching && (
+          <p className="mt-2 text-xs text-gray-400">Searching...</p>
+        )}
+
+        {results.length > 0 && (
+          <div className="mt-2 max-h-60 overflow-auto rounded-md border border-gray-200">
+            {results.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setSelected(m.id)}
+                className={`flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-gray-50 ${
+                  selected === m.id ? "bg-blue-50" : ""
+                }`}
+              >
+                <div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {m.name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {m.company_name || "-"} &middot; {m.primary_email}
+                  </div>
+                </div>
+                {selected === m.id && (
+                  <span className="ml-auto text-xs text-blue-600">
+                    Selected
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {search.length >= 2 && !searching && results.length === 0 && (
+          <p className="mt-2 text-xs text-gray-400">No members found.</p>
+        )}
+
+        {error && (
+          <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!selected || isPending}
+            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {isPending ? "Linking..." : "Link & Approve"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── DetailField ──
 
 function DetailField({
   label,

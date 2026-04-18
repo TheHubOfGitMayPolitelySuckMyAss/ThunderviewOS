@@ -1,15 +1,20 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
-export async function approveApplication(
-  applicationId: string
-): Promise<{
+type ApproveResult = {
   success: boolean;
   error?: string;
   memberId?: string;
   isExisting?: boolean;
-}> {
+  isKickedOut?: boolean;
+  kickedOutName?: string;
+};
+
+export async function approveApplication(
+  applicationId: string
+): Promise<ApproveResult> {
   const admin = createAdminClient();
 
   const { data, error } = await admin.rpc("approve_application", {
@@ -18,9 +23,27 @@ export async function approveApplication(
 
   if (error) return { success: false, error: error.message };
 
-  const result = data as { member_id: string; is_existing: boolean };
+  const result = data as {
+    member_id: string;
+    is_existing: boolean;
+    is_kicked_out: boolean;
+    member_name?: string;
+  };
 
-  // TODO: Send approval email via Resend (Phase 3 email wiring)
+  if (result.is_kicked_out) {
+    return {
+      success: false,
+      isKickedOut: true,
+      memberId: result.member_id,
+      kickedOutName: result.member_name,
+    };
+  }
+
+  if (result.is_existing) {
+    // TODO: Send re-application email (template #2 — "you're already in, just buy a ticket next time")
+  } else {
+    // TODO: Send approval email (template #1 — "you're approved, buy a ticket")
+  }
 
   return {
     success: true,
@@ -49,4 +72,76 @@ export async function rejectApplication(
   // TODO: Send rejection email via Resend (Phase 3 email wiring)
 
   return { success: true };
+}
+
+type LinkResult = {
+  success: boolean;
+  error?: string;
+  memberId?: string;
+  memberName?: string;
+  isKickedOut?: boolean;
+};
+
+export async function linkApplicationToMember(
+  applicationId: string,
+  memberId: string
+): Promise<LinkResult> {
+  const admin = createAdminClient();
+
+  const { data, error } = await admin.rpc("link_application_to_member", {
+    p_application_id: applicationId,
+    p_member_id: memberId,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  const result = data as {
+    member_id: string;
+    member_name: string;
+    is_kicked_out: boolean;
+  };
+
+  if (result.is_kicked_out) {
+    return {
+      success: false,
+      isKickedOut: true,
+      memberId: result.member_id,
+      memberName: result.member_name,
+    };
+  }
+
+  // TODO: Send re-application email (template #2 — "you're already in, just buy a ticket next time")
+
+  return {
+    success: true,
+    memberId: result.member_id,
+    memberName: result.member_name,
+  };
+}
+
+export async function searchMembers(
+  query: string
+): Promise<
+  { id: string; name: string; company_name: string | null; primary_email: string }[]
+> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("members")
+    .select("id, name, company_name, member_emails(email, is_primary)")
+    .or(`name.ilike.%${query}%`)
+    .order("name")
+    .limit(10);
+
+  return (data || []).map((m) => {
+    const emails = m.member_emails as { email: string; is_primary: boolean }[];
+    const primary =
+      emails?.find((e) => e.is_primary)?.email ?? emails?.[0]?.email ?? "-";
+    return {
+      id: m.id,
+      name: m.name,
+      company_name: m.company_name,
+      primary_email: primary,
+    };
+  });
 }
