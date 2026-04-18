@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatStageType } from "@/lib/format";
+import { formatDate, formatStageType } from "@/lib/format";
 
 type MemberEmail = {
   id: string;
@@ -152,9 +152,7 @@ export default function MembersTable({
                 </td>
                 <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {member.last_dinner_attended
-                    ? new Date(
-                        member.last_dinner_attended + "T00:00:00"
-                      ).toLocaleDateString()
+                    ? formatDate(member.last_dinner_attended)
                     : "-"}
                 </td>
                 <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>

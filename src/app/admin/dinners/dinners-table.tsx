@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/format";
 
 type DinnerStat = {
   id: string;
@@ -86,15 +87,12 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
                   href={`/admin/dinners/${dinner.id}`}
                   className="after:absolute after:inset-0"
                 >
-                  {new Date(dinner.date + "T00:00:00").toLocaleDateString(
-                    "en-US",
-                    {
-                      weekday: "short",
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    }
-                  )}
+                  {formatDate(dinner.date, {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
                 </Link>
               </td>
               <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatDate } from "@/lib/format";
 
 type Credit = {
   id: string;
@@ -128,9 +129,7 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {credit.source_ticket?.dinners?.date
-                    ? new Date(
-                        credit.source_ticket.dinners.date + "T00:00:00"
-                      ).toLocaleDateString()
+                    ? formatDate(credit.source_ticket.dinners.date)
                     : "-"}
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -146,13 +145,11 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {credit.redeemed_ticket?.dinners?.date
-                    ? new Date(
-                        credit.redeemed_ticket.dinners.date + "T00:00:00"
-                      ).toLocaleDateString()
+                    ? formatDate(credit.redeemed_ticket.dinners.date)
                     : "-"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {new Date(credit.created_at).toLocaleDateString()}
+                  {formatDate(credit.created_at)}
                 </td>
               </tr>
             ))}

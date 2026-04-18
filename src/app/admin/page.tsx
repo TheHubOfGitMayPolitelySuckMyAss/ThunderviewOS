@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import DashboardAccordions from "./dashboard-accordions";
+import { formatDate, getTodayMT } from "@/lib/format";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayMT();
 
   // Next upcoming dinner
   const { data: nextDinner } = await supabase
@@ -48,12 +49,9 @@ export default async function DashboardPage() {
   // Days until next dinner
   let daysUntil: number | null = null;
   if (nextDinner) {
-    const dinnerDate = new Date(nextDinner.date + "T00:00:00");
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    daysUntil = Math.round(
-      (dinnerDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const dinnerMs = new Date(nextDinner.date + "T00:00:00").getTime();
+    const todayMs = new Date(today + "T00:00:00").getTime();
+    daysUntil = Math.round((dinnerMs - todayMs) / (1000 * 60 * 60 * 24));
   }
 
   // Pending applications
@@ -147,10 +145,11 @@ export default async function DashboardPage() {
           <div className="rounded-lg bg-white px-4 py-4 shadow">
             <p className="text-xs uppercase text-gray-500">Next Dinner</p>
             <p className="mt-1 text-lg font-bold text-gray-900">
-              {new Date(nextDinner.date + "T00:00:00").toLocaleDateString(
-                "en-US",
-                { month: "short", day: "numeric", year: "numeric" }
-              )}
+              {formatDate(nextDinner.date, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
             </p>
           </div>
           <div className="rounded-lg bg-white px-4 py-4 shadow">

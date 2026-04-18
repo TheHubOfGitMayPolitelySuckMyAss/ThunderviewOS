@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatStageType } from "@/lib/format";
+import { formatDate, formatStageType, getTodayMT } from "@/lib/format";
 
 export default async function MemberDetailPage({
   params,
@@ -44,7 +44,7 @@ export default async function MemberDetailPage({
     .filter((d, i, arr) => arr.indexOf(d) === i);
 
   // Ask staleness
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayMT();
   const futureTickets = tickets.filter(
     (t) => t.dinners?.date && t.dinners.date >= today
   );
@@ -180,7 +180,7 @@ export default async function MemberDetailPage({
               {member.intro_updated_at && (
                 <dd className="mt-0.5 text-xs text-gray-400">
                   Last updated{" "}
-                  {new Date(member.intro_updated_at).toLocaleDateString()}
+                  {formatDate(member.intro_updated_at)}
                 </dd>
               )}
             </div>
@@ -200,7 +200,7 @@ export default async function MemberDetailPage({
               {member.ask_updated_at && (
                 <dd className="mt-0.5 text-xs text-gray-400">
                   Last updated{" "}
-                  {new Date(member.ask_updated_at).toLocaleDateString()}
+                  {formatDate(member.ask_updated_at)}
                 </dd>
               )}
             </div>
@@ -214,7 +214,7 @@ export default async function MemberDetailPage({
           <div className="space-y-4">
             <DetailField label="Application Date">
               {applicationDate
-                ? `Approved ${new Date(applicationDate).toLocaleDateString()}`
+                ? `Approved ${formatDate(applicationDate)}`
                 : "None"}
             </DetailField>
 
@@ -227,7 +227,7 @@ export default async function MemberDetailPage({
                   <ul className="space-y-1">
                     {dinnerDates.map((d) => (
                       <li key={d} className="text-sm text-gray-900">
-                        {new Date(d + "T00:00:00").toLocaleDateString()}
+                        {formatDate(d)}
                       </li>
                     ))}
                   </ul>

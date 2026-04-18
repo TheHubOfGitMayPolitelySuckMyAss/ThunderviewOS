@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatStageType } from "@/lib/format";
+import { formatDate, formatStageType } from "@/lib/format";
 
 type Application = {
   id: string;
@@ -142,15 +142,13 @@ export default function ApplicationsTable({
                   {formatStageType(app.attendee_stagetype)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {new Date(
-                    app.preferred_dinner_date + "T00:00:00"
-                  ).toLocaleDateString()}
+                  {formatDate(app.preferred_dinner_date)}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <StatusBadge status={app.status} />
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {new Date(app.submitted_on).toLocaleDateString()}
+                  {formatDate(app.submitted_on)}
                 </td>
               </tr>
             ))}

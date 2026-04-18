@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatStageType } from "@/lib/format";
+import { formatDate, formatStageType, formatTimestamp } from "@/lib/format";
 
 export default async function ApplicationDetailPage({
   params,
@@ -23,12 +23,7 @@ export default async function ApplicationDetailPage({
     ["Company", application.company_name],
     ["Website", application.company_website],
     ["Stage/Type", formatStageType(application.attendee_stagetype)],
-    [
-      "Preferred Dinner",
-      new Date(
-        application.preferred_dinner_date + "T00:00:00"
-      ).toLocaleDateString(),
-    ],
+    ["Preferred Dinner", formatDate(application.preferred_dinner_date)],
     ["LinkedIn", application.linkedin_profile],
     ["Gender", application.gender],
     ["Race", application.race],
@@ -43,11 +38,11 @@ export default async function ApplicationDetailPage({
     ],
     ["Status", application.status],
     ["Rejection Reason", application.rejection_reason || "N/A"],
-    ["Submitted", new Date(application.submitted_on).toLocaleString()],
+    ["Submitted", formatTimestamp(application.submitted_on)],
     [
       "Reviewed",
       application.reviewed_at
-        ? new Date(application.reviewed_at).toLocaleString()
+        ? formatTimestamp(application.reviewed_at)
         : "Not yet",
     ],
   ];

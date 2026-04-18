@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/format";
 
 type PendingApp = {
   id: string;
@@ -105,7 +106,7 @@ export default function DashboardAccordions({
                     {app.company_name}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
-                    {new Date(app.submitted_on).toLocaleDateString()}
+                    {formatDate(app.submitted_on)}
                   </td>
                 </tr>
               ))}
@@ -157,9 +158,7 @@ export default function DashboardAccordions({
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
                     {ticket.dinnerDate
-                      ? new Date(
-                          ticket.dinnerDate + "T00:00:00"
-                        ).toLocaleDateString("en-US", {
+                      ? formatDate(ticket.dinnerDate, {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -167,7 +166,7 @@ export default function DashboardAccordions({
                       : "-"}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
-                    {new Date(ticket.purchasedAt).toLocaleDateString()}
+                    {formatDate(ticket.purchasedAt)}
                   </td>
                   <td className="px-4 py-2 text-sm">
                     <span className="inline-block rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
@@ -214,7 +213,7 @@ export default function DashboardAccordions({
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
-                    {new Date(m.marketingOptedOutAt).toLocaleDateString()}
+                    {formatDate(m.marketingOptedOutAt)}
                   </td>
                 </tr>
               ))}

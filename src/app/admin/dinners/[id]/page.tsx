@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatStageType } from "@/lib/format";
+import { formatDate, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -74,7 +74,7 @@ export default async function DinnerDetailPage({
   );
 
   // Build set of member IDs who have tickets for this dinner
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayMT();
   const isPast = dinner.date < today;
 
   const ticketMemberIds = new Set(
@@ -82,7 +82,7 @@ export default async function DinnerDetailPage({
       .filter((t) => {
         if (isPast) {
           // After dinner date: only count tickets purchased on or before the dinner
-          return t.purchased_at && t.purchased_at.slice(0, 10) <= dinner.date;
+          return t.purchased_at && toDateMT(t.purchased_at) <= dinner.date;
         }
         return true;
       })
@@ -103,7 +103,7 @@ export default async function DinnerDetailPage({
       {/* Dinner header */}
       <div>
         <h2 className="text-xl font-bold text-gray-900">
-          {new Date(dinner.date + "T00:00:00").toLocaleDateString("en-US", {
+          {formatDate(dinner.date, {
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -199,7 +199,7 @@ export default async function DinnerDetailPage({
                       <StatusBadge status={displayStatus} />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {new Date(ticket.purchased_at).toLocaleDateString()}
+                      {formatDate(ticket.purchased_at)}
                     </td>
                   </tr>
                 );
@@ -266,7 +266,7 @@ export default async function DinnerDetailPage({
                     {formatStageType(app.attendee_stagetype)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {new Date(app.submitted_on).toLocaleDateString()}
+                    {formatDate(app.submitted_on)}
                   </td>
                 </tr>
               ))}
