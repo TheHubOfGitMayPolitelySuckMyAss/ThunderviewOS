@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTargetDinner } from "@/lib/ticket-assignment";
@@ -16,8 +17,10 @@ export default async function GuestPage({
 
   if (!user) redirect("/login");
 
+  const admin = createAdminClient();
+
   // Look up member
-  const { data: memberEmail } = await supabase
+  const { data: memberEmail } = await admin
     .from("member_emails")
     .select("members!inner(id, kicked_out)")
     .eq("email", user.email!)
@@ -32,7 +35,7 @@ export default async function GuestPage({
   if (!member || member.kicked_out) redirect("/portal");
 
   // Verify target dinner is December
-  const targetDinner = await getTargetDinner(member.id, supabase);
+  const targetDinner = await getTargetDinner(member.id, admin);
   if (!targetDinner) redirect("/portal/tickets");
 
   const dinnerMonth = new Date(targetDinner.date + "T00:00:00").getMonth() + 1;

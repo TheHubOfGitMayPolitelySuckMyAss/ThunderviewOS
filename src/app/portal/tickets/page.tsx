@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { formatDinnerDisplay, formatDate } from "@/lib/format";
+import { formatDinnerDisplay } from "@/lib/format";
 import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
 
 export default async function TicketSelectionPage() {
@@ -12,8 +13,10 @@ export default async function TicketSelectionPage() {
 
   if (!user) redirect("/login");
 
+  const admin = createAdminClient();
+
   // Look up member by auth email
-  const { data: memberEmail } = await supabase
+  const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
       "members!inner(id, attendee_stagetype, has_community_access, kicked_out, last_dinner_attended)"
@@ -63,7 +66,7 @@ export default async function TicketSelectionPage() {
   }
 
   // Check for existing pending ticket
-  const { data: pendingTicket } = await supabase
+  const { data: pendingTicket } = await admin
     .from("tickets")
     .select("id, dinner_id, dinners(date)")
     .eq("member_id", member.id)
@@ -93,7 +96,7 @@ export default async function TicketSelectionPage() {
   }
 
   // Compute target dinner
-  const targetDinner = await getTargetDinner(member.id, supabase);
+  const targetDinner = await getTargetDinner(member.id, admin);
 
   if (!targetDinner) {
     return (

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
 
@@ -14,8 +15,11 @@ export async function purchaseTicket(formData: FormData) {
 
   if (!user) redirect("/login");
 
+  // Use admin client for DB operations (tickets table has no INSERT RLS policy for members)
+  const admin = createAdminClient();
+
   // Look up member
-  const { data: memberEmail } = await supabase
+  const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
       "members!inner(id, attendee_stagetype, has_community_access, kicked_out)"
@@ -36,7 +40,7 @@ export async function purchaseTicket(formData: FormData) {
   }
 
   // Recompute target dinner at submit time
-  const targetDinner = await getTargetDinner(member.id, supabase);
+  const targetDinner = await getTargetDinner(member.id, admin);
   if (!targetDinner) redirect("/portal/tickets");
 
   // Only allow guest for December dinners
@@ -52,7 +56,7 @@ export async function purchaseTicket(formData: FormData) {
   const quantity = actualWithGuest ? 2 : 1;
   const amountPaid = actualWithGuest ? price + 40 : price;
 
-  const { error } = await supabase.from("tickets").insert({
+  const { error } = await admin.from("tickets").insert({
     member_id: member.id,
     dinner_id: targetDinner.id,
     ticket_type: ticketType,

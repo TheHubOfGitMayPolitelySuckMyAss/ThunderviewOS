@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { formatDinnerDisplay } from "@/lib/format";
@@ -12,8 +13,10 @@ export default async function TicketSuccessPage() {
 
   if (!user) redirect("/login");
 
+  const admin = createAdminClient();
+
   // Look up member's most recent ticket to show dinner date
-  const { data: memberEmail } = await supabase
+  const { data: memberEmail } = await admin
     .from("member_emails")
     .select("members!inner(id)")
     .eq("email", user.email!)
@@ -24,7 +27,7 @@ export default async function TicketSuccessPage() {
 
   let dinnerDateDisplay = "an upcoming dinner";
   if (member) {
-    const { data: latestTicket } = await supabase
+    const { data: latestTicket } = await admin
       .from("tickets")
       .select("dinners(date)")
       .eq("member_id", member.id)
