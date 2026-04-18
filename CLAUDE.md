@@ -217,7 +217,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 
 ## What's done (Phase 3, in progress)
 
-- Admin dashboard home page (`/admin`): next-dinner stats (date, days until, new apps, tickets sold), collapsible accordion sections (pending applications, unfulfilled tickets needing action, marketing opt-outs). Unfulfilled tickets queue only shows `fulfillment_status = 'pending'` — refunded and credited tickets are excluded.
+- Admin dashboard home page (`/admin`): next-dinner stats (date, days until, new apps, tickets sold), collapsible accordion sections (pending applications, marketing opt-outs).
 - Schema: `marketing_opted_out_at` TIMESTAMPTZ on members, with trigger on `marketing_opted_in` changes; backfilled 85 existing opt-outs
 - Schema: `first_dinner_attended` DATE on members; backfilled from earliest non-refunded/credited ticket
 - Schema: renamed `has_attended` → `has_community_access` (all code references updated)
@@ -243,6 +243,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Refund flow: qty=1 sets `fulfillment_status = 'refunded'`, existing triggers recalculate dates. qty=2 offers "Refund Guest Only" (decrements quantity to 1, halves amount_paid, keeps status) or "Refund Both" (sets status to refunded). Confirmation modal for all refunds.
 - Credit flow: sets ticket `fulfillment_status = 'credited'`, creates a `credits` row with `source_ticket_id` and `status = 'outstanding'`. Confirmation modal.
 - Apply Credit on member detail page: "Apply Credit" button shown at top of column two when member has unredeemed credits (`credits.status = 'outstanding'` AND `redeemed_ticket_id IS NULL`). On confirm: computes target dinner via `getTargetDinner()`, inserts ticket as pending then updates to fulfilled (fires both insert and fulfillment triggers), sets `payment_source = 'credit'`, `amount_paid = 0`, marks oldest unredeemed credit as redeemed. Button stays visible if multiple credits remain.
+- Kicked-out member exclusion from dinner views: approved applications whose linked member has `kicked_out = true` are excluded from dinner funnel counts (Applied/Approved columns on dinners list) and "Approved Without Ticket" lists on dinner detail pages. Applications inbox and tickets are unaffected.
 
 ## What's NOT done
 
@@ -287,3 +288,4 @@ Remaining Phase 3 work:
 - **Vercel preview env vars partially missing.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are not set for the preview environment due to a Vercel CLI plugin bug. Add manually in Vercel dashboard if branch deploys are needed.
 - **Supabase built-in SMTP is rate-limited.** Magic link requests are capped at 1 per 60 seconds per email, with an hourly sending cap. Must switch to Resend before launch.
 - **Supabase/PostgREST default row cap.** Supabase limits query results to 1,000 rows by default. This is silent — no error, just truncated results. Any query that might return more than 1,000 rows MUST paginate. This has caused bugs across multiple projects. Always account for it.
+- **Portal pages use admin client for data queries.** RLS policies on most tables (tickets, dinners, applications, members) only grant SELECT to admin/team. Portal pages authenticate the user via the session client (`createClient`), then use the admin client (`createAdminClient`) for all data reads and writes. This is the same pattern as the `/apply` form.
