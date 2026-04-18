@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDate, formatStageType } from "@/lib/format";
+import AddMemberModal from "./add-member-modal";
 
 type MemberEmail = {
   id: string;
@@ -50,10 +52,14 @@ function getSortValue(member: Member, key: SortKey): string {
 
 export default function MembersTable({
   members,
+  upcomingDinners,
 }: {
   members: Member[];
+  upcomingDinners: { id: string; date: string }[];
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -93,7 +99,7 @@ export default function MembersTable({
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-4">
         <input
           type="text"
           placeholder="Search by name or email..."
@@ -101,7 +107,24 @@ export default function MembersTable({
           onChange={(e) => setSearch(e.target.value)}
           className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="whitespace-nowrap rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+        >
+          Add Member
+        </button>
       </div>
+
+      {showAddModal && (
+        <AddMemberModal
+          dinners={upcomingDinners}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            setShowAddModal(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
