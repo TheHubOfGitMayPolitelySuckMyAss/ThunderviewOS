@@ -46,7 +46,7 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 
 Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`. Phase 2 schema additions (`email_status`, historical enum values) applied via `tmp/import.sql`.
 
-- `dinners` — first-Thursday-of-month events, auto-generated 12 months out, skipping Jan/Jul. Date is UNIQUE.
+- `dinners` — first-Thursday-of-month events, auto-generated 12 months out via Vercel Cron (`/api/cron/generate-dinner`), skipping Jan/Jul. Date is UNIQUE. Cron fires daily at 1pm UTC; handler runs only on the day after the first Thursday of each month.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `first_name` + `last_name` (same split as members). `member_id` is NULL until approved.
 - `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). Key trigger-managed columns:
   - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. One-way by default; does not revert on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
@@ -99,6 +99,8 @@ src/
 │   ├── portal/
 │   │   ├── page.tsx                    # Authenticated landing: auth check, role check, admin button for admin/team, sign out
 │   │   └── sign-out-button.tsx         # Client component: sign-out button (inline, not shared with admin-shell)
+│   ├── api/cron/generate-dinner/
+│   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
 │   └── admin/
 │       ├── layout.tsx                  # Auth check + role detection (server component)
 │       ├── admin-shell.tsx             # Sidebar nav, header, sign-out (client component)
@@ -128,7 +130,7 @@ src/
 │           ├── page.tsx                # Server wrapper
 │           └── credits-table.tsx       # Filter, sortable columns, sticky header
 ├── lib/
-│   └── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, getTodayMT, toDateMT)
+│   └── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, getTodayMT, toDateMT, firstThursdayOf)
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()

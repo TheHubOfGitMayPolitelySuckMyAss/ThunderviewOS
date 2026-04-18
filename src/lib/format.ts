@@ -56,6 +56,19 @@ export function getTodayMT(): string {
 }
 
 /**
+ * Compute the first Thursday of a given month.
+ * Returns YYYY-MM-DD string.
+ */
+export function firstThursdayOf(year: number, month: number): string {
+  // month is 1-indexed
+  const d = new Date(year, month - 1, 1); // local date, day 1
+  const dow = d.getDay(); // 0=Sun..6=Sat, Thu=4
+  const offset = (4 - dow + 7) % 7;
+  const day = 1 + offset;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
  * Convert a TIMESTAMPTZ string to a YYYY-MM-DD date in Mountain Time.
  */
 export function toDateMT(timestamptz: string): string {
