@@ -192,7 +192,7 @@ export default function MemberDetail({
                 ? `Last updated ${formatDate(m.ask_updated_at)}`
                 : undefined
             }
-            onSaved={(v) => setM({ ...m, current_ask: v as string | null, ask_updated_at: new Date().toISOString() })}
+            onSaved={(v) => setM({ ...m, current_ask: v as string | null })}
           />
 
           <EditableField

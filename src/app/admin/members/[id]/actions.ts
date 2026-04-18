@@ -11,12 +11,8 @@ export async function updateMemberField(
   const admin = createAdminClient();
 
   const updates: Record<string, unknown> = { [field]: value };
-
-  // If updating current_ask, also set ask_updated_at
-  if (field === "current_ask") {
-    updates.ask_updated_at = new Date().toISOString();
-  }
-  // intro_updated_at is handled by the DB trigger
+  // intro_updated_at and ask_updated_at are NOT set by admin edits.
+  // These timestamps are only set by the portal save action (Phase 4).
 
   const { error } = await admin
     .from("members")
