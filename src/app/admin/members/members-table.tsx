@@ -209,11 +209,11 @@ export default function MembersTable({
                 Email Addresses
               </dt>
               <dd className="mt-1">
-                <div className="rounded-md border border-gray-200">
+                <div>
                   {selected.member_emails.map((me) => (
                     <div
                       key={me.id}
-                      className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-3 py-2 last:border-b-0"
+                      className="flex flex-wrap items-center gap-2 py-1"
                     >
                       <span className="text-sm text-gray-900">{me.email}</span>
                       <span className="text-xs text-gray-400">{me.source}</span>
