@@ -69,7 +69,7 @@ export default async function DashboardPage() {
     .select(
       "id, purchased_at, fulfillment_status, buyer_email, member_id, members(name, kicked_out, member_emails(email, is_primary)), dinner_id, dinners(date)"
     )
-    .neq("fulfillment_status", "fulfilled")
+    .eq("fulfillment_status", "pending")
     .order("purchased_at", { ascending: false });
 
   // Check which unfulfilled ticket buyer_emails have pending/rejected applications
@@ -116,10 +116,6 @@ export default async function DashboardPage() {
       reason = "Rejected applicant";
     } else if (ticket.buyer_email && appStatusByEmail[ticket.buyer_email] === "pending") {
       reason = "Pending applicant";
-    } else if (ticket.fulfillment_status === "refunded") {
-      reason = "Refunded";
-    } else if (ticket.fulfillment_status === "credited") {
-      reason = "Credited";
     }
 
     const displayName =

@@ -170,17 +170,7 @@ export default function DashboardAccordions({
                     {new Date(ticket.purchasedAt).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-2 text-sm">
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                        ticket.fulfillmentStatus === "pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : ticket.fulfillmentStatus === "refunded"
-                            ? "bg-gray-100 text-gray-800"
-                            : ticket.fulfillmentStatus === "credited"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
+                    <span className="inline-block rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
                       {ticket.fulfillmentStatus}
                     </span>
                   </td>
