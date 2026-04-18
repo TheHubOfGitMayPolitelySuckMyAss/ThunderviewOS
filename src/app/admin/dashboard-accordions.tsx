@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/format";
 
 type PendingApp = {
   id: string;
-  name: string;
+  name: string; // pre-formatted full name
   company_name: string;
   submitted_on: string;
 };
@@ -23,7 +23,7 @@ type UnfulfilledTicket = {
 
 type OptOut = {
   id: string;
-  name: string;
+  name: string; // pre-formatted full name
   marketingOptedOutAt: string;
 };
 

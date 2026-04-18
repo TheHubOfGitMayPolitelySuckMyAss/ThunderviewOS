@@ -67,7 +67,8 @@ export default async function MemberDetailPage({
   // Shape member data for client component (exclude nested applications/tickets)
   const memberData = {
     id: member.id,
-    name: member.name,
+    first_name: member.first_name,
+    last_name: member.last_name,
     company_name: member.company_name,
     company_website: member.company_website,
     linkedin_profile: member.linkedin_profile,

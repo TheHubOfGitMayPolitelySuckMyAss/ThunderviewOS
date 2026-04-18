@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatDate, formatStageType } from "@/lib/format";
+import { formatDate, formatName, formatStageType } from "@/lib/format";
 import {
   updateMemberField,
   toggleMemberFlag,
@@ -43,7 +43,8 @@ type MemberEmail = {
 
 type MemberData = {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   company_name: string | null;
   company_website: string | null;
   linkedin_profile: string | null;
@@ -90,12 +91,20 @@ export default function MemberDetail({
         {/* Column One */}
         <div className="space-y-4">
           <EditableField
-            label="Name"
-            value={m.name}
+            label="First Name"
+            value={m.first_name}
             memberId={m.id}
-            field="name"
+            field="first_name"
             type="text"
-            onSaved={(v) => setM({ ...m, name: v as string })}
+            onSaved={(v) => setM({ ...m, first_name: v as string })}
+          />
+          <EditableField
+            label="Last Name"
+            value={m.last_name}
+            memberId={m.id}
+            field="last_name"
+            type="text"
+            onSaved={(v) => setM({ ...m, last_name: v as string })}
           />
           <EditableField
             label="Company"
@@ -265,9 +274,10 @@ export default function MemberDetail({
 // ── Heading ──
 
 function Heading({ member }: { member: MemberData }) {
+  const fullName = formatName(member.first_name, member.last_name);
   const heading = member.company_name
-    ? `${member.name} at ${member.company_name}`
-    : member.name;
+    ? `${fullName} at ${member.company_name}`
+    : fullName;
 
   return (
     <h3
@@ -527,8 +537,8 @@ function RemoveReinstateSection({ member }: { member: MemberData }) {
           <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
             <p className="text-sm text-gray-900">
               {isRemove
-                ? `Remove ${member.name} from Thunderview? This will block all emails and flag future ticket purchases for refund.`
-                : `Reinstate ${member.name}? This will restore their membership and marketing emails.`}
+                ? `Remove ${formatName(member.first_name, member.last_name)} from Thunderview? This will block all emails and flag future ticket purchases for refund.`
+                : `Reinstate ${formatName(member.first_name, member.last_name)}? This will restore their membership and marketing emails.`}
             </p>
             <div className="mt-4 flex justify-end gap-3">
               <button

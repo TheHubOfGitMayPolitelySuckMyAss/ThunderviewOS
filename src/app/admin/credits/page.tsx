@@ -8,7 +8,7 @@ export default async function CreditsPage() {
   const { data: credits } = await supabase
     .from("credits")
     .select(
-      "*, members(name, member_emails(email, is_primary)), source_ticket:tickets!source_ticket_id(dinner_id, dinners(date)), redeemed_ticket:tickets!redeemed_ticket_id(dinner_id, dinners(date))"
+      "*, members(first_name, last_name, member_emails(email, is_primary)), source_ticket:tickets!source_ticket_id(dinner_id, dinners(date)), redeemed_ticket:tickets!redeemed_ticket_id(dinner_id, dinners(date))"
     )
     .order("created_at", { ascending: false });
 

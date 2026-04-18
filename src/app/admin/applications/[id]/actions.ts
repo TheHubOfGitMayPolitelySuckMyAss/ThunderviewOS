@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { formatName } from "@/lib/format";
 
 type ApproveResult = {
   success: boolean;
@@ -128,9 +129,9 @@ export async function searchMembers(
 
   const { data } = await supabase
     .from("members")
-    .select("id, name, company_name, member_emails(email, is_primary)")
-    .or(`name.ilike.%${query}%`)
-    .order("name")
+    .select("id, first_name, last_name, company_name, member_emails(email, is_primary)")
+    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+    .order("first_name")
     .limit(10);
 
   return (data || []).map((m) => {
@@ -139,7 +140,7 @@ export async function searchMembers(
       emails?.find((e) => e.is_primary)?.email ?? emails?.[0]?.email ?? "-";
     return {
       id: m.id,
-      name: m.name,
+      name: formatName(m.first_name, m.last_name),
       company_name: m.company_name,
       primary_email: primary,
     };

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { formatDate, formatStageType } from "@/lib/format";
+import { formatDate, formatName, formatStageType } from "@/lib/format";
 import { checkEmail, addMember } from "./actions";
 import type { EmailCheckResult } from "./actions";
 
@@ -48,7 +48,8 @@ export default function AddMemberModal({
   onClose: () => void;
   onSuccess: (name: string) => void;
 }) {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
@@ -94,7 +95,8 @@ export default function AddMemberModal({
 
     startTransition(async () => {
       const result = await addMember({
-        name,
+        firstName,
+        lastName,
         email,
         companyName,
         companyWebsite,
@@ -107,7 +109,7 @@ export default function AddMemberModal({
       });
 
       if (result.success) {
-        onSuccess(name);
+        onSuccess(formatName(firstName, lastName));
       } else {
         setError(result.error || "Failed to add member");
       }
@@ -132,17 +134,30 @@ export default function AddMemberModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className={labelClass}>
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClass}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className={inputClass}
+              />
+            </div>
           </div>
 
           <div>

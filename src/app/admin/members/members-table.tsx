@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatDate, formatStageType } from "@/lib/format";
+import { formatDate, formatName, formatStageType } from "@/lib/format";
 import AddMemberModal from "./add-member-modal";
 
 type MemberEmail = {
@@ -16,7 +16,8 @@ type MemberEmail = {
 
 type Member = {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   member_emails: MemberEmail[];
   contact_preference: string;
   linkedin_profile: string | null;
@@ -41,7 +42,7 @@ type SortDir = "asc" | "desc";
 
 function getSortValue(member: Member, key: SortKey): string {
   switch (key) {
-    case "name": return member.name.toLowerCase();
+    case "name": return formatName(member.first_name, member.last_name).toLowerCase();
     case "email": return getPrimaryEmail(member).toLowerCase();
     case "company": return (member.company_name || "").toLowerCase();
     case "stage": return (member.attendee_stagetype || "").toLowerCase();
@@ -74,13 +75,16 @@ export default function MembersTable({
   }
 
   const filtered = search
-    ? members.filter(
-        (m) =>
-          m.name.toLowerCase().includes(search.toLowerCase()) ||
-          m.member_emails.some((e) =>
-            e.email.toLowerCase().includes(search.toLowerCase())
-          )
-      )
+    ? members.filter((m) => {
+        const s = search.toLowerCase();
+        const fullName = formatName(m.first_name, m.last_name).toLowerCase();
+        return (
+          m.first_name.toLowerCase().includes(s) ||
+          m.last_name.toLowerCase().includes(s) ||
+          fullName.includes(s) ||
+          m.member_emails.some((e) => e.email.toLowerCase().includes(s))
+        );
+      })
     : members;
 
   const sorted = [...filtered].sort((a, b) => {
@@ -179,7 +183,7 @@ export default function MembersTable({
                     href={`/admin/members/${member.id}`}
                     className="after:absolute after:inset-0"
                   >
-                    {member.name}
+                    {formatName(member.first_name, member.last_name)}
                   </Link>
                 </td>
                 <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>

@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatDate, formatStageType } from "@/lib/format";
+import { formatDate, formatName, formatStageType } from "@/lib/format";
 import {
   approveApplication,
   rejectApplication,
@@ -21,7 +21,8 @@ const REJECTION_REASONS = ["Service Provider", "services business", "Other"];
 
 type ApplicationData = {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   company_name: string;
   company_website: string;
@@ -61,7 +62,8 @@ export default function ApplicationDetail({
     setApp(application);
   }, [application]);
 
-  const heading = `${app.name} at ${app.company_name}`;
+  const fullName = formatName(app.first_name, app.last_name);
+  const heading = `${fullName} at ${app.company_name}`;
   const isActiveCEO =
     app.attendee_stagetype === "Active CEO (Bootstrapping or VC-Backed)";
 
@@ -78,7 +80,7 @@ export default function ApplicationDetail({
       }
       if (result.success) {
         if (result.isExisting) {
-          setToast(`${app.name} is already a member — application linked.`);
+          setToast(`${fullName} is already a member — application linked.`);
           setTimeout(() => setToast(null), 4000);
         }
         router.refresh();
@@ -250,7 +252,7 @@ export default function ApplicationDetail({
       {showRejectModal && (
         <RejectModal
           applicationId={app.id}
-          name={app.name}
+          name={fullName}
           onClose={() => setShowRejectModal(false)}
           onRejected={() => {
             setShowRejectModal(false);

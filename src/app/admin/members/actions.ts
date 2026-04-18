@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { formatName } from "@/lib/format";
 
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
@@ -15,7 +16,7 @@ export async function checkEmail(email: string): Promise<EmailCheckResult> {
   // Check member_emails for existing member
   const { data: memberEmail } = await supabase
     .from("member_emails")
-    .select("member_id, members(id, name)")
+    .select("member_id, members(id, first_name, last_name)")
     .eq("email", email.toLowerCase())
     .limit(1)
     .single();
@@ -23,9 +24,10 @@ export async function checkEmail(email: string): Promise<EmailCheckResult> {
   if (memberEmail?.members) {
     const member = memberEmail.members as unknown as {
       id: string;
-      name: string;
+      first_name: string;
+      last_name: string;
     };
-    return { existingMember: { id: member.id, name: member.name } };
+    return { existingMember: { id: member.id, name: formatName(member.first_name, member.last_name) } };
   }
 
   // Check applications for pending/rejected
@@ -46,7 +48,8 @@ export async function checkEmail(email: string): Promise<EmailCheckResult> {
 }
 
 export async function addMember(formData: {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   companyName: string;
   companyWebsite: string;
@@ -63,7 +66,8 @@ export async function addMember(formData: {
     formData.attendeeStagetype === "Active CEO (Bootstrapping or VC-Backed)";
 
   const { data, error } = await admin.rpc("add_member_with_application", {
-    p_name: formData.name,
+    p_first_name: formData.firstName,
+    p_last_name: formData.lastName,
     p_email: formData.email.toLowerCase(),
     p_company_name: formData.companyName,
     p_company_website: formData.companyWebsite || null,

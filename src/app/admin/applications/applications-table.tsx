@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatDate, formatStageType } from "@/lib/format";
+import { formatDate, formatName, formatStageType } from "@/lib/format";
 
 type Application = {
   id: string;
   submitted_on: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   company_name: string;
   attendee_stagetype: string;
@@ -22,7 +23,7 @@ type SortDir = "asc" | "desc";
 
 function getSortValue(app: Application, key: SortKey): string {
   switch (key) {
-    case "name": return app.name.toLowerCase();
+    case "name": return formatName(app.first_name, app.last_name).toLowerCase();
     case "email": return app.email.toLowerCase();
     case "company": return app.company_name.toLowerCase();
     case "stage": return app.attendee_stagetype.toLowerCase();
@@ -129,7 +130,7 @@ export default function ApplicationsTable({
                     href={`/admin/applications/${app.id}`}
                     className="after:absolute after:inset-0"
                   >
-                    {app.name}
+                    {formatName(app.first_name, app.last_name)}
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">

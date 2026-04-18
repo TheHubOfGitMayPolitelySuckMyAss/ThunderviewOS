@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import DashboardAccordions from "./dashboard-accordions";
-import { formatDate, getTodayMT } from "@/lib/format";
+import { formatDate, formatName, getTodayMT } from "@/lib/format";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
   // Pending applications
   const { data: pendingApps } = await supabase
     .from("applications")
-    .select("id, name, company_name, submitted_on")
+    .select("id, first_name, last_name, company_name, submitted_on")
     .eq("status", "pending")
     .order("submitted_on", { ascending: false });
 
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const { data: unfulfilledTickets } = await supabase
     .from("tickets")
     .select(
-      "id, purchased_at, fulfillment_status, buyer_email, member_id, members(name, kicked_out, member_emails(email, is_primary)), dinner_id, dinners(date)"
+      "id, purchased_at, fulfillment_status, buyer_email, member_id, members(first_name, last_name, kicked_out, member_emails(email, is_primary)), dinner_id, dinners(date)"
     )
     .eq("fulfillment_status", "pending")
     .order("purchased_at", { ascending: false });
@@ -92,14 +92,15 @@ export default async function DashboardPage() {
   // Marketing opt-outs
   const { data: optOuts } = await supabase
     .from("members")
-    .select("id, name, marketing_opted_out_at")
+    .select("id, first_name, last_name, marketing_opted_out_at")
     .not("marketing_opted_out_at", "is", null)
     .order("marketing_opted_out_at", { ascending: false });
 
   // Derive unfulfilled reason for each ticket
   const unfulfilledWithReason = (unfulfilledTickets || []).map((ticket) => {
     const member = ticket.members as unknown as {
-      name: string;
+      first_name: string;
+      last_name: string;
       kicked_out: boolean;
       member_emails: { email: string; is_primary: boolean }[];
     } | null;
@@ -116,8 +117,9 @@ export default async function DashboardPage() {
       reason = "Pending applicant";
     }
 
-    const displayName =
-      member?.name ?? ticket.buyer_email ?? "Unknown";
+    const displayName = member
+      ? formatName(member.first_name, member.last_name)
+      : ticket.buyer_email ?? "Unknown";
     const displayEmail =
       member?.member_emails?.find((e) => e.is_primary)?.email ??
       member?.member_emails?.[0]?.email ??
@@ -179,12 +181,17 @@ export default async function DashboardPage() {
 
       {/* Accordion sections */}
       <DashboardAccordions
-        pendingApps={pendingApps || []}
+        pendingApps={(pendingApps || []).map((a) => ({
+          id: a.id,
+          name: formatName(a.first_name, a.last_name),
+          company_name: a.company_name,
+          submitted_on: a.submitted_on,
+        }))}
         unfulfilledTickets={unfulfilledWithReason}
         optOuts={
           (optOuts || []).map((m) => ({
             id: m.id,
-            name: m.name,
+            name: formatName(m.first_name, m.last_name),
             marketingOptedOutAt: m.marketing_opted_out_at,
           }))
         }

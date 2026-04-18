@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
+import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -54,7 +54,7 @@ export default async function DinnerDetailPage({
 
   const { data: tickets } = await supabase
     .from("tickets")
-    .select("*, members(id, name, current_intro, current_ask, ask_updated_at, last_dinner_attended, member_emails(email, is_primary))")
+    .select("*, members(id, first_name, last_name, current_intro, current_ask, ask_updated_at, last_dinner_attended, member_emails(email, is_primary))")
     .eq("dinner_id", id)
     .order("purchased_at", { ascending: false });
 
@@ -159,7 +159,8 @@ export default async function DinnerDetailPage({
               {tickets?.map((ticket) => {
                 const member = ticket.members as unknown as {
                   id: string;
-                  name: string;
+                  first_name: string;
+                  last_name: string;
                   current_intro: string | null;
                   current_ask: string | null;
                   ask_updated_at: string | null;
@@ -180,7 +181,7 @@ export default async function DinnerDetailPage({
                           href={`/admin/members/${member.id}`}
                           className="after:absolute after:inset-0"
                         >
-                          {member.name}
+                          {formatName(member.first_name, member.last_name)}
                         </Link>
                       ) : (
                         "-"
@@ -253,7 +254,7 @@ export default async function DinnerDetailPage({
                       href={`/admin/applications/${app.id}`}
                       className="after:absolute after:inset-0"
                     >
-                      {app.name}
+                      {formatName(app.first_name, app.last_name)}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">

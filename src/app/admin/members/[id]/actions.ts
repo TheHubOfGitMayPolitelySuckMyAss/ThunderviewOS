@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { formatName } from "@/lib/format";
 
 export async function updateMemberField(
   memberId: string,
@@ -125,18 +126,19 @@ export async function checkEmailForMember(
 
   const { data: memberEmail } = await supabase
     .from("member_emails")
-    .select("member_id, members(id, name)")
+    .select("member_id, members(id, first_name, last_name)")
     .eq("email", email.toLowerCase())
     .limit(1)
     .single();
 
   if (memberEmail?.members) {
-    const member = memberEmail.members as unknown as { id: string; name: string };
+    const member = memberEmail.members as unknown as { id: string; first_name: string; last_name: string };
+    const name = formatName(member.first_name, member.last_name);
     if (member.id !== excludeMemberId) {
-      return { existingMember: { id: member.id, name: member.name } };
+      return { existingMember: { id: member.id, name } };
     }
     // Email already belongs to this member
-    return { existingMember: { id: member.id, name: member.name } };
+    return { existingMember: { id: member.id, name } };
   }
 
   const { data: apps } = await supabase

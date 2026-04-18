@@ -1,3 +1,8 @@
+/** Concatenate first_name + last_name for display. */
+export function formatName(first_name: string, last_name: string): string {
+  return last_name ? `${first_name} ${last_name}` : first_name;
+}
+
 /** Display-friendly stage/type labels. Stored values are unchanged. */
 export function formatStageType(raw: string | null | undefined): string {
   if (!raw) return "-";

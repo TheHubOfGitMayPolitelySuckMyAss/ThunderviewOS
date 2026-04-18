@@ -7,7 +7,7 @@ export default async function MembersPage() {
   const { data: members } = await supabase
     .from("members")
     .select("*, member_emails(id, email, is_primary, source, email_status)")
-    .order("name", { ascending: true });
+    .order("first_name", { ascending: true });
 
   const today = getTodayMT();
   const { data: upcomingDinners } = await supabase

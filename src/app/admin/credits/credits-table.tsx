@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatName } from "@/lib/format";
 
 type Credit = {
   id: string;
@@ -11,7 +11,7 @@ type Credit = {
   redeemed_ticket_id: string | null;
   created_at: string;
   redeemed_at: string | null;
-  members: { name: string; member_emails: { email: string; is_primary: boolean }[] } | null;
+  members: { first_name: string; last_name: string; member_emails: { email: string; is_primary: boolean }[] } | null;
   source_ticket: { dinner_id: string; dinners: { date: string } | null } | null;
   redeemed_ticket: {
     dinner_id: string;
@@ -31,7 +31,7 @@ function getPrimaryEmail(credit: Credit): string {
 
 function getSortValue(credit: Credit, key: SortKey): string {
   switch (key) {
-    case "member": return (credit.members?.name || "").toLowerCase();
+    case "member": return (credit.members ? formatName(credit.members.first_name, credit.members.last_name) : "").toLowerCase();
     case "email": return getPrimaryEmail(credit).toLowerCase();
     case "sourceDinner": return credit.source_ticket?.dinners?.date || "";
     case "status": return credit.status;
@@ -122,7 +122,7 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
             {sorted.map((credit) => (
               <tr key={credit.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm text-gray-900">
-                  {credit.members?.name || "-"}
+                  {credit.members ? formatName(credit.members.first_name, credit.members.last_name) : "-"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {getPrimaryEmail(credit)}
