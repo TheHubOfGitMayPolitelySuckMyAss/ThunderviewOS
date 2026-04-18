@@ -22,7 +22,7 @@ export default function AddMemberModal({
 }: {
   dinners: Dinner[];
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (name: string) => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -77,7 +77,7 @@ export default function AddMemberModal({
       });
 
       if (result.success) {
-        onSuccess();
+        onSuccess(name);
       } else {
         setError(result.error || "Failed to add member");
       }

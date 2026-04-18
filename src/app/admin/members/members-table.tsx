@@ -60,6 +60,7 @@ export default function MembersTable({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addedName, setAddedName] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -119,11 +120,28 @@ export default function MembersTable({
         <AddMemberModal
           dinners={upcomingDinners}
           onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
+          onSuccess={(name) => {
             setShowAddModal(false);
+            setAddedName(name);
             router.refresh();
           }}
         />
+      )}
+
+      {addedName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 rounded-lg bg-white px-8 py-6 text-center shadow-xl">
+            <p className="text-lg font-semibold text-gray-900">
+              {addedName} added!
+            </p>
+            <button
+              onClick={() => setAddedName(null)}
+              className="mt-4 rounded-md bg-gray-900 px-6 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              Onwards!
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
