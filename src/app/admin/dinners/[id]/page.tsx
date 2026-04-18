@@ -177,7 +177,7 @@ export default async function DinnerDetailPage({
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {member?.id ? (
                         <Link
-                          href={`/admin/members?selected=${member.id}`}
+                          href={`/admin/members/${member.id}`}
                           className="after:absolute after:inset-0"
                         >
                           {member.name}
@@ -250,7 +250,7 @@ export default async function DinnerDetailPage({
                 <tr key={app.id} className="group relative hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900">
                     <Link
-                      href={`/admin/applications?selected=${app.id}`}
+                      href={`/admin/applications/${app.id}`}
                       className="after:absolute after:inset-0"
                     >
                       {app.name}

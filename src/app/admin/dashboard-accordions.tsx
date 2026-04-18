@@ -95,7 +95,7 @@ export default function DashboardAccordions({
                 <tr key={app.id} className="group relative hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm text-gray-900">
                     <Link
-                      href={`/admin/applications?selected=${app.id}`}
+                      href={`/admin/applications/${app.id}`}
                       className="after:absolute after:inset-0"
                     >
                       {app.name}
@@ -207,7 +207,7 @@ export default function DashboardAccordions({
                 <tr key={m.id} className="group relative hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm text-gray-900">
                     <Link
-                      href={`/admin/members?selected=${m.id}`}
+                      href={`/admin/members/${m.id}`}
                       className="after:absolute after:inset-0"
                     >
                       {m.name}

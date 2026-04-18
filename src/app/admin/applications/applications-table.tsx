@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { formatStageType } from "@/lib/format";
 
 type Application = {
@@ -8,22 +9,10 @@ type Application = {
   submitted_on: string;
   name: string;
   email: string;
-  gender: string;
-  race: string;
-  orientation: string;
   company_name: string;
-  company_website: string;
   attendee_stagetype: string;
   preferred_dinner_date: string;
-  i_am_my_startups_ceo: string | null;
-  my_startup_is_not_a_services_business: string | null;
-  linkedin_profile: string;
   status: string;
-  member_id: string | null;
-  rejection_reason: string | null;
-  created_at: string;
-  reviewed_at: string | null;
-  reviewed_by: string | null;
 };
 
 const filters = ["All", "Pending", "Approved", "Rejected"] as const;
@@ -45,17 +34,10 @@ function getSortValue(app: Application, key: SortKey): string {
 
 export default function ApplicationsTable({
   applications,
-  initialSelectedId,
 }: {
   applications: Application[];
-  initialSelectedId?: string;
 }) {
   const [filter, setFilter] = useState<string>("All");
-  const [selected, setSelected] = useState<Application | null>(
-    initialSelectedId
-      ? applications.find((a) => a.id === initialSelectedId) ?? null
-      : null
-  );
   const [sortKey, setSortKey] = useState<SortKey>("submitted");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -81,64 +63,6 @@ export default function ApplicationsTable({
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
     return sortDir === "asc" ? cmp : -cmp;
   });
-
-  if (selected) {
-    return (
-      <div className="rounded-lg bg-white p-6 shadow">
-        <button
-          onClick={() => setSelected(null)}
-          className="mb-4 text-sm text-blue-600 hover:text-blue-800"
-        >
-          &larr; Back to list
-        </button>
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          {selected.name}
-        </h3>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
-          {[
-            ["Email", selected.email],
-            ["Company", selected.company_name],
-            ["Website", selected.company_website],
-            ["Stage/Type", formatStageType(selected.attendee_stagetype)],
-            [
-              "Preferred Dinner",
-              new Date(
-                selected.preferred_dinner_date + "T00:00:00"
-              ).toLocaleDateString(),
-            ],
-            ["LinkedIn", selected.linkedin_profile],
-            ["Gender", selected.gender],
-            ["Race", selected.race],
-            ["Orientation", selected.orientation],
-            ["I am my startup's CEO", selected.i_am_my_startups_ceo || "N/A"],
-            [
-              "Not a services business",
-              selected.my_startup_is_not_a_services_business || "N/A",
-            ],
-            ["Status", selected.status],
-            ["Rejection Reason", selected.rejection_reason || "N/A"],
-            [
-              "Submitted",
-              new Date(selected.submitted_on).toLocaleString(),
-            ],
-            [
-              "Reviewed",
-              selected.reviewed_at
-                ? new Date(selected.reviewed_at).toLocaleString()
-                : "Not yet",
-            ],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-xs font-medium uppercase text-gray-500">
-                {label}
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    );
-  }
 
   const thClass =
     "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
@@ -198,10 +122,16 @@ export default function ApplicationsTable({
             {sorted.map((app) => (
               <tr
                 key={app.id}
-                onClick={() => setSelected(app)}
-                className="cursor-pointer hover:bg-gray-50"
+                className="group relative cursor-pointer hover:bg-gray-50"
               >
-                <td className="px-4 py-3 text-sm text-gray-900">{app.name}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  <Link
+                    href={`/admin/applications/${app.id}`}
+                    className="after:absolute after:inset-0"
+                  >
+                    {app.name}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {app.email}
                 </td>
