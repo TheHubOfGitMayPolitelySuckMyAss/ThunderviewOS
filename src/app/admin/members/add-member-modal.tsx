@@ -13,6 +13,30 @@ const STAGE_OPTIONS = [
   "Guest (Speaker/Press/Etc)",
 ];
 
+const GENDER_OPTIONS = [
+  "Prefer not to say",
+  "Male",
+  "Female",
+  "Other",
+];
+
+const RACE_OPTIONS = [
+  "Prefer not to say",
+  "American Indian or Alaska Native",
+  "Asian",
+  "Black or African American",
+  "Hispanic or Latino",
+  "Middle Eastern or North African",
+  "Native Hawaiian or Other Pacific Islander",
+  "White",
+];
+
+const ORIENTATION_OPTIONS = [
+  "Prefer not to say",
+  "Straight",
+  "LGBTQ+",
+];
+
 type Dinner = { id: string; date: string };
 
 export default function AddMemberModal({
@@ -30,6 +54,9 @@ export default function AddMemberModal({
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [linkedinProfile, setLinkedinProfile] = useState("");
   const [attendeeStagetype, setAttendeeStagetype] = useState(STAGE_OPTIONS[0]);
+  const [gender, setGender] = useState("Prefer not to say");
+  const [race, setRace] = useState("Prefer not to say");
+  const [orientation, setOrientation] = useState("Prefer not to say");
   const [preferredDinnerDate, setPreferredDinnerDate] = useState(
     dinners[0]?.date ?? ""
   );
@@ -74,6 +101,9 @@ export default function AddMemberModal({
         linkedinProfile,
         attendeeStagetype,
         preferredDinnerDate,
+        gender,
+        race,
+        orientation,
       });
 
       if (result.success) {
@@ -210,6 +240,51 @@ export default function AddMemberModal({
               {STAGE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
                   {formatStageType(opt)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Gender</label>
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              className={inputClass}
+            >
+              {GENDER_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Race/Ethnicity</label>
+            <select
+              value={race}
+              onChange={(e) => setRace(e.target.value)}
+              className={inputClass}
+            >
+              {RACE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Orientation</label>
+            <select
+              value={orientation}
+              onChange={(e) => setOrientation(e.target.value)}
+              className={inputClass}
+            >
+              {ORIENTATION_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
                 </option>
               ))}
             </select>

@@ -53,6 +53,9 @@ export async function addMember(formData: {
   linkedinProfile: string;
   attendeeStagetype: string;
   preferredDinnerDate: string;
+  gender: string;
+  race: string;
+  orientation: string;
 }): Promise<{ success: boolean; error?: string; memberId?: string }> {
   const admin = createAdminClient();
 
@@ -67,6 +70,9 @@ export async function addMember(formData: {
     p_linkedin_profile: formData.linkedinProfile || null,
     p_attendee_stagetype: formData.attendeeStagetype,
     p_preferred_dinner_date: formData.preferredDinnerDate,
+    p_gender: formData.gender,
+    p_race: formData.race,
+    p_orientation: formData.orientation,
     p_i_am_ceo: isActiveCEO ? "Yes" : null,
     p_not_services: isActiveCEO ? "Yes" : null,
   });
