@@ -48,7 +48,12 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 - `dinners` — first-Thursday-of-month events, auto-generated 12 months out, skipping Jan/Jul. Date is UNIQUE.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `member_id` is NULL until approved.
-- `members` — approved people, soft-deletable via `kicked_out`. `has_community_access` (renamed from `has_attended`) is one-way — set to `true` on ticket insert, never reverted. `first_dinner_attended` DATE — earliest non-refunded/credited ticket's dinner date, set by trigger on ticket insert, recalculated on refund/credit. `last_dinner_attended` DATE — set by trigger when `fulfillment_status` changes to `fulfilled`, recalculated on refund/credit. `marketing_opted_out_at` TIMESTAMPTZ — set/cleared by trigger when `marketing_opted_in` changes. `updated_at` auto-set by trigger.
+- `members` — approved people, soft-deletable via `kicked_out`. Key trigger-managed columns:
+  - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. One-way by default; does not revert on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
+  - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
+  - `last_dinner_attended` DATE — set on ticket fulfillment (`fulfillment_status` → `'fulfilled'`) to the dinner's date if later than the current value. On refund/credit, recalculated as MAX of remaining fulfilled tickets' dinner dates; null if none remain.
+  - `marketing_opted_out_at` TIMESTAMPTZ — set to `now()` when `marketing_opted_in` flips to `false`, cleared to null when it flips back to `true`. Managed by trigger on UPDATE of `marketing_opted_in`.
+  - `updated_at` — auto-set by trigger.
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (pending/fulfilled/refunded/credited). Tracks payment source and match confidence.
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
@@ -163,20 +168,20 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 
 - Data migration from Google Sheets, Squarespace Orders, Squarespace Contacts, and Streak CRM. 632 members, 825 member_emails, 706 applications, 1,253 historical tickets, 32 dinners imported. 0 credits (none in historical data).
 - Schema additions applied inline via `tmp/import.sql`: `member_emails.email_status` column (`active`/`bounced`), `'historical'` added to `tickets.payment_source` and `tickets.ticket_type` CHECK constraints.
-- Import audit passed: FK integrity, primary email uniqueness, has_attended/ticket consistency, marketing opt-out verification all clean.
+- Import audit passed: FK integrity, primary email uniqueness, has_community_access/ticket consistency, marketing opt-out verification all clean.
 - 65 bounced emails flagged via Squarespace cleaned export. 81 members opted out via Squarespace unsubscribed export.
 - Import artifacts in `tmp/`: `import.sql` (generated SQL), `import_summary.txt`, `import_validation.txt`.
 
 ## What's done (Phase 3, in progress)
 
-- Admin dashboard home page (`/admin`): next-dinner stats (date, days until, new apps, tickets sold), collapsible accordion sections (pending applications, unfulfilled tickets with reason, marketing opt-outs)
+- Admin dashboard home page (`/admin`): next-dinner stats (date, days until, new apps, tickets sold), collapsible accordion sections (pending applications, unfulfilled tickets needing action, marketing opt-outs). Unfulfilled tickets queue only shows `fulfillment_status = 'pending'` — refunded and credited tickets are excluded.
 - Schema: `marketing_opted_out_at` TIMESTAMPTZ on members, with trigger on `marketing_opted_in` changes; backfilled 85 existing opt-outs
 - Schema: `first_dinner_attended` DATE on members; backfilled from earliest non-refunded/credited ticket
 - Schema: renamed `has_attended` → `has_community_access` (all code references updated)
-- Triggers on tickets: `trg_ticket_insert` (sets `has_community_access = true`, sets `first_dinner_attended` if null), `trg_ticket_fulfillment_change` (sets `last_dinner_attended` on fulfill, recalculates both `last_dinner_attended` and `first_dinner_attended` on refund/credit)
-- Dinner detail: "Approved Without Ticket" list replaces raw applications list (filters to approved apps whose member has no ticket); ticket rows link to member detail; application rows link to application detail
+- Triggers on tickets: `trg_ticket_insert` (sets `has_community_access = true` on member, sets `first_dinner_attended` to dinner date if null), `trg_ticket_fulfillment_change` (on fulfill: sets `last_dinner_attended` if later than current; on refund/credit: recalculates `last_dinner_attended` as MAX of remaining fulfilled, reverts `first_dinner_attended` to null if it matched the refunded dinner)
+- Dinner detail: "Approved Without Ticket" list replaces raw applications list. Before dinner date: approved apps whose member has no ticket for this dinner. After dinner date: approved apps whose member had no ticket purchased on or before the dinner date. Ticket rows link to member detail; application rows link to application detail.
 - All list pages: sortable columns (click header to toggle asc/desc), sticky headers
-- Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with strikethrough name
+- Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with full-row strikethrough
 - Member detail: added "First Dinner" and "Community Access" fields; `attendee_stagetype` uses display-friendly labels
 - Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
 - Members search input text color fixed (was invisible against background)
@@ -187,6 +192,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 Phase 1 deliberately excluded these. Don't build them without an explicit prompt:
 
 - Action buttons (approve/reject/fulfill/refund/credit) — Phase 3+
+- `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
 - Attendee portal (intro/ask editor, profile, community directory) — Phase 4
 - Email sending (Resend wiring) — Phase 3+
