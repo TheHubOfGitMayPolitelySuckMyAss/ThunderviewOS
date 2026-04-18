@@ -53,6 +53,14 @@ export default async function MemberDetailPage({
     .sort((a, b) => b.localeCompare(a))
     .filter((d, i, arr) => arr.indexOf(d) === i);
 
+  // Unredeemed credits
+  const { count: unredeemedCredits } = await supabase
+    .from("credits")
+    .select("*", { count: "exact", head: true })
+    .eq("member_id", id)
+    .eq("status", "outstanding")
+    .is("redeemed_ticket_id", null);
+
   // Ask staleness
   const today = getTodayMT();
   const futureTickets = tickets.filter(
@@ -106,6 +114,7 @@ export default async function MemberDetailPage({
         dinnerDates={dinnerDates}
         askIsStale={askIsStale}
         isAdmin={isAdmin}
+        unredeemedCredits={unredeemedCredits ?? 0}
       />
     </div>
   );

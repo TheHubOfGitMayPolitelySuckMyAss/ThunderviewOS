@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import DashboardAccordions from "./dashboard-accordions";
-import { formatDate, formatName, formatTicketName, getTodayMT } from "@/lib/format";
+import { formatDate, formatName, getTodayMT } from "@/lib/format";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -61,84 +61,12 @@ export default async function DashboardPage() {
     .eq("status", "pending")
     .order("submitted_on", { ascending: false });
 
-  // Unfulfilled tickets (anything not fulfilled)
-  const { data: unfulfilledTickets } = await supabase
-    .from("tickets")
-    .select(
-      "id, purchased_at, fulfillment_status, quantity, buyer_email, member_id, members(first_name, last_name, kicked_out, member_emails(email, is_primary)), dinner_id, dinners(date)"
-    )
-    .eq("fulfillment_status", "pending")
-    .order("purchased_at", { ascending: false });
-
-  // Check which unfulfilled ticket buyer_emails have pending/rejected applications
-  const buyerEmails = (unfulfilledTickets || [])
-    .map((t) => t.buyer_email)
-    .filter(Boolean) as string[];
-  let appStatusByEmail: Record<string, string> = {};
-  if (buyerEmails.length > 0) {
-    const { data: relatedApps } = await supabase
-      .from("applications")
-      .select("email, status")
-      .in("email", buyerEmails);
-    for (const app of relatedApps || []) {
-      // Keep the "worst" status: rejected > pending > approved
-      const existing = appStatusByEmail[app.email];
-      if (!existing || app.status === "rejected" || (app.status === "pending" && existing !== "rejected")) {
-        appStatusByEmail[app.email] = app.status;
-      }
-    }
-  }
-
   // Marketing opt-outs
   const { data: optOuts } = await supabase
     .from("members")
     .select("id, first_name, last_name, marketing_opted_out_at")
     .not("marketing_opted_out_at", "is", null)
     .order("marketing_opted_out_at", { ascending: false });
-
-  // Derive unfulfilled reason for each ticket
-  const unfulfilledWithReason = (unfulfilledTickets || []).map((ticket) => {
-    const member = ticket.members as unknown as {
-      first_name: string;
-      last_name: string;
-      kicked_out: boolean;
-      member_emails: { email: string; is_primary: boolean }[];
-    } | null;
-    const dinner = ticket.dinners as unknown as { date: string } | null;
-
-    let reason = "";
-    if (!ticket.member_id || !member) {
-      reason = "No member match";
-    } else if (member.kicked_out) {
-      reason = "Kicked out";
-    } else if (ticket.buyer_email && appStatusByEmail[ticket.buyer_email] === "rejected") {
-      reason = "Rejected applicant";
-    } else if (ticket.buyer_email && appStatusByEmail[ticket.buyer_email] === "pending") {
-      reason = "Pending applicant";
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const qty: number = (ticket as any).quantity ?? 1;
-    const rawName = member
-      ? formatName(member.first_name, member.last_name)
-      : ticket.buyer_email ?? "Unknown";
-    const displayName = formatTicketName(rawName, qty);
-    const displayEmail =
-      member?.member_emails?.find((e) => e.is_primary)?.email ??
-      member?.member_emails?.[0]?.email ??
-      ticket.buyer_email ??
-      "-";
-
-    return {
-      id: ticket.id,
-      displayName,
-      displayEmail,
-      purchasedAt: ticket.purchased_at,
-      dinnerDate: dinner?.date ?? null,
-      fulfillmentStatus: ticket.fulfillment_status,
-      reason,
-    };
-  });
 
   return (
     <div className="space-y-6">
@@ -190,7 +118,6 @@ export default async function DashboardPage() {
           company_name: a.company_name,
           submitted_on: a.submitted_on,
         }))}
-        unfulfilledTickets={unfulfilledWithReason}
         optOuts={
           (optOuts || []).map((m) => ({
             id: m.id,

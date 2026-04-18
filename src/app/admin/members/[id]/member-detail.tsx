@@ -13,6 +13,7 @@ import {
   deleteMemberEmail,
   setPrimaryEmail,
   checkEmailForMember,
+  applyCredit,
 } from "./actions";
 import type { EmailCheckResult } from "./actions";
 
@@ -67,12 +68,14 @@ export default function MemberDetail({
   dinnerDates,
   askIsStale,
   isAdmin,
+  unredeemedCredits,
 }: {
   member: MemberData;
   applicationDate: string | null;
   dinnerDates: string[];
   askIsStale: boolean;
   isAdmin: boolean;
+  unredeemedCredits: number;
 }) {
   const router = useRouter();
   const [m, setM] = useState(member);
@@ -217,6 +220,10 @@ export default function MemberDetail({
 
         {/* Column Two */}
         <div className="space-y-4">
+          {unredeemedCredits > 0 && (
+            <ApplyCreditSection member={m} />
+          )}
+
           <DetailField label="Application Date">
             {applicationDate
               ? `Approved ${formatDate(applicationDate)}`
@@ -561,6 +568,72 @@ function RemoveReinstateSection({ member }: { member: MemberData }) {
                   : isRemove
                     ? "Remove"
                     : "Reinstate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Apply Credit ──
+
+function ApplyCreditSection({ member }: { member: MemberData }) {
+  const router = useRouter();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  function handleConfirm() {
+    setError("");
+    startTransition(async () => {
+      const result = await applyCredit(member.id);
+      if (result.success) {
+        setShowConfirm(false);
+        router.refresh();
+      } else {
+        setError(result.error || "Failed to apply credit");
+      }
+    });
+  }
+
+  const fullName = formatName(member.first_name, member.last_name);
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowConfirm(true)}
+        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+      >
+        Apply Credit
+      </button>
+
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <p className="text-sm text-gray-900">
+              Apply credit for <strong>{fullName}</strong>? This will create a
+              ticket for the next upcoming dinner.
+            </p>
+            {error && (
+              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            )}
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowConfirm(false); setError(""); }}
+                className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={isPending}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isPending ? "..." : "Confirm"}
               </button>
             </div>
           </div>

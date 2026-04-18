@@ -112,12 +112,15 @@ src/
 │   └── admin/
 │       ├── layout.tsx                  # Auth check + role detection (server component)
 │       ├── admin-shell.tsx             # Sidebar nav, header, sign-out (client component)
-│       ├── page.tsx                    # Dashboard: next-dinner stats, pending apps, unfulfilled tickets, opt-outs
-│       ├── dashboard-accordions.tsx    # Client component: collapsible accordion sections
+│       ├── page.tsx                    # Dashboard: next-dinner stats, pending apps, opt-outs
+│       ├── dashboard-accordions.tsx    # Client component: collapsible accordion sections (pending apps, opt-outs)
 │       ├── dinners/
 │       │   ├── page.tsx                # Server wrapper: fetches dinners + funnel stats
 │       │   ├── dinners-table.tsx       # Client component: sortable columns, sticky header, rows link to detail
-│       │   └── [id]/page.tsx           # Dinner detail: tickets (clickable to member) + approved-without-ticket list (clickable to app)
+│       │   └── [id]/
+│       │       ├── page.tsx            # Server wrapper: fetches dinner + tickets + applications
+│       │       ├── dinner-tickets.tsx  # Client component: active ticket table with Credit/Refund buttons, inactive section with strikethrough
+│       │       └── actions.ts          # Server actions: refundTicket (full/guest_only), creditTicket
 │       ├── applications/
 │       │   ├── page.tsx                # Server wrapper
 │       │   ├── applications-table.tsx  # Filter tabs, sortable columns, sticky header, rows link to [id]
@@ -234,13 +237,18 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Schema: `quantity` INTEGER NOT NULL DEFAULT 1 on tickets. `payment_source` CHECK updated to include `'portal'`.
 - Proxy updated: `/portal/*` routes now redirect unauthenticated users to `/login`.
 - Portal page: "Buy Your Ticket" button shown for non-kicked-out members.
-- Admin display: dinner detail and dinners list sum `quantity` for attendee counts (not row count). Ticket rows with `quantity > 1` display as "Name +1". Shared helper `formatTicketName()` in `src/lib/format.ts`. Dashboard unfulfilled tickets also show +N.
+- Admin display: dinner detail and dinners list sum `quantity` for attendee counts (not row count). Ticket rows with `quantity > 1` display as "Name +1". Shared helper `formatTicketName()` in `src/lib/format.ts`.
+- Dashboard: removed "Unfulfilled Tickets" accordion (no longer needed with portal ticket flow). Only pending applications and marketing opt-outs remain.
+- Dinner detail redesigned: active tickets table (pending/fulfilled) with Credit and Refund action buttons per row; Type and Amount columns removed. Refunded/credited tickets shown in a separate bottom section with full-row strikethrough and status pills. Refund-only (no Credit) for qty=2 tickets.
+- Refund flow: qty=1 sets `fulfillment_status = 'refunded'`, existing triggers recalculate dates. qty=2 offers "Refund Guest Only" (decrements quantity to 1, halves amount_paid, keeps status) or "Refund Both" (sets status to refunded). Confirmation modal for all refunds.
+- Credit flow: sets ticket `fulfillment_status = 'credited'`, creates a `credits` row with `source_ticket_id` and `status = 'outstanding'`. Confirmation modal.
+- Apply Credit on member detail page: "Apply Credit" button shown at top of column two when member has unredeemed credits (`credits.status = 'outstanding'` AND `redeemed_ticket_id IS NULL`). On confirm: computes target dinner via `getTargetDinner()`, inserts ticket as pending then updates to fulfilled (fires both insert and fulfillment triggers), sets `payment_source = 'credit'`, `amount_paid = 0`, marks oldest unredeemed credit as redeemed. Button stays visible if multiple credits remain.
 
 ## What's NOT done
 
 Don't build these without an explicit prompt:
 
-- Action buttons: fulfill/refund/credit tickets — Phase 3+
+- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — Phase 3+
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
 - Attendee portal (intro/ask editor, profile, community directory) — Phase 4. Portal save action must explicitly set `intro_updated_at = now()` and `ask_updated_at = now()` when the member updates their own Intro or Ask.
@@ -259,7 +267,6 @@ Don't build these without an explicit prompt:
 **Phase 3: Admin actions + application form + transactional emails (next up)**
 
 Remaining Phase 3 work:
-- Fulfill/refund/credit tickets
 - Application form (hosted on Thunderview OS, replacing Squarespace)
 - Transactional emails via Resend (approval notifications, magic links with custom branding)
 

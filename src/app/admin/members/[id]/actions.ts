@@ -112,6 +112,100 @@ export async function setPrimaryEmail(
   return { success: true };
 }
 
+// Apply credit — creates a fulfilled ticket and marks the oldest unredeemed credit as redeemed
+
+import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
+
+export async function applyCredit(
+  memberId: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient();
+
+  // Find the oldest unredeemed credit for this member
+  const { data: credit } = await admin
+    .from("credits")
+    .select("id")
+    .eq("member_id", memberId)
+    .eq("status", "outstanding")
+    .is("redeemed_ticket_id", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .single();
+
+  if (!credit) return { success: false, error: "No unredeemed credit found" };
+
+  // Get member stagetype for ticket type mapping
+  const { data: member } = await admin
+    .from("members")
+    .select("attendee_stagetype, has_community_access")
+    .eq("id", memberId)
+    .single();
+
+  if (!member || !member.attendee_stagetype) {
+    return { success: false, error: "Member stagetype not set" };
+  }
+
+  // Compute target dinner
+  const targetDinner = await getTargetDinner(memberId, admin);
+  if (!targetDinner) {
+    return { success: false, error: "No upcoming dinner found" };
+  }
+
+  const { ticketType } = getTicketInfo(
+    member.attendee_stagetype,
+    member.has_community_access
+  );
+
+  // Insert ticket as pending first, then update to fulfilled (to fire both triggers)
+  const { data: newTicket, error: insertError } = await admin
+    .from("tickets")
+    .insert({
+      member_id: memberId,
+      dinner_id: targetDinner.id,
+      ticket_type: ticketType,
+      quantity: 1,
+      amount_paid: 0,
+      payment_source: "credit",
+      fulfillment_status: "pending",
+      purchased_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !newTicket) {
+    return { success: false, error: insertError?.message || "Failed to create ticket" };
+  }
+
+  // Update to fulfilled (fires trg_ticket_fulfillment_change)
+  const { error: fulfillError } = await admin
+    .from("tickets")
+    .update({
+      fulfillment_status: "fulfilled",
+      fulfilled_at: new Date().toISOString(),
+    })
+    .eq("id", newTicket.id);
+
+  if (fulfillError) {
+    return { success: false, error: fulfillError.message };
+  }
+
+  // Mark credit as redeemed
+  const { error: creditError } = await admin
+    .from("credits")
+    .update({
+      redeemed_ticket_id: newTicket.id,
+      status: "redeemed",
+      redeemed_at: new Date().toISOString(),
+    })
+    .eq("id", credit.id);
+
+  if (creditError) {
+    return { success: false, error: creditError.message };
+  }
+
+  return { success: true };
+}
+
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
   pendingApp?: { id: string };

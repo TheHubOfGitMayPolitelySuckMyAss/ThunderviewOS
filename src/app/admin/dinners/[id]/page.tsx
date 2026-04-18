@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate, formatName, formatStageType, formatTicketName, getTodayMT, toDateMT } from "@/lib/format";
+import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
+import DinnerTickets from "./dinner-tickets";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -83,7 +84,6 @@ export default async function DinnerDetailPage({
     (tickets || [])
       .filter((t) => {
         if (isPast) {
-          // After dinner date: only count tickets purchased on or before the dinner
           return t.purchased_at && toDateMT(t.purchased_at) <= dinner.date;
         }
         return true;
@@ -92,13 +92,44 @@ export default async function DinnerDetailPage({
       .filter(Boolean)
   );
 
-  // Filter applications: only approved, and member has no ticket for this dinner
   const filteredApplications = (applications || []).filter(
     (app) =>
       app.status === "approved" &&
       app.member_id &&
       !ticketMemberIds.has(app.member_id)
   );
+
+  // Shape ticket data for client component
+  const ticketRows = (tickets || []).map((ticket) => {
+    const member = ticket.members as unknown as {
+      id: string;
+      first_name: string;
+      last_name: string;
+      current_intro: string | null;
+      current_ask: string | null;
+      ask_updated_at: string | null;
+      last_dinner_attended: string | null;
+      member_emails: { email: string; is_primary: boolean }[];
+    } | null;
+    const primaryEmail =
+      member?.member_emails?.find((e) => e.is_primary)?.email ??
+      member?.member_emails?.[0]?.email ??
+      "-";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const qty: number = (ticket as any).quantity ?? 1;
+
+    return {
+      id: ticket.id,
+      memberId: member?.id ?? null,
+      memberName: member ? formatName(member.first_name, member.last_name) : "-",
+      primaryEmail,
+      displayStatus: deriveTicketStatus(ticket.fulfillment_status, member),
+      fulfillmentStatus: ticket.fulfillment_status,
+      purchasedAt: ticket.purchased_at,
+      quantity: qty,
+      amountPaid: Number(ticket.amount_paid),
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -130,99 +161,8 @@ export default async function DinnerDetailPage({
         ))}
       </div>
 
-      {/* Tickets table */}
-      <div>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900">Tickets</h3>
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Type
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Amount
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Purchased
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {tickets?.map((ticket) => {
-                const member = ticket.members as unknown as {
-                  id: string;
-                  first_name: string;
-                  last_name: string;
-                  current_intro: string | null;
-                  current_ask: string | null;
-                  ask_updated_at: string | null;
-                  last_dinner_attended: string | null;
-                  member_emails: { email: string; is_primary: boolean }[];
-                } | null;
-                const primaryEmail = member?.member_emails?.find((e) => e.is_primary)?.email
-                  ?? member?.member_emails?.[0]?.email ?? "-";
-                const displayStatus = deriveTicketStatus(
-                  ticket.fulfillment_status,
-                  member
-                );
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const qty: number = (ticket as any).quantity ?? 1;
-                return (
-                  <tr key={ticket.id} className="group relative hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {member?.id ? (
-                        <Link
-                          href={`/admin/members/${member.id}`}
-                          className="after:absolute after:inset-0"
-                        >
-                          {formatTicketName(formatName(member.first_name, member.last_name), qty)}
-                        </Link>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {primaryEmail}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {ticket.ticket_type}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      ${Number(ticket.amount_paid).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <StatusBadge status={displayStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {formatDate(ticket.purchased_at)}
-                    </td>
-                  </tr>
-                );
-              })}
-              {(!tickets || tickets.length === 0) && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-sm text-gray-400"
-                  >
-                    No tickets for this dinner.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Tickets (client component with actions) */}
+      <DinnerTickets tickets={ticketRows} />
 
       {/* Applications table — only approved without tickets */}
       <div>
@@ -290,25 +230,5 @@ export default async function DinnerDetailPage({
         </div>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    Pending: "bg-yellow-100 text-yellow-800",
-    pending: "bg-yellow-100 text-yellow-800",
-    approved: "bg-green-100 text-green-800",
-    Fulfilled: "bg-green-100 text-green-800",
-    "Intro/Ask": "bg-purple-100 text-purple-700",
-    rejected: "bg-red-100 text-red-800",
-    Refunded: "bg-gray-100 text-gray-800",
-    Credited: "bg-blue-100 text-blue-800",
-  };
-  return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] || "bg-gray-100 text-gray-800"}`}
-    >
-      {status}
-    </span>
   );
 }

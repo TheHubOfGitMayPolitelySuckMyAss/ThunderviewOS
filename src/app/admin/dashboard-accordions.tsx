@@ -6,24 +6,14 @@ import { formatDate } from "@/lib/format";
 
 type PendingApp = {
   id: string;
-  name: string; // pre-formatted full name
+  name: string;
   company_name: string;
   submitted_on: string;
 };
 
-type UnfulfilledTicket = {
-  id: string;
-  displayName: string;
-  displayEmail: string;
-  purchasedAt: string;
-  dinnerDate: string | null;
-  fulfillmentStatus: string;
-  reason: string;
-};
-
 type OptOut = {
   id: string;
-  name: string; // pre-formatted full name
+  name: string;
   marketingOptedOutAt: string;
 };
 
@@ -61,11 +51,9 @@ function Accordion({
 
 export default function DashboardAccordions({
   pendingApps,
-  unfulfilledTickets,
   optOuts,
 }: {
   pendingApps: PendingApp[];
-  unfulfilledTickets: UnfulfilledTicket[];
   optOuts: OptOut[];
 }) {
   return (
@@ -107,74 +95,6 @@ export default function DashboardAccordions({
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
                     {formatDate(app.submitted_on)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Accordion>
-
-      {/* Unfulfilled tickets */}
-      <Accordion
-        title="Unfulfilled Tickets"
-        count={unfulfilledTickets.length}
-      >
-        {unfulfilledTickets.length === 0 ? (
-          <p className="px-4 py-4 text-sm text-gray-400">
-            All tickets fulfilled.
-          </p>
-        ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                  Name / Email
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                  Dinner
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                  Purchased
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                  Status
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                  Reason
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {unfulfilledTickets.map((ticket) => (
-                <tr key={ticket.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 text-sm">
-                    <div className="text-gray-900">{ticket.displayName}</div>
-                    {ticket.displayEmail !== ticket.displayName && (
-                      <div className="text-xs text-gray-400">
-                        {ticket.displayEmail}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-500">
-                    {ticket.dinnerDate
-                      ? formatDate(ticket.dinnerDate, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-500">
-                    {formatDate(ticket.purchasedAt)}
-                  </td>
-                  <td className="px-4 py-2 text-sm">
-                    <span className="inline-block rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                      {ticket.fulfillmentStatus}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-500">
-                    {ticket.reason || "-"}
                   </td>
                 </tr>
               ))}
