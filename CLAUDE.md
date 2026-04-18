@@ -246,6 +246,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Kicked-out member exclusion from dinner views: approved applications whose linked member has `kicked_out = true` are excluded from dinner funnel counts (Applied/Approved columns on dinners list) and "Approved Without Ticket" lists on dinner detail pages. Applications inbox and tickets are unaffected.
 - `/admin/tickets` page: cross-dinner ticket list with all 1,350+ tickets (paginated past the 1,000-row PostgREST cap). Columns: Purchased, Member (strikethrough if kicked out), Dinner (formatted "May 7th, 2026"), Qty, Amount, Type, Source, Status (colored pills). All columns sortable, default reverse-chron by purchased_at. Search by member name. Row click navigates to dinner detail.
 - `/admin/credits` page removed. Credits now surface contextually: "Credit" button on dinner ticket rows, "Apply Credit" button on member detail. Nav updated: Tickets added between Dinners and Applications, Credits removed.
+- Pagination audit: all admin list queries that could exceed the 1,000-row PostgREST cap now use the `fetchAll` helper with `.range()`. Paginated: applications (718 rows), members (634 rows), tickets (1,350 rows), dinners funnel aggregations (applications + tickets). Bounded queries (`.single()`, `.limit()`, count-only, scoped to single dinner/member) left as-is.
 
 ## What's NOT done
 
