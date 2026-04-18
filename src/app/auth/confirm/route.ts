@@ -33,27 +33,7 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const email = user?.email;
-
-      if (email === "eric@marcoullier.com") {
-        return NextResponse.redirect(`${origin}/admin`);
-      }
-
-      const { data: memberRow } = await supabase
-        .from("member_emails")
-        .select("members!inner(is_team, kicked_out)")
-        .eq("email", email!)
-        .limit(1)
-        .single();
-
-      const member = (memberRow?.members as unknown as { is_team: boolean; kicked_out: boolean }) ?? null;
-      const isTeam = member?.is_team === true && member?.kicked_out === false;
-      return NextResponse.redirect(
-        `${origin}${isTeam ? "/admin" : "/portal"}`
-      );
+      return NextResponse.redirect(`${origin}/portal`);
     }
   }
 

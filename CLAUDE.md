@@ -29,7 +29,7 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 
 ## Key architectural decisions
 
-- **Auth:** Magic link only via Supabase Auth. NO Google OAuth. Uses PKCE flow (`@supabase/ssr` default). Magic link emails route to `/auth/confirm?token_hash=...&type=email`.
+- **Auth:** Magic link only via Supabase Auth. NO Google OAuth. Uses PKCE flow (`@supabase/ssr` default). Magic link emails route to `/auth/confirm?token_hash=...&type=email`. All auth routes redirect to `/portal` — role-based routing happens on the portal page.
 - **Admin role:** `eric@marcoullier.com` is hard-coded as the sole admin.
 - **Team role:** Any member with `is_team = true` AND `kicked_out = false`. Same admin UI access as admin.
 - **Member role:** Portal-only access (Phase 4).
@@ -47,8 +47,8 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`. Phase 2 schema additions (`email_status`, historical enum values) applied via `tmp/import.sql`.
 
 - `dinners` — first-Thursday-of-month events, auto-generated 12 months out, skipping Jan/Jul. Date is UNIQUE.
-- `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `member_id` is NULL until approved.
-- `members` — approved people, soft-deletable via `kicked_out`. Key trigger-managed columns:
+- `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `first_name` + `last_name` (same split as members). `member_id` is NULL until approved.
+- `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). Key trigger-managed columns:
   - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. One-way by default; does not revert on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
   - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
   - `last_dinner_attended` DATE — set on ticket fulfillment (`fulfillment_status` → `'fulfilled'`) to the dinner's date if later than the current value. On refund/credit, recalculated as MAX of remaining fulfilled tickets' dinner dates; null if none remain.
@@ -68,8 +68,8 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 3. Supabase sends magic link email (PKCE flow)
 4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
 5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
-6. Route checks admin/team status and redirects to `/admin` or `/portal`. Team lookup joins `members` to `member_emails` on `auth.jwt() ->> 'email'` (checks ALL of a member's emails, not a single `members.email` column — that column no longer exists).
-7. Proxy (`src/proxy.ts`) refreshes session on every request and protects `/admin/*` routes — unauthenticated users go to `/login`, non-admin/non-team users go to `/portal`
+6. Both `/auth/confirm` and `/auth/callback` always redirect to `/portal` after successful auth, regardless of role. Portal page checks role and shows admin button for admin/team.
+7. Proxy (`src/proxy.ts`) refreshes session on every request, protects `/admin/*` routes (unauthenticated → `/login`, non-admin/non-team → `/portal`), and redirects authenticated users from `/login` to `/portal`
 
 **Gotcha:** `/auth/callback` (code exchange flow) also exists but the primary magic link flow uses `/auth/confirm` (token hash flow). Both are needed. The PKCE flow via `@supabase/ssr` generates email templates that use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`.
 
@@ -77,19 +77,28 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 ```
 src/
-├── proxy.ts                            # Session refresh + /admin route protection (Next.js 16 "proxy", replaces middleware.ts)
+├── proxy.ts                            # Session refresh + /admin protection + /login redirect to /portal (Next.js 16 "proxy", replaces middleware.ts)
 ├── lib/supabase/
 │   ├── client.ts                       # Browser client (createBrowserClient)
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
 │   └── admin.ts                        # Service role client (bypasses RLS)
 ├── app/
-│   ├── page.tsx                        # Redirects to /login
+│   ├── page.tsx                        # Public marketing placeholder (Thunderview CEO Dinners)
 │   ├── layout.tsx                      # Root layout (Geist fonts, Tailwind)
 │   ├── login/page.tsx                  # Magic link sign-in form (client component)
+│   ├── apply/
+│   │   ├── page.tsx                    # Public application form (server wrapper: fetches dinners + schedule)
+│   │   ├── application-form.tsx        # Client component: form fields, validation, submit
+│   │   ├── actions.ts                  # Server action: submitApplication (inserts pending application)
+│   │   └── thanks/
+│   │       ├── page.tsx                # Thank-you page (static)
+│   │       └── confetti.tsx            # Client component: canvas-confetti on page load
 │   ├── auth/
 │   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler)
 │   │   └── callback/route.ts           # Code exchange flow (secondary)
-│   ├── portal/page.tsx                 # "Portal Coming Soon" placeholder
+│   ├── portal/
+│   │   ├── page.tsx                    # Authenticated landing: auth check, role check, admin button for admin/team, sign out
+│   │   └── sign-out-button.tsx         # Client component: sign-out button (inline, not shared with admin-shell)
 │   └── admin/
 │       ├── layout.tsx                  # Auth check + role detection (server component)
 │       ├── admin-shell.tsx             # Sidebar nav, header, sign-out (client component)
@@ -119,7 +128,7 @@ src/
 │           ├── page.tsx                # Server wrapper
 │           └── credits-table.tsx       # Filter, sortable columns, sticky header
 ├── lib/
-│   └── format.ts                       # Shared display utilities (formatStageType, formatDate, formatTimestamp, getTodayMT, toDateMT)
+│   └── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, getTodayMT, toDateMT)
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
@@ -130,7 +139,9 @@ supabase/
 │   ├── 20260418300000_add_member_rpc.sql             # add_member_with_application RPC (Add Member modal)
 │   ├── 20260418400000_swap_primary_email_rpc.sql     # swap_primary_email RPC (atomic primary flip)
 │   ├── 20260418500000_approve_application_rpc.sql    # approve_application RPC v1 (superseded by v2)
-│   └── 20260418600000_approve_v2_and_link_member_rpcs.sql  # approve_application v2 (kicked-out guard, primary flip) + link_application_to_member RPC
+│   ├── 20260418600000_approve_v2_and_link_member_rpcs.sql  # approve_application v2 (kicked-out guard, primary flip) + link_application_to_member RPC
+│   ├── 20260418700000_split_name_columns.sql              # Split name → first_name + last_name on members + applications, backfill, drop name
+│   └── 20260418800000_update_rpcs_for_name_split.sql      # Update add_member_with_application, approve_application, link_application_to_member RPCs for first_name/last_name
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)

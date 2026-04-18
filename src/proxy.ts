@@ -66,24 +66,7 @@ export async function proxy(request: NextRequest) {
   // Redirect authenticated users away from login
   if (request.nextUrl.pathname === "/login" && user) {
     const url = request.nextUrl.clone();
-    const email = user.email;
-    const isAdmin = email === "eric@marcoullier.com";
-
-    if (isAdmin) {
-      url.pathname = "/admin";
-      return NextResponse.redirect(url);
-    }
-
-    const { data: memberRow } = await supabase
-      .from("member_emails")
-      .select("members!inner(is_team, kicked_out)")
-      .eq("email", email!)
-      .limit(1)
-      .single();
-
-    const member = (memberRow?.members as unknown as { is_team: boolean; kicked_out: boolean }) ?? null;
-    const isTeam = member?.is_team === true && member?.kicked_out === false;
-    url.pathname = isTeam ? "/admin" : "/portal";
+    url.pathname = "/portal";
     return NextResponse.redirect(url);
   }
 
