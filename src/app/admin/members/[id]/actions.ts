@@ -106,22 +106,12 @@ export async function setPrimaryEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const admin = createAdminClient();
 
-  // Unset current primary
-  const { error: err1 } = await admin
-    .from("member_emails")
-    .update({ is_primary: false })
-    .eq("member_id", memberId)
-    .eq("is_primary", true);
+  const { error } = await admin.rpc("swap_primary_email", {
+    p_member_id: memberId,
+    p_new_primary_email_id: emailId,
+  });
 
-  if (err1) return { success: false, error: err1.message };
-
-  // Set new primary
-  const { error: err2 } = await admin
-    .from("member_emails")
-    .update({ is_primary: true })
-    .eq("id", emailId);
-
-  if (err2) return { success: false, error: err2.message };
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
