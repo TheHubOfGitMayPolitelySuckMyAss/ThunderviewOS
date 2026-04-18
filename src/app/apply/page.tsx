@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
 import ApplicationForm from "./application-form";
 
@@ -21,7 +21,7 @@ function formatDinnerDate(dateStr: string): string {
 }
 
 export default async function ApplyPage() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const today = getTodayMT();
 
   // Fetch all dinners from today onward
