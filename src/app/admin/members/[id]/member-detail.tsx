@@ -25,6 +25,14 @@ const STAGE_OPTIONS = [
 
 const CONTACT_OPTIONS = ["linkedin", "email"];
 
+function PencilIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+    </svg>
+  );
+}
+
 type MemberEmail = {
   id: string;
   email: string;
@@ -395,13 +403,17 @@ function EditableField({
       : value || "None";
 
   return (
-    <div
-      onClick={startEdit}
-      className="cursor-pointer rounded px-1 -mx-1 hover:bg-gray-50"
-    >
+    <div className="group/field">
       <dt className="flex items-center gap-2 text-xs font-medium uppercase text-gray-500">
         {label}
         {labelExtra}
+        <button
+          onClick={startEdit}
+          className="text-gray-400 opacity-0 transition-opacity hover:text-gray-600 group-hover/field:opacity-100"
+          title={`Edit ${label.toLowerCase()}`}
+        >
+          <PencilIcon />
+        </button>
       </dt>
       <dd className="mt-1 text-sm text-gray-900">{displayValue}</dd>
       {subtitle && (
@@ -556,9 +568,7 @@ function EmailsSection({
           className="text-gray-400 hover:text-gray-600"
           title="Manage emails"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-            <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-          </svg>
+          <PencilIcon />
         </button>
       </dt>
       <dd className="mt-1">
@@ -566,7 +576,8 @@ function EmailsSection({
           {member.member_emails.map((me) => (
             <div
               key={me.id}
-              className="flex flex-wrap items-center gap-2 py-1"
+              onClick={() => setShowModal(true)}
+              className="flex cursor-pointer flex-wrap items-center gap-2 py-1"
             >
               <span className="text-sm text-gray-900">{me.email}</span>
               <span className="text-xs text-gray-400">{me.source}</span>
