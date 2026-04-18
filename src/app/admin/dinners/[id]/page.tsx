@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
+import { formatDate, formatName, formatStageType, formatTicketName, getTodayMT, toDateMT } from "@/lib/format";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -64,10 +64,12 @@ export default async function DinnerDetailPage({
     .eq("preferred_dinner_date", dinner.date)
     .order("submitted_on", { ascending: false });
 
-  // Count tickets by fulfillment status
+  // Count tickets by fulfillment status, summing quantity
   const statusCounts = (tickets || []).reduce(
     (acc, t) => {
-      acc[t.fulfillment_status] = (acc[t.fulfillment_status] || 0) + 1;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const qty: number = (t as any).quantity ?? 1;
+      acc[t.fulfillment_status] = (acc[t.fulfillment_status] || 0) + qty;
       return acc;
     },
     {} as Record<string, number>
@@ -173,6 +175,8 @@ export default async function DinnerDetailPage({
                   ticket.fulfillment_status,
                   member
                 );
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const qty: number = (ticket as any).quantity ?? 1;
                 return (
                   <tr key={ticket.id} className="group relative hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">
@@ -181,7 +185,7 @@ export default async function DinnerDetailPage({
                           href={`/admin/members/${member.id}`}
                           className="after:absolute after:inset-0"
                         >
-                          {formatName(member.first_name, member.last_name)}
+                          {formatTicketName(formatName(member.first_name, member.last_name), qty)}
                         </Link>
                       ) : (
                         "-"

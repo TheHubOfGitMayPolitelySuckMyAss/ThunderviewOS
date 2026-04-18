@@ -77,7 +77,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 ```
 src/
-├── proxy.ts                            # Session refresh + /admin protection + /login redirect to /portal (Next.js 16 "proxy", replaces middleware.ts)
+├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect (Next.js 16 "proxy", replaces middleware.ts)
 ├── lib/supabase/
 │   ├── client.ts                       # Browser client (createBrowserClient)
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
@@ -97,8 +97,16 @@ src/
 │   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler)
 │   │   └── callback/route.ts           # Code exchange flow (secondary)
 │   ├── portal/
-│   │   ├── page.tsx                    # Authenticated landing: auth check, role check, admin button for admin/team, sign out
-│   │   └── sign-out-button.tsx         # Client component: sign-out button (inline, not shared with admin-shell)
+│   │   ├── page.tsx                    # Authenticated landing: auth check, role check, Buy Ticket + admin buttons, sign out
+│   │   ├── sign-out-button.tsx         # Client component: sign-out button (inline, not shared with admin-shell)
+│   │   └── tickets/
+│   │       ├── page.tsx                # Ticket selection: stagetype-based ticket card, target dinner assignment
+│   │       ├── guest/page.tsx          # December-only guest upsell (+$40 spouse/partner/+1)
+│   │       ├── cart/
+│   │       │   ├── page.tsx            # Order review: line items, total, purchase button
+│   │       │   ├── actions.ts          # Server action: purchaseTicket (recomputes dinner, inserts ticket row)
+│   │       │   └── purchase-button.tsx # Client component: form with pending state
+│   │       └── success/page.tsx        # Post-purchase confirmation with confetti (reuses /apply/thanks/confetti)
 │   ├── api/cron/generate-dinner/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
 │   └── admin/
@@ -130,7 +138,8 @@ src/
 │           ├── page.tsx                # Server wrapper
 │           └── credits-table.tsx       # Filter, sortable columns, sticky header
 ├── lib/
-│   └── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, getTodayMT, toDateMT, firstThursdayOf)
+│   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
+│   └── ticket-assignment.ts            # Target dinner logic (getTargetDinner) + ticket type/price mapping (getTicketInfo)
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
@@ -143,7 +152,8 @@ supabase/
 │   ├── 20260418500000_approve_application_rpc.sql    # approve_application RPC v1 (superseded by v2)
 │   ├── 20260418600000_approve_v2_and_link_member_rpcs.sql  # approve_application v2 (kicked-out guard, primary flip) + link_application_to_member RPC
 │   ├── 20260418700000_split_name_columns.sql              # Split name → first_name + last_name on members + applications, backfill, drop name
-│   └── 20260418800000_update_rpcs_for_name_split.sql      # Update add_member_with_application, approve_application, link_application_to_member RPCs for first_name/last_name
+│   ├── 20260418800000_update_rpcs_for_name_split.sql      # Update add_member_with_application, approve_application, link_application_to_member RPCs for first_name/last_name
+│   └── 20260418900000_portal_tickets.sql                  # Add quantity column to tickets, add 'portal' to payment_source CHECK
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -220,6 +230,11 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Timezone standardization: all date display and comparison logic uses America/Denver. Shared utilities in `src/lib/format.ts`: `formatDate()` (DATE or TIMESTAMPTZ → display string in MT), `formatTimestamp()` (TIMESTAMPTZ → display with time in MT), `getTodayMT()` (today as YYYY-MM-DD in MT), `toDateMT()` (TIMESTAMPTZ → YYYY-MM-DD in MT for comparisons). No raw `toLocaleDateString()` or `toISOString().slice()` calls remain in the codebase. Stored data is unchanged (TIMESTAMPTZ is UTC internally, DATE columns are timezone-agnostic).
 - Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
 - Members search input text color fixed (was invisible against background)
+- Portal ticket purchase flow (`/portal/tickets`): authenticated members can buy tickets directly. Four-step flow: selection → guest upsell (December only) → cart review → success with confetti. Ticket type and price derived from member's `attendee_stagetype` (Active/Exited CEO → $40, Investor → $100, Guest → $40). Target dinner computed via `getTargetDinner()` in `src/lib/ticket-assignment.ts` (checks approved application preferred date first, falls back to next upcoming dinner). December dinners offer +1 guest ticket ($40). Single ticket row with `quantity` column (1 or 2). `payment_source = 'portal'`. Server action recomputes target dinner at submit time. Edge cases: existing pending ticket → blocked with message; kicked out → redirect to portal; no stagetype → contact Eric message; no upcoming dinner → error message.
+- Schema: `quantity` INTEGER NOT NULL DEFAULT 1 on tickets. `payment_source` CHECK updated to include `'portal'`.
+- Proxy updated: `/portal/*` routes now redirect unauthenticated users to `/login`.
+- Portal page: "Buy Your Ticket" button shown for non-kicked-out members.
+- Admin display: dinner detail and dinners list sum `quantity` for attendee counts (not row count). Ticket rows with `quantity > 1` display as "Name +1". Shared helper `formatTicketName()` in `src/lib/format.ts`. Dashboard unfulfilled tickets also show +N.
 
 ## What's NOT done
 
@@ -230,7 +245,8 @@ Don't build these without an explicit prompt:
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
 - Attendee portal (intro/ask editor, profile, community directory) — Phase 4. Portal save action must explicitly set `intro_updated_at = now()` and `ask_updated_at = now()` when the member updates their own Intro or Ask.
 - Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
-- Ticket purchase integration (Squarespace webhooks or Stripe) — Phase 5, blocked on Squarespace plan upgrade
+- Stripe payment integration for ticket purchases (currently writes ticket row with no payment) — Phase 5
+- Ticket purchase integration via Squarespace webhooks — Phase 5, blocked on Squarespace plan upgrade
 - Bulk email templates — Phase 4
 - Streak API integration — Phase 5
 - CoachingOS sync — Phase 6
@@ -263,4 +279,4 @@ Remaining Phase 3 work:
 - **Next.js 16 uses `proxy.ts` instead of `middleware.ts`.** The file is `src/proxy.ts` with `export async function proxy(request)`. The `middleware` convention is deprecated.
 - **Vercel preview env vars partially missing.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are not set for the preview environment due to a Vercel CLI plugin bug. Add manually in Vercel dashboard if branch deploys are needed.
 - **Supabase built-in SMTP is rate-limited.** Magic link requests are capped at 1 per 60 seconds per email, with an hourly sending cap. Must switch to Resend before launch.
-- **Supabase/PostgREST default row cap.** Supabase limits query results to 1,000 rows by default. This is silent — no error, just truncated results. Any query that might return more than 1,000 rows MUST explicitly set a higher limit or paginate. This has caused bugs across multiple projects. Always account for it.
+- **Supabase/PostgREST default row cap.** Supabase limits query results to 1,000 rows by default. This is silent — no error, just truncated results. Any query that might return more than 1,000 rows MUST paginate. This has caused bugs across multiple projects. Always account for it.

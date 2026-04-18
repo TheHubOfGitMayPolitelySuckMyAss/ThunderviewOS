@@ -63,6 +63,15 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Protect /portal routes
+  if (request.nextUrl.pathname.startsWith("/portal")) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+  }
+
   // Redirect authenticated users away from login
   if (request.nextUrl.pathname === "/login" && user) {
     const url = request.nextUrl.clone();

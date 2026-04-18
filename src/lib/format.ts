@@ -69,6 +69,32 @@ export function firstThursdayOf(year: number, month: number): string {
 }
 
 /**
+ * Format a dinner date for display: "May 7th, 2026" style.
+ */
+export function formatDinnerDisplay(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const month = d.toLocaleDateString("en-US", { month: "long" });
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const suffix =
+    day >= 11 && day <= 13
+      ? "th"
+      : [null, "st", "nd", "rd"][day % 10] ?? "th";
+  return `${month} ${day}${suffix}, ${year}`;
+}
+
+/**
+ * Format a ticket display name: append "+N" for quantity > 1.
+ */
+export function formatTicketName(
+  memberName: string,
+  quantity: number
+): string {
+  if (quantity > 1) return `${memberName} +${quantity - 1}`;
+  return memberName;
+}
+
+/**
  * Convert a TIMESTAMPTZ string to a YYYY-MM-DD date in Mountain Time.
  */
 export function toDateMT(timestamptz: string): string {

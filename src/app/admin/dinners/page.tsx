@@ -40,12 +40,13 @@ export default async function DinnersPage() {
     dinner_id: string;
     fulfillment_status: string;
     member_id: string;
+    quantity: number;
     members: unknown;
   }>((from, to) =>
     supabase
       .from("tickets")
       .select(
-        "dinner_id, fulfillment_status, member_id, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)",
+        "dinner_id, fulfillment_status, member_id, quantity, members(current_intro, current_ask, ask_updated_at, last_dinner_attended)",
       )
       .range(from, to),
   );
@@ -69,24 +70,26 @@ export default async function DinnersPage() {
       (a) => a.status === "approved" && a.member_id && !fulfilledMemberIds.has(a.member_id)
     ).length;
 
-    const paid = dinnerTickets.filter(
-      (t) => t.fulfillment_status === "fulfilled"
-    ).length;
+    const paid = dinnerTickets
+      .filter((t) => t.fulfillment_status === "fulfilled")
+      .reduce((sum, t) => sum + (t.quantity ?? 1), 0);
 
-    const introAsk = dinnerTickets.filter((t) => {
-      if (t.fulfillment_status !== "fulfilled") return false;
-      const m = t.members as unknown as {
-        current_intro: string | null;
-        current_ask: string | null;
-        ask_updated_at: string | null;
-        last_dinner_attended: string | null;
-      } | null;
-      if (!m) return false;
-      if (!m.current_intro || !m.current_ask) return false;
-      if (!m.last_dinner_attended) return true;
-      if (!m.ask_updated_at) return false;
-      return m.ask_updated_at > m.last_dinner_attended;
-    }).length;
+    const introAsk = dinnerTickets
+      .filter((t) => {
+        if (t.fulfillment_status !== "fulfilled") return false;
+        const m = t.members as unknown as {
+          current_intro: string | null;
+          current_ask: string | null;
+          ask_updated_at: string | null;
+          last_dinner_attended: string | null;
+        } | null;
+        if (!m) return false;
+        if (!m.current_intro || !m.current_ask) return false;
+        if (!m.last_dinner_attended) return true;
+        if (!m.ask_updated_at) return false;
+        return m.ask_updated_at > m.last_dinner_attended;
+      })
+      .reduce((sum, t) => sum + (t.quantity ?? 1), 0);
 
     return { id: dinner.id, date: dinner.date, venue: dinner.venue, applied, approved, paid, introAsk };
   });

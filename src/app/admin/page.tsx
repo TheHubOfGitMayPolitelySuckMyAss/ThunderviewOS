@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import DashboardAccordions from "./dashboard-accordions";
-import { formatDate, formatName, getTodayMT } from "@/lib/format";
+import { formatDate, formatName, formatTicketName, getTodayMT } from "@/lib/format";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const { data: unfulfilledTickets } = await supabase
     .from("tickets")
     .select(
-      "id, purchased_at, fulfillment_status, buyer_email, member_id, members(first_name, last_name, kicked_out, member_emails(email, is_primary)), dinner_id, dinners(date)"
+      "id, purchased_at, fulfillment_status, quantity, buyer_email, member_id, members(first_name, last_name, kicked_out, member_emails(email, is_primary)), dinner_id, dinners(date)"
     )
     .eq("fulfillment_status", "pending")
     .order("purchased_at", { ascending: false });
@@ -117,9 +117,12 @@ export default async function DashboardPage() {
       reason = "Pending applicant";
     }
 
-    const displayName = member
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const qty: number = (ticket as any).quantity ?? 1;
+    const rawName = member
       ? formatName(member.first_name, member.last_name)
       : ticket.buyer_email ?? "Unknown";
+    const displayName = formatTicketName(rawName, qty);
     const displayEmail =
       member?.member_emails?.find((e) => e.is_primary)?.email ??
       member?.member_emails?.[0]?.email ??
