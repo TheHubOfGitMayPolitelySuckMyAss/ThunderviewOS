@@ -8,12 +8,28 @@ type MemberEmail = {
   email: string;
   is_primary: boolean;
   source: string;
+  email_status: string;
+};
+
+type Application = {
+  id: string;
+  submitted_on: string;
+  status: string;
+};
+
+type Ticket = {
+  id: string;
+  fulfillment_status: string;
+  dinner_id: string;
+  dinners: { date: string };
 };
 
 type Member = {
   id: string;
   name: string;
   member_emails: MemberEmail[];
+  applications: Application[];
+  tickets: Ticket[];
   contact_preference: string;
   linkedin_profile: string | null;
   company_name: string | null;
@@ -52,6 +68,21 @@ function getSortValue(member: Member, key: SortKey): string {
     case "lastDinner": return member.last_dinner_attended || "";
     case "marketing": return member.marketing_opted_in ? "yes" : "no";
   }
+}
+
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900">{children}</dd>
+    </div>
+  );
 }
 
 export default function MembersTable({
@@ -97,7 +128,35 @@ export default function MembersTable({
   });
 
   if (selected) {
-    const primaryEmail = getPrimaryEmail(selected);
+    // Earliest approved application date
+    const approvedApps = selected.applications
+      .filter((a) => a.status === "approved")
+      .sort(
+        (a, b) =>
+          new Date(a.submitted_on).getTime() -
+          new Date(b.submitted_on).getTime()
+      );
+    const applicationDate = approvedApps[0]?.submitted_on;
+
+    // Dinner dates from tickets, most recent first
+    const dinnerDates = selected.tickets
+      .map((t) => t.dinners?.date)
+      .filter(Boolean)
+      .sort((a, b) => b.localeCompare(a))
+      // deduplicate (member could have multiple tickets for same dinner)
+      .filter((d, i, arr) => arr.indexOf(d) === i);
+
+    // Ask staleness: ask_updated_at <= last_dinner_attended, or ask_updated_at is null and last_dinner_attended is not null
+    const askIsStale =
+      (selected.ask_updated_at &&
+        selected.last_dinner_attended &&
+        selected.ask_updated_at <= selected.last_dinner_attended) ||
+      (!selected.ask_updated_at && !!selected.last_dinner_attended);
+
+    const heading = selected.company_name
+      ? `${selected.name} at ${selected.company_name}`
+      : selected.name;
+
     return (
       <div className="rounded-lg bg-white p-6 shadow">
         <button
@@ -106,77 +165,159 @@ export default function MembersTable({
         >
           &larr; Back to list
         </button>
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          {selected.name}
-        </h3>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
-          {[
-            ["Primary Email", primaryEmail],
-            ["Contact Preference", selected.contact_preference],
-            ["LinkedIn", selected.linkedin_profile || "N/A"],
-            ["Company", selected.company_name || "N/A"],
-            ["Website", selected.company_website || "N/A"],
-            ["Stage/Type", formatStageType(selected.attendee_stagetype)],
-            ["Marketing Opted In", selected.marketing_opted_in ? "Yes" : "No"],
-            ["Kicked Out", selected.kicked_out ? "Yes" : "No"],
-            ["Community Access", selected.has_community_access ? "Yes" : "No"],
-            ["Is Team", selected.is_team ? "Yes" : "No"],
-            [
-              "First Dinner",
-              selected.first_dinner_attended
-                ? new Date(
-                    selected.first_dinner_attended + "T00:00:00"
-                  ).toLocaleDateString()
-                : "Never",
-            ],
-            [
-              "Last Dinner Attended",
-              selected.last_dinner_attended
-                ? new Date(
-                    selected.last_dinner_attended + "T00:00:00"
-                  ).toLocaleDateString()
-                : "Never",
-            ],
-            ["Current Intro", selected.current_intro || "N/A"],
-            ["Current Ask", selected.current_ask || "N/A"],
-            [
-              "Ask Updated",
-              selected.ask_updated_at
-                ? new Date(selected.ask_updated_at).toLocaleString()
-                : "N/A",
-            ],
-            ["Created", new Date(selected.created_at).toLocaleString()],
-            ["Updated", new Date(selected.updated_at).toLocaleString()],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-xs font-medium uppercase text-gray-500">
-                {label}
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900">{value}</dd>
-            </div>
-          ))}
-        </dl>
 
-        {/* Multi-email list */}
-        <div className="mt-6">
-          <h4 className="mb-2 text-sm font-medium uppercase text-gray-500">
-            Email Addresses
-          </h4>
-          <div className="rounded-md border border-gray-200">
-            {selected.member_emails.map((me) => (
-              <div
-                key={me.id}
-                className="flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0"
-              >
-                <span className="text-sm text-gray-900">{me.email}</span>
-                <span className="text-xs text-gray-400">{me.source}</span>
-                {me.is_primary && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                    primary
+        {/* Heading + pills */}
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3
+              className={`text-lg font-semibold ${selected.kicked_out ? "line-through text-gray-400" : "text-gray-900"}`}
+            >
+              {heading}
+            </h3>
+            {selected.is_team && (
+              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                Team
+              </span>
+            )}
+            {!selected.marketing_opted_in && (
+              <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                Marketing Opt-Out
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          {/* Column One */}
+          <div className="space-y-4">
+            <DetailField label="Type">
+              {formatStageType(selected.attendee_stagetype)}
+            </DetailField>
+
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500">
+                Email Addresses
+              </dt>
+              <dd className="mt-1">
+                <div className="rounded-md border border-gray-200">
+                  {selected.member_emails.map((me) => (
+                    <div
+                      key={me.id}
+                      className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-3 py-2 last:border-b-0"
+                    >
+                      <span className="text-sm text-gray-900">{me.email}</span>
+                      <span className="text-xs text-gray-400">{me.source}</span>
+                      {me.is_primary && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          primary
+                        </span>
+                      )}
+                      {me.email_status === "bounced" && (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                          bounced
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </dd>
+            </div>
+
+            <DetailField label="LinkedIn">
+              {selected.linkedin_profile ? (
+                <a
+                  href={selected.linkedin_profile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  {selected.linkedin_profile}
+                </a>
+              ) : (
+                "None"
+              )}
+            </DetailField>
+
+            <DetailField label="Website">
+              {selected.company_website ? (
+                <a
+                  href={
+                    selected.company_website.startsWith("http")
+                      ? selected.company_website
+                      : `https://${selected.company_website}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  {selected.company_website}
+                </a>
+              ) : (
+                "None"
+              )}
+            </DetailField>
+
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500">
+                Intro
+              </dt>
+              <dd className="mt-1 text-sm text-gray-900">
+                {selected.current_intro || "None"}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="flex items-center gap-2 text-xs font-medium uppercase text-gray-500">
+                Ask
+                {askIsStale && (
+                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium normal-case text-yellow-800">
+                    Stale
                   </span>
                 )}
-              </div>
-            ))}
+              </dt>
+              <dd className="mt-1 text-sm text-gray-900">
+                {selected.current_ask || "None"}
+              </dd>
+              {selected.ask_updated_at && (
+                <dd className="mt-0.5 text-xs text-gray-400">
+                  Last updated{" "}
+                  {new Date(selected.ask_updated_at).toLocaleDateString()}
+                </dd>
+              )}
+            </div>
+
+            <DetailField label="Contact Preference">
+              {selected.contact_preference}
+            </DetailField>
+          </div>
+
+          {/* Column Two */}
+          <div className="space-y-4">
+            <DetailField label="Application Date">
+              {applicationDate
+                ? `Approved ${new Date(applicationDate).toLocaleDateString()}`
+                : "None"}
+            </DetailField>
+
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500">
+                Dinners
+              </dt>
+              <dd className="mt-1">
+                {dinnerDates.length > 0 ? (
+                  <ul className="space-y-1">
+                    {dinnerDates.map((d) => (
+                      <li key={d} className="text-sm text-gray-900">
+                        {new Date(d + "T00:00:00").toLocaleDateString()}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-sm text-gray-900">None</span>
+                )}
+              </dd>
+            </div>
           </div>
         </div>
       </div>
