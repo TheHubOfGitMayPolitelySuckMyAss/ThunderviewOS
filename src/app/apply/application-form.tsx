@@ -46,9 +46,7 @@ export default function ApplicationForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
-  const [preferredDinnerDate, setPreferredDinnerDate] = useState(
-    dinnerOptions[0]?.value ?? ""
-  );
+  const [preferredDinnerDate, setPreferredDinnerDate] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -116,6 +114,9 @@ export default function ApplicationForm({
             onChange={(e) => setPreferredDinnerDate(e.target.value)}
             className={inputClass}
           >
+            <option value="" disabled>
+              Select an option
+            </option>
             {dinnerOptions.map((d) => (
               <option key={d.value} value={d.value}>
                 {d.label}
@@ -191,7 +192,7 @@ export default function ApplicationForm({
               className={inputClass}
             >
               <option value="" disabled>
-                Select...
+                Select an option
               </option>
               {GENDER_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
@@ -210,7 +211,7 @@ export default function ApplicationForm({
               className={inputClass}
             >
               <option value="" disabled>
-                Select...
+                Select an option
               </option>
               {RACE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
@@ -229,7 +230,7 @@ export default function ApplicationForm({
               className={inputClass}
             >
               <option value="" disabled>
-                Select...
+                Select an option
               </option>
               {ORIENTATION_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
@@ -283,7 +284,7 @@ export default function ApplicationForm({
               className={inputClass}
             >
               <option value="" disabled>
-                Select...
+                Select an option
               </option>
               {STAGE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
@@ -311,7 +312,7 @@ export default function ApplicationForm({
                   className={inputClass}
                 >
                   <option value="" disabled>
-                    Select...
+                    Select an option
                   </option>
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
@@ -335,7 +336,7 @@ export default function ApplicationForm({
                   className={inputClass}
                 >
                   <option value="" disabled>
-                    Select...
+                    Select an option
                   </option>
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
