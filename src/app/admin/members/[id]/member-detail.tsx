@@ -124,6 +124,7 @@ export default function MemberDetail({
             memberId={m.id}
             field="linkedin_profile"
             type="text"
+            valueNotClickable
             renderDisplay={(v) =>
               v ? (
                 <a href={v} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
@@ -141,6 +142,7 @@ export default function MemberDetail({
             memberId={m.id}
             field="company_website"
             type="text"
+            valueNotClickable
             renderDisplay={(v) =>
               v ? (
                 <a
@@ -312,6 +314,8 @@ function EditableField({
   renderDisplay?: (v: string | null) => React.ReactNode;
   labelExtra?: React.ReactNode;
   subtitle?: string;
+  /** If true, clicking the value does NOT enter edit mode (for URL fields) */
+  valueNotClickable?: boolean;
   onSaved: (v: string | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -402,6 +406,8 @@ function EditableField({
       ? displayFn(value)
       : value || "None";
 
+  const clickableValue = !valueNotClickable;
+
   return (
     <div className="group/field">
       <dt className="flex items-center gap-2 text-xs font-medium uppercase text-gray-500">
@@ -415,7 +421,12 @@ function EditableField({
           <PencilIcon />
         </button>
       </dt>
-      <dd className="mt-1 text-sm text-gray-900">{displayValue}</dd>
+      <dd
+        className={`mt-1 text-sm text-gray-900${clickableValue ? " cursor-pointer" : ""}`}
+        onClick={clickableValue ? startEdit : undefined}
+      >
+        {displayValue}
+      </dd>
       {subtitle && (
         <dd className="mt-0.5 text-xs text-gray-400">{subtitle}</dd>
       )}
@@ -560,12 +571,12 @@ function EmailsSection({
   const [showModal, setShowModal] = useState(false);
 
   return (
-    <div>
+    <div className="group/field">
       <dt className="flex items-center gap-2 text-xs font-medium uppercase text-gray-500">
         Email Addresses
         <button
           onClick={() => setShowModal(true)}
-          className="text-gray-400 hover:text-gray-600"
+          className="text-gray-400 opacity-0 transition-opacity hover:text-gray-600 group-hover/field:opacity-100"
           title="Manage emails"
         >
           <PencilIcon />
