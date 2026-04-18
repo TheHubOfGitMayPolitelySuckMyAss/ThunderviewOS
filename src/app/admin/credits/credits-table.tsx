@@ -20,8 +20,38 @@ type Credit = {
 
 const filters = ["All", "Outstanding", "Redeemed"] as const;
 
+type SortKey = "member" | "email" | "sourceDinner" | "status" | "redeemedDinner" | "created";
+type SortDir = "asc" | "desc";
+
+function getPrimaryEmail(credit: Credit): string {
+  return credit.members?.member_emails?.find((e) => e.is_primary)?.email
+    ?? credit.members?.member_emails?.[0]?.email ?? "-";
+}
+
+function getSortValue(credit: Credit, key: SortKey): string {
+  switch (key) {
+    case "member": return (credit.members?.name || "").toLowerCase();
+    case "email": return getPrimaryEmail(credit).toLowerCase();
+    case "sourceDinner": return credit.source_ticket?.dinners?.date || "";
+    case "status": return credit.status;
+    case "redeemedDinner": return credit.redeemed_ticket?.dinners?.date || "";
+    case "created": return credit.created_at;
+  }
+}
+
 export default function CreditsTable({ credits }: { credits: Credit[] }) {
   const [filter, setFilter] = useState<string>("All");
+  const [sortKey, setSortKey] = useState<SortKey>("created");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const filtered =
     filter === "All"
@@ -29,6 +59,21 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
       : credits.filter(
           (c) => c.status === filter.toLowerCase()
         );
+
+  const sorted = [...filtered].sort((a, b) => {
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  const thClass =
+    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
+
+  function SortIndicator({ col }: { col: SortKey }) {
+    if (sortKey !== col) return null;
+    return <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
+  }
 
   return (
     <div>
@@ -48,38 +93,38 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="sticky top-0 z-10 bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Member
+              <th className={thClass} onClick={() => toggleSort("member")}>
+                Member<SortIndicator col="member" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Email
+              <th className={thClass} onClick={() => toggleSort("email")}>
+                Email<SortIndicator col="email" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Source Dinner
+              <th className={thClass} onClick={() => toggleSort("sourceDinner")}>
+                Source Dinner<SortIndicator col="sourceDinner" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Status
+              <th className={thClass} onClick={() => toggleSort("status")}>
+                Status<SortIndicator col="status" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Redeemed Dinner
+              <th className={thClass} onClick={() => toggleSort("redeemedDinner")}>
+                Redeemed Dinner<SortIndicator col="redeemedDinner" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Created
+              <th className={thClass} onClick={() => toggleSort("created")}>
+                Created<SortIndicator col="created" />
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filtered.map((credit) => (
+            {sorted.map((credit) => (
               <tr key={credit.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm text-gray-900">
                   {credit.members?.name || "-"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {credit.members?.member_emails?.find((e) => e.is_primary)?.email ?? credit.members?.member_emails?.[0]?.email ?? "-"}
+                  {getPrimaryEmail(credit)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {credit.source_ticket?.dinners?.date
@@ -111,7 +156,7 @@ export default function CreditsTable({ credits }: { credits: Credit[] }) {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
                 <td
                   colSpan={6}

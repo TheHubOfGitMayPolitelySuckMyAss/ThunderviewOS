@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { formatStageType } from "@/lib/format";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -52,7 +54,7 @@ export default async function DinnerDetailPage({
 
   const { data: tickets } = await supabase
     .from("tickets")
-    .select("*, members(name, current_intro, current_ask, ask_updated_at, last_dinner_attended, member_emails(email, is_primary))")
+    .select("*, members(id, name, current_intro, current_ask, ask_updated_at, last_dinner_attended, member_emails(email, is_primary))")
     .eq("dinner_id", id)
     .order("purchased_at", { ascending: false });
 
@@ -69,6 +71,31 @@ export default async function DinnerDetailPage({
       return acc;
     },
     {} as Record<string, number>
+  );
+
+  // Build set of member IDs who have tickets for this dinner
+  const today = new Date().toISOString().slice(0, 10);
+  const isPast = dinner.date < today;
+
+  const ticketMemberIds = new Set(
+    (tickets || [])
+      .filter((t) => {
+        if (isPast) {
+          // After dinner date: only count tickets purchased on or before the dinner
+          return t.purchased_at && t.purchased_at.slice(0, 10) <= dinner.date;
+        }
+        return true;
+      })
+      .map((t) => t.member_id)
+      .filter(Boolean)
+  );
+
+  // Filter applications: only approved, and member has no ticket for this dinner
+  const filteredApplications = (applications || []).filter(
+    (app) =>
+      app.status === "approved" &&
+      app.member_id &&
+      !ticketMemberIds.has(app.member_id)
   );
 
   return (
@@ -131,6 +158,7 @@ export default async function DinnerDetailPage({
             <tbody className="divide-y divide-gray-200">
               {tickets?.map((ticket) => {
                 const member = ticket.members as unknown as {
+                  id: string;
                   name: string;
                   current_intro: string | null;
                   current_ask: string | null;
@@ -145,9 +173,18 @@ export default async function DinnerDetailPage({
                   member
                 );
                 return (
-                  <tr key={ticket.id} className="hover:bg-gray-50">
+                  <tr key={ticket.id} className="group relative hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {member?.name}
+                      {member?.id ? (
+                        <Link
+                          href={`/admin/members?selected=${member.id}`}
+                          className="after:absolute after:inset-0"
+                        >
+                          {member.name}
+                        </Link>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {primaryEmail}
@@ -182,10 +219,10 @@ export default async function DinnerDetailPage({
         </div>
       </div>
 
-      {/* Applications table */}
+      {/* Applications table — only approved without tickets */}
       <div>
         <h3 className="mb-2 text-lg font-semibold text-gray-900">
-          Applications for this date
+          Approved Without Ticket ({filteredApplications.length})
         </h3>
         <div className="overflow-hidden rounded-lg bg-white shadow">
           <table className="min-w-full divide-y divide-gray-200">
@@ -201,7 +238,7 @@ export default async function DinnerDetailPage({
                   Company
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Status
+                  Stage/Type
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                   Submitted
@@ -209,10 +246,15 @@ export default async function DinnerDetailPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {applications?.map((app) => (
-                <tr key={app.id} className="hover:bg-gray-50">
+              {filteredApplications.map((app) => (
+                <tr key={app.id} className="group relative hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {app.name}
+                    <Link
+                      href={`/admin/applications?selected=${app.id}`}
+                      className="after:absolute after:inset-0"
+                    >
+                      {app.name}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {app.email}
@@ -220,21 +262,21 @@ export default async function DinnerDetailPage({
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {app.company_name}
                   </td>
-                  <td className="px-4 py-3 text-sm">
-                    <StatusBadge status={app.status} />
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {formatStageType(app.attendee_stagetype)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {new Date(app.submitted_on).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
-              {(!applications || applications.length === 0) && (
+              {filteredApplications.length === 0 && (
                 <tr>
                   <td
                     colSpan={5}
                     className="px-4 py-6 text-center text-sm text-gray-400"
                   >
-                    No applications for this dinner date.
+                    No approved applications without tickets.
                   </td>
                 </tr>
               )}

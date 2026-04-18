@@ -48,7 +48,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 - `dinners` — first-Thursday-of-month events, auto-generated 12 months out, skipping Jan/Jul. Date is UNIQUE.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `member_id` is NULL until approved.
-- `members` — approved people, soft-deletable via `kicked_out`. `has_attended` is sticky (never flips back to false). `updated_at` auto-set by trigger.
+- `members` — approved people, soft-deletable via `kicked_out`. `has_community_access` (renamed from `has_attended`) is one-way — set to `true` on ticket insert, never reverted. `first_dinner_attended` DATE — earliest non-refunded/credited ticket's dinner date, set by trigger on ticket insert, recalculated on refund/credit. `last_dinner_attended` DATE — set by trigger when `fulfillment_status` changes to `fulfilled`, recalculated on refund/credit. `marketing_opted_out_at` TIMESTAMPTZ — set/cleared by trigger when `marketing_opted_in` changes. `updated_at` auto-set by trigger.
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (pending/fulfilled/refunded/credited). Tracks payment source and match confidence.
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
@@ -86,23 +86,29 @@ src/
 │   └── admin/
 │       ├── layout.tsx                  # Auth check + role detection (server component)
 │       ├── admin-shell.tsx             # Sidebar nav, header, sign-out (client component)
-│       ├── page.tsx                    # Redirects to /admin/dinners
+│       ├── page.tsx                    # Dashboard: next-dinner stats, pending apps, unfulfilled tickets, opt-outs
+│       ├── dashboard-accordions.tsx    # Client component: collapsible accordion sections
 │       ├── dinners/
-│       │   ├── page.tsx                # Dinner list with funnel columns (Applied/Approved/Paid/Intro-Ask); rows link to detail
-│       │   └── [id]/page.tsx           # Dinner detail: tickets (with derived Intro/Ask status) + applications for that date
+│       │   ├── page.tsx                # Server wrapper: fetches dinners + funnel stats
+│       │   ├── dinners-table.tsx       # Client component: sortable columns, sticky header, rows link to detail
+│       │   └── [id]/page.tsx           # Dinner detail: tickets (clickable to member) + approved-without-ticket list (clickable to app)
 │       ├── applications/
 │       │   ├── page.tsx                # Server wrapper
-│       │   └── applications-table.tsx  # Filter tabs (pending/approved/rejected/all), click-to-detail
+│       │   └── applications-table.tsx  # Filter tabs, sortable columns, sticky header, click-to-detail
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper
-│       │   └── members-table.tsx       # Search by name/email, click-to-detail
+│       │   └── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough
 │       └── credits/
 │           ├── page.tsx                # Server wrapper
-│           └── credits-table.tsx       # Filter (outstanding/redeemed/all)
+│           └── credits-table.tsx       # Filter, sortable columns, sticky header
+├── lib/
+│   └── format.ts                       # Shared display utilities (formatStageType)
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
-│   └── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
+│   ├── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
+│   ├── 20260418000000_add_marketing_opted_out_at.sql  # marketing_opted_out_at column + trigger + backfill
+│   └── 20260418100000_schema_triggers_and_rename.sql  # first_dinner_attended, has_attended→has_community_access rename, ticket triggers
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -160,6 +166,21 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Import audit passed: FK integrity, primary email uniqueness, has_attended/ticket consistency, marketing opt-out verification all clean.
 - 65 bounced emails flagged via Squarespace cleaned export. 81 members opted out via Squarespace unsubscribed export.
 - Import artifacts in `tmp/`: `import.sql` (generated SQL), `import_summary.txt`, `import_validation.txt`.
+
+## What's done (Phase 3, in progress)
+
+- Admin dashboard home page (`/admin`): next-dinner stats (date, days until, new apps, tickets sold), collapsible accordion sections (pending applications, unfulfilled tickets with reason, marketing opt-outs)
+- Schema: `marketing_opted_out_at` TIMESTAMPTZ on members, with trigger on `marketing_opted_in` changes; backfilled 85 existing opt-outs
+- Schema: `first_dinner_attended` DATE on members; backfilled from earliest non-refunded/credited ticket
+- Schema: renamed `has_attended` → `has_community_access` (all code references updated)
+- Triggers on tickets: `trg_ticket_insert` (sets `has_community_access = true`, sets `first_dinner_attended` if null), `trg_ticket_fulfillment_change` (sets `last_dinner_attended` on fulfill, recalculates both `last_dinner_attended` and `first_dinner_attended` on refund/credit)
+- Dinner detail: "Approved Without Ticket" list replaces raw applications list (filters to approved apps whose member has no ticket); ticket rows link to member detail; application rows link to application detail
+- All list pages: sortable columns (click header to toggle asc/desc), sticky headers
+- Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with strikethrough name
+- Member detail: added "First Dinner" and "Community Access" fields; `attendee_stagetype` uses display-friendly labels
+- Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
+- Members search input text color fixed (was invisible against background)
+- Applications and members pages accept `?selected=` query param for deep-linking
 
 ## What's NOT done
 

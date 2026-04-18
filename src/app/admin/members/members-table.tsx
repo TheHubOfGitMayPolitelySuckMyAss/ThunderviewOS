@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatStageType } from "@/lib/format";
 
 type MemberEmail = {
   id: string;
@@ -20,11 +21,12 @@ type Member = {
   attendee_stagetype: string | null;
   marketing_opted_in: boolean;
   kicked_out: boolean;
+  first_dinner_attended: string | null;
   last_dinner_attended: string | null;
   current_intro: string | null;
   current_ask: string | null;
   ask_updated_at: string | null;
-  has_attended: boolean;
+  has_community_access: boolean;
   is_team: boolean;
   created_at: string;
   updated_at: string;
@@ -36,6 +38,20 @@ function getPrimaryEmail(member: Member): string {
     member.member_emails[0]?.email ??
     "-"
   );
+}
+
+type SortKey = "name" | "email" | "company" | "stage" | "lastDinner" | "marketing";
+type SortDir = "asc" | "desc";
+
+function getSortValue(member: Member, key: SortKey): string {
+  switch (key) {
+    case "name": return member.name.toLowerCase();
+    case "email": return getPrimaryEmail(member).toLowerCase();
+    case "company": return (member.company_name || "").toLowerCase();
+    case "stage": return (member.attendee_stagetype || "").toLowerCase();
+    case "lastDinner": return member.last_dinner_attended || "";
+    case "marketing": return member.marketing_opted_in ? "yes" : "no";
+  }
 }
 
 export default function MembersTable({
@@ -51,6 +67,17 @@ export default function MembersTable({
       ? members.find((m) => m.id === initialSelectedId) ?? null
       : null
   );
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const filtered = search
     ? members.filter(
@@ -61,6 +88,13 @@ export default function MembersTable({
           )
       )
     : members;
+
+  const sorted = [...filtered].sort((a, b) => {
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   if (selected) {
     const primaryEmail = getPrimaryEmail(selected);
@@ -82,11 +116,19 @@ export default function MembersTable({
             ["LinkedIn", selected.linkedin_profile || "N/A"],
             ["Company", selected.company_name || "N/A"],
             ["Website", selected.company_website || "N/A"],
-            ["Stage/Type", selected.attendee_stagetype || "N/A"],
+            ["Stage/Type", formatStageType(selected.attendee_stagetype)],
             ["Marketing Opted In", selected.marketing_opted_in ? "Yes" : "No"],
             ["Kicked Out", selected.kicked_out ? "Yes" : "No"],
-            ["Has Attended", selected.has_attended ? "Yes" : "No"],
+            ["Community Access", selected.has_community_access ? "Yes" : "No"],
             ["Is Team", selected.is_team ? "Yes" : "No"],
+            [
+              "First Dinner",
+              selected.first_dinner_attended
+                ? new Date(
+                    selected.first_dinner_attended + "T00:00:00"
+                  ).toLocaleDateString()
+                : "Never",
+            ],
             [
               "Last Dinner Attended",
               selected.last_dinner_attended
@@ -141,6 +183,14 @@ export default function MembersTable({
     );
   }
 
+  const thClass =
+    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
+
+  function SortIndicator({ col }: { col: SortKey }) {
+    if (sortKey !== col) return null;
+    return <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
+  }
+
   return (
     <div>
       <div className="mb-4">
@@ -149,48 +199,42 @@ export default function MembersTable({
           placeholder="Search by name or email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="sticky top-0 z-10 bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Name
+              <th className={thClass} onClick={() => toggleSort("name")}>
+                Name<SortIndicator col="name" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Email
+              <th className={thClass} onClick={() => toggleSort("email")}>
+                Email<SortIndicator col="email" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Company
+              <th className={thClass} onClick={() => toggleSort("company")}>
+                Company<SortIndicator col="company" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Stage/Type
+              <th className={thClass} onClick={() => toggleSort("stage")}>
+                Stage/Type<SortIndicator col="stage" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Last Dinner
+              <th className={thClass} onClick={() => toggleSort("lastDinner")}>
+                Last Dinner<SortIndicator col="lastDinner" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Marketing
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Kicked Out
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Team
+              <th className={thClass} onClick={() => toggleSort("marketing")}>
+                Marketing<SortIndicator col="marketing" />
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filtered.map((member) => (
+            {sorted.map((member) => (
               <tr
                 key={member.id}
                 onClick={() => setSelected(member)}
                 className="cursor-pointer hover:bg-gray-50"
               >
-                <td className="px-4 py-3 text-sm text-gray-900">
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400 line-through" : "text-gray-900"}`}>
                   {member.name}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
@@ -200,7 +244,7 @@ export default function MembersTable({
                   {member.company_name || "-"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {member.attendee_stagetype || "-"}
+                  {formatStageType(member.attendee_stagetype)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {member.last_dinner_attended
@@ -212,26 +256,12 @@ export default function MembersTable({
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {member.marketing_opted_in ? "Yes" : "No"}
                 </td>
-                <td className="px-4 py-3 text-sm">
-                  {member.kicked_out ? (
-                    <span className="text-red-600">Yes</span>
-                  ) : (
-                    <span className="text-gray-400">No</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {member.is_team ? (
-                    <span className="text-blue-600">Yes</span>
-                  ) : (
-                    <span className="text-gray-400">No</span>
-                  )}
-                </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={6}
                   className="px-4 py-6 text-center text-sm text-gray-400"
                 >
                   No members found.

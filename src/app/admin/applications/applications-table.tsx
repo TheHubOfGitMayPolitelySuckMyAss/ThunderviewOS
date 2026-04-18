@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatStageType } from "@/lib/format";
 
 type Application = {
   id: string;
@@ -27,6 +28,21 @@ type Application = {
 
 const filters = ["All", "Pending", "Approved", "Rejected"] as const;
 
+type SortKey = "name" | "email" | "company" | "stage" | "dinner" | "status" | "submitted";
+type SortDir = "asc" | "desc";
+
+function getSortValue(app: Application, key: SortKey): string {
+  switch (key) {
+    case "name": return app.name.toLowerCase();
+    case "email": return app.email.toLowerCase();
+    case "company": return app.company_name.toLowerCase();
+    case "stage": return app.attendee_stagetype.toLowerCase();
+    case "dinner": return app.preferred_dinner_date;
+    case "status": return app.status;
+    case "submitted": return app.submitted_on;
+  }
+}
+
 export default function ApplicationsTable({
   applications,
   initialSelectedId,
@@ -40,6 +56,17 @@ export default function ApplicationsTable({
       ? applications.find((a) => a.id === initialSelectedId) ?? null
       : null
   );
+  const [sortKey, setSortKey] = useState<SortKey>("submitted");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const filtered =
     filter === "All"
@@ -47,6 +74,13 @@ export default function ApplicationsTable({
       : applications.filter(
           (a) => a.status === filter.toLowerCase()
         );
+
+  const sorted = [...filtered].sort((a, b) => {
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   if (selected) {
     return (
@@ -65,7 +99,7 @@ export default function ApplicationsTable({
             ["Email", selected.email],
             ["Company", selected.company_name],
             ["Website", selected.company_website],
-            ["Stage/Type", selected.attendee_stagetype],
+            ["Stage/Type", formatStageType(selected.attendee_stagetype)],
             [
               "Preferred Dinner",
               new Date(
@@ -106,6 +140,14 @@ export default function ApplicationsTable({
     );
   }
 
+  const thClass =
+    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
+
+  function SortIndicator({ col }: { col: SortKey }) {
+    if (sortKey !== col) return null;
+    return <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
+  }
+
   return (
     <div>
       {/* Filter tabs */}
@@ -125,35 +167,35 @@ export default function ApplicationsTable({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="sticky top-0 z-10 bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Name
+              <th className={thClass} onClick={() => toggleSort("name")}>
+                Name<SortIndicator col="name" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Email
+              <th className={thClass} onClick={() => toggleSort("email")}>
+                Email<SortIndicator col="email" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Company
+              <th className={thClass} onClick={() => toggleSort("company")}>
+                Company<SortIndicator col="company" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Stage/Type
+              <th className={thClass} onClick={() => toggleSort("stage")}>
+                Stage/Type<SortIndicator col="stage" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Preferred Dinner
+              <th className={thClass} onClick={() => toggleSort("dinner")}>
+                Preferred Dinner<SortIndicator col="dinner" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Status
+              <th className={thClass} onClick={() => toggleSort("status")}>
+                Status<SortIndicator col="status" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Submitted
+              <th className={thClass} onClick={() => toggleSort("submitted")}>
+                Submitted<SortIndicator col="submitted" />
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filtered.map((app) => (
+            {sorted.map((app) => (
               <tr
                 key={app.id}
                 onClick={() => setSelected(app)}
@@ -167,7 +209,7 @@ export default function ApplicationsTable({
                   {app.company_name}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
-                  {app.attendee_stagetype}
+                  {formatStageType(app.attendee_stagetype)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {new Date(
@@ -182,7 +224,7 @@ export default function ApplicationsTable({
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
                 <td
                   colSpan={7}

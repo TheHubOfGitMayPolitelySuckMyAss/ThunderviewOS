@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
+import DinnersTable from "./dinners-table";
 
 // PostgREST on Supabase caps responses at 1000 rows server-side, so .limit()
 // above that is silently clamped. Paginate with .range() until drained.
@@ -88,80 +88,13 @@ export default async function DinnersPage() {
       return m.ask_updated_at > m.last_dinner_attended;
     }).length;
 
-    return { ...dinner, applied, approved, paid, introAsk };
+    return { id: dinner.id, date: dinner.date, venue: dinner.venue, applied, approved, paid, introAsk };
   });
 
   return (
     <div>
       <h2 className="mb-4 text-xl font-bold text-gray-900">Dinners</h2>
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Date
-              </th>
-              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
-                Applied
-              </th>
-              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
-                Approved
-              </th>
-              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
-                Paid
-              </th>
-              <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
-                Intro/Ask
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {dinnerStats.map((dinner) => (
-              <tr key={dinner.id} className="group relative hover:bg-gray-50">
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                  <Link
-                    href={`/admin/dinners/${dinner.id}`}
-                    className="after:absolute after:inset-0"
-                  >
-                    {new Date(dinner.date + "T00:00:00").toLocaleDateString(
-                      "en-US",
-                      {
-                        weekday: "short",
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      }
-                    )}
-                  </Link>
-                </td>
-                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                  {dinner.applied}
-                </td>
-                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                  {dinner.approved}
-                </td>
-                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                  {dinner.paid}
-                </td>
-                <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                  {dinner.introAsk}
-                </td>
-              </tr>
-            ))}
-            {(!dinners || dinners.length === 0) && (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-6 py-8 text-center text-sm text-gray-400"
-                >
-                  No dinners found. Run the seed script to generate dinner
-                  dates.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DinnersTable dinners={dinnerStats} />
     </div>
   );
 }
