@@ -302,6 +302,7 @@ function EditableField({
   renderDisplay,
   labelExtra,
   subtitle,
+  valueNotClickable,
   onSaved,
 }: {
   label: string;
