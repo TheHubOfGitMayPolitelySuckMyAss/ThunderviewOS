@@ -100,15 +100,17 @@ src/
 │       │   └── [id]/page.tsx           # Dinner detail: tickets (clickable to member) + approved-without-ticket list (clickable to app)
 │       ├── applications/
 │       │   ├── page.tsx                # Server wrapper
-│       │   └── applications-table.tsx  # Filter tabs, sortable columns, sticky header, click-to-detail
+│       │   ├── applications-table.tsx  # Filter tabs, sortable columns, sticky header, rows link to [id]
+│       │   └── [id]/page.tsx           # Application detail: two-column layout, status pill, conditional fields
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper
-│       │   └── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough
+│       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id]
+│       │   └── [id]/page.tsx           # Member detail: two-column layout, status pills, emails, intro/ask, dinners
 │       └── credits/
 │           ├── page.tsx                # Server wrapper
 │           └── credits-table.tsx       # Filter, sortable columns, sticky header
 ├── lib/
-│   └── format.ts                       # Shared display utilities (formatStageType)
+│   └── format.ts                       # Shared display utilities (formatStageType, formatDate, formatTimestamp, getTodayMT, toDateMT)
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
@@ -184,11 +186,13 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Dinner detail: "Approved Without Ticket" list replaces raw applications list. Before dinner date: approved apps whose member has no ticket for this dinner. After dinner date: approved apps whose member had no ticket purchased on or before the dinner date. Ticket rows link to member detail; application rows link to application detail.
 - All list pages: sortable columns (click header to toggle asc/desc), sticky headers
 - Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with full-row strikethrough
-- Member detail redesign: two-column layout, `<name> at <company>` heading with strikethrough for kicked-out, status pills (Team green, Marketing Opt-Out red), clickable LinkedIn/Website links, Intro/Ask with "Last updated" dates, "Stale" pill on Ask, application date (earliest approved), dinner date list from tickets. Removed first_dinner_attended, last_dinner_attended, has_community_access, created/updated timestamps from display.
+- Member detail page (`/admin/members/[id]`): standalone server-component page (not inline modal). `<name> at <company>` heading with strikethrough for kicked-out. Status pills: green "Team", red "Marketing Opt-Out". Two-column layout — column one: Type, Email Addresses (with primary/bounced/source pills), LinkedIn (clickable), Website (clickable), Intro (with "Last updated" date from `intro_updated_at`), Ask (with "Last updated" date from `ask_updated_at`, yellow "Stale" pill if member has a future dinner ticket purchased after last ask update), Contact Preference. Column two: Application Date (earliest approved), Dinners (all dates from tickets, most recent first). Removed from display: first_dinner_attended, last_dinner_attended, has_community_access, created/updated timestamps.
+- Application detail page (`/admin/applications/[id]`): standalone server-component page. `<name> at <company>` heading with status pill (yellow pending, green approved, red rejected). "View member →" link when `member_id` exists. Two-column layout — column one: Type, Email, LinkedIn (clickable), Website (clickable), Gender, Race/Ethnicity, Orientation, plus "I Am My Startup's CEO" and "My Startup Is NOT A Services Business" (conditional: only shown for Active CEO stage type). Column two: Applied date, Preferred Dinner, Status, Rejection Reason (only if rejected).
+- Detail pages are standalone routes, not inline modals. Table rows use `Link` to navigate to `/admin/members/[id]` or `/admin/applications/[id]`. Browser back button works correctly. Old `?selected=` query param pattern removed.
 - Schema: `intro_updated_at` TIMESTAMPTZ on members, with `trg_intro_updated_at` trigger that sets `now()` when `current_intro` value changes (IS DISTINCT FROM). No backfill — existing rows null.
+- Timezone standardization: all date display and comparison logic uses America/Denver. Shared utilities in `src/lib/format.ts`: `formatDate()` (DATE or TIMESTAMPTZ → display string in MT), `formatTimestamp()` (TIMESTAMPTZ → display with time in MT), `getTodayMT()` (today as YYYY-MM-DD in MT), `toDateMT()` (TIMESTAMPTZ → YYYY-MM-DD in MT for comparisons). No raw `toLocaleDateString()` or `toISOString().slice()` calls remain in the codebase. Stored data is unchanged (TIMESTAMPTZ is UTC internally, DATE columns are timezone-agnostic).
 - Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
 - Members search input text color fixed (was invisible against background)
-- Applications and members pages accept `?selected=` query param for deep-linking
 
 ## What's NOT done
 
