@@ -53,6 +53,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
   - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
   - `last_dinner_attended` DATE — set on ticket fulfillment (`fulfillment_status` → `'fulfilled'`) to the dinner's date if later than the current value. On refund/credit, recalculated as MAX of remaining fulfilled tickets' dinner dates; null if none remain.
   - `marketing_opted_out_at` TIMESTAMPTZ — set to `now()` when `marketing_opted_in` flips to `false`, cleared to null when it flips back to `true`. Managed by trigger on UPDATE of `marketing_opted_in`.
+  - `intro_updated_at` TIMESTAMPTZ — set to `now()` when `current_intro` value changes. Managed by `trg_intro_updated_at` BEFORE UPDATE trigger (uses `IS DISTINCT FROM`).
   - `updated_at` — auto-set by trigger.
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (pending/fulfilled/refunded/credited). Tracks payment source and match confidence.
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
@@ -113,7 +114,8 @@ supabase/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
 │   ├── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
 │   ├── 20260418000000_add_marketing_opted_out_at.sql  # marketing_opted_out_at column + trigger + backfill
-│   └── 20260418100000_schema_triggers_and_rename.sql  # first_dinner_attended, has_attended→has_community_access rename, ticket triggers
+│   ├── 20260418100000_schema_triggers_and_rename.sql  # first_dinner_attended, has_attended→has_community_access rename, ticket triggers
+│   └── 20260418200000_add_intro_updated_at.sql       # intro_updated_at column + trigger on current_intro change
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -182,7 +184,8 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Dinner detail: "Approved Without Ticket" list replaces raw applications list. Before dinner date: approved apps whose member has no ticket for this dinner. After dinner date: approved apps whose member had no ticket purchased on or before the dinner date. Ticket rows link to member detail; application rows link to application detail.
 - All list pages: sortable columns (click header to toggle asc/desc), sticky headers
 - Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with full-row strikethrough
-- Member detail: added "First Dinner" and "Community Access" fields; `attendee_stagetype` uses display-friendly labels
+- Member detail redesign: two-column layout, `<name> at <company>` heading with strikethrough for kicked-out, status pills (Team green, Marketing Opt-Out red), clickable LinkedIn/Website links, Intro/Ask with "Last updated" dates, "Stale" pill on Ask, application date (earliest approved), dinner date list from tickets. Removed first_dinner_attended, last_dinner_attended, has_community_access, created/updated timestamps from display.
+- Schema: `intro_updated_at` TIMESTAMPTZ on members, with `trg_intro_updated_at` trigger that sets `now()` when `current_intro` value changes (IS DISTINCT FROM). No backfill — existing rows null.
 - Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
 - Members search input text color fixed (was invisible against background)
 - Applications and members pages accept `?selected=` query param for deep-linking

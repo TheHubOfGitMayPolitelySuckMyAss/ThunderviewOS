@@ -40,6 +40,7 @@ type Member = {
   first_dinner_attended: string | null;
   last_dinner_attended: string | null;
   current_intro: string | null;
+  intro_updated_at: string | null;
   current_ask: string | null;
   ask_updated_at: string | null;
   has_community_access: boolean;
@@ -265,6 +266,12 @@ export default function MembersTable({
               <dd className="mt-1 text-sm text-gray-900">
                 {selected.current_intro || "None"}
               </dd>
+              {selected.intro_updated_at && (
+                <dd className="mt-0.5 text-xs text-gray-400">
+                  Last updated{" "}
+                  {new Date(selected.intro_updated_at).toLocaleDateString()}
+                </dd>
+              )}
             </div>
 
             <div>
