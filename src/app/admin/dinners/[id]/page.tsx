@@ -61,7 +61,7 @@ export default async function DinnerDetailPage({
 
   const { data: applications } = await supabase
     .from("applications")
-    .select("*")
+    .select("*, members(kicked_out)")
     .eq("preferred_dinner_date", dinner.date)
     .order("submitted_on", { ascending: false });
 
@@ -92,12 +92,14 @@ export default async function DinnerDetailPage({
       .filter(Boolean)
   );
 
-  const filteredApplications = (applications || []).filter(
-    (app) =>
-      app.status === "approved" &&
-      app.member_id &&
-      !ticketMemberIds.has(app.member_id)
-  );
+  const filteredApplications = (applications || []).filter((app) => {
+    if (app.status !== "approved" || !app.member_id) return false;
+    if (ticketMemberIds.has(app.member_id)) return false;
+    // Exclude kicked-out members
+    const m = app.members as unknown as { kicked_out: boolean } | null;
+    if (m?.kicked_out === true) return false;
+    return true;
+  });
 
   // Shape ticket data for client component
   const ticketRows = (tickets || []).map((ticket) => {

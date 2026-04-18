@@ -29,10 +29,11 @@ export default async function DinnersPage() {
     preferred_dinner_date: string;
     status: string;
     member_id: string | null;
+    members: unknown;
   }>((from, to) =>
     supabase
       .from("applications")
-      .select("preferred_dinner_date, status, member_id")
+      .select("preferred_dinner_date, status, member_id, members(kicked_out)")
       .range(from, to),
   );
 
@@ -59,6 +60,12 @@ export default async function DinnersPage() {
       (t) => t.dinner_id === dinner.id
     );
 
+    // Exclude applications whose linked member is kicked out
+    const isKickedOut = (a: typeof dinnerApps[0]) => {
+      const m = a.members as { kicked_out: boolean } | null;
+      return m?.kicked_out === true;
+    };
+
     const applied = dinnerApps.filter((a) => a.status === "pending").length;
 
     const fulfilledMemberIds = new Set(
@@ -67,7 +74,7 @@ export default async function DinnersPage() {
         .map((t) => t.member_id)
     );
     const approved = dinnerApps.filter(
-      (a) => a.status === "approved" && a.member_id && !fulfilledMemberIds.has(a.member_id)
+      (a) => a.status === "approved" && a.member_id && !fulfilledMemberIds.has(a.member_id) && !isKickedOut(a)
     ).length;
 
     const paid = dinnerTickets
