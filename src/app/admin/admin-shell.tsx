@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 const navItems = [
+  { href: "/admin", label: "Dashboard", exact: true },
   { href: "/admin/dinners", label: "Dinners" },
   { href: "/admin/applications", label: "Applications" },
   { href: "/admin/members", label: "Members" },
@@ -39,7 +40,9 @@ export default function AdminShell({
         </div>
         <nav className="flex-1 space-y-1 px-2">
           {navItems.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = (item as { exact?: boolean }).exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

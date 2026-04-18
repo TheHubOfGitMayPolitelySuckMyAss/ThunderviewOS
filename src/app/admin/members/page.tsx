@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import MembersTable from "./members-table";
 
-export default async function MembersPage() {
+export default async function MembersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ selected?: string }>;
+}) {
+  const { selected } = await searchParams;
   const supabase = await createClient();
   const { data: members } = await supabase
     .from("members")
@@ -11,7 +16,7 @@ export default async function MembersPage() {
   return (
     <div>
       <h2 className="mb-4 text-xl font-bold text-gray-900">Members</h2>
-      <MembersTable members={members || []} />
+      <MembersTable members={members || []} initialSelectedId={selected} />
     </div>
   );
 }

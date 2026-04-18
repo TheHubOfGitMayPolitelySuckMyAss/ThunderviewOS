@@ -38,9 +38,19 @@ function getPrimaryEmail(member: Member): string {
   );
 }
 
-export default function MembersTable({ members }: { members: Member[] }) {
+export default function MembersTable({
+  members,
+  initialSelectedId,
+}: {
+  members: Member[];
+  initialSelectedId?: string;
+}) {
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Member | null>(null);
+  const [selected, setSelected] = useState<Member | null>(
+    initialSelectedId
+      ? members.find((m) => m.id === initialSelectedId) ?? null
+      : null
+  );
 
   const filtered = search
     ? members.filter(

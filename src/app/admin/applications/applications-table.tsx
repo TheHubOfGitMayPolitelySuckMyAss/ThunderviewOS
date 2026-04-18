@@ -29,11 +29,17 @@ const filters = ["All", "Pending", "Approved", "Rejected"] as const;
 
 export default function ApplicationsTable({
   applications,
+  initialSelectedId,
 }: {
   applications: Application[];
+  initialSelectedId?: string;
 }) {
   const [filter, setFilter] = useState<string>("All");
-  const [selected, setSelected] = useState<Application | null>(null);
+  const [selected, setSelected] = useState<Application | null>(
+    initialSelectedId
+      ? applications.find((a) => a.id === initialSelectedId) ?? null
+      : null
+  );
 
   const filtered =
     filter === "All"
