@@ -20,6 +20,7 @@ type Application = {
 type Ticket = {
   id: string;
   fulfillment_status: string;
+  purchased_at: string;
   dinner_id: string;
   dinners: { date: string };
 };
@@ -147,12 +148,19 @@ export default function MembersTable({
       // deduplicate (member could have multiple tickets for same dinner)
       .filter((d, i, arr) => arr.indexOf(d) === i);
 
-    // Ask staleness: ask_updated_at <= last_dinner_attended, or ask_updated_at is null and last_dinner_attended is not null
+    // Ask is stale if member has a ticket for a future dinner and hasn't
+    // updated their ask since buying that ticket
+    const today = new Date().toISOString().slice(0, 10);
+    const futureTickets = selected.tickets.filter(
+      (t) => t.dinners?.date && t.dinners.date >= today
+    );
     const askIsStale =
-      (selected.ask_updated_at &&
-        selected.last_dinner_attended &&
-        selected.ask_updated_at <= selected.last_dinner_attended) ||
-      (!selected.ask_updated_at && !!selected.last_dinner_attended);
+      futureTickets.length > 0 &&
+      futureTickets.some(
+        (t) =>
+          !selected.ask_updated_at ||
+          selected.ask_updated_at < t.purchased_at
+      );
 
     const heading = selected.company_name
       ? `${selected.name} at ${selected.company_name}`
