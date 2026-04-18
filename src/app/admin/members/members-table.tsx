@@ -232,28 +232,28 @@ export default function MembersTable({
               <tr
                 key={member.id}
                 onClick={() => setSelected(member)}
-                className="cursor-pointer hover:bg-gray-50"
+                className={`cursor-pointer hover:bg-gray-50 ${member.kicked_out ? "line-through text-gray-400" : ""}`}
               >
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-900"}`}>
                   {member.name}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {getPrimaryEmail(member)}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {member.company_name || "-"}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {formatStageType(member.attendee_stagetype)}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {member.last_dinner_attended
                     ? new Date(
                         member.last_dinner_attended + "T00:00:00"
                       ).toLocaleDateString()
                     : "-"}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {member.marketing_opted_in ? "Yes" : "No"}
                 </td>
               </tr>
