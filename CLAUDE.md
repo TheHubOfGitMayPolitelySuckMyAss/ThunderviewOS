@@ -39,7 +39,7 @@ The v3 handoff doc is the source of truth for product decisions. It lives outsid
 - **Demographics (gender, race, orientation) live on `applications` only.** Never copied to `members`.
 - **One Ask per member.** `members.current_ask` is overwritten on save. Prefill logic: `ask_updated_at > last_dinner_attended`.
 - **Multi-email members.** Members can have multiple email addresses via the `member_emails` table. Lookups (auth, ticket matching, application matching) check against ALL of a member's emails. Primary email = the email on the member's most recent approved application; this is what's used for outbound communication. Primary flips automatically when a new application is approved with a different email. Tickets do NOT change primary email (Stripe autofill is noisy).
-  - TODO: When an application is approved with a different email than primary, flip primary to the application email (add to approve action in Phase 3).
+  - ~~TODO: When an application is approved with a different email than primary, flip primary to the application email.~~ Done — `approve_application` and `link_application_to_member` RPCs handle this.
   - TODO: When a ticket is fulfilled with an unrecognized email, insert a new `member_emails` row with `is_primary = false`, `source = 'ticket'` (add to fulfill action in Phase 3).
 
 ## Data model
@@ -53,7 +53,8 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
   - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
   - `last_dinner_attended` DATE — set on ticket fulfillment (`fulfillment_status` → `'fulfilled'`) to the dinner's date if later than the current value. On refund/credit, recalculated as MAX of remaining fulfilled tickets' dinner dates; null if none remain.
   - `marketing_opted_out_at` TIMESTAMPTZ — set to `now()` when `marketing_opted_in` flips to `false`, cleared to null when it flips back to `true`. Managed by trigger on UPDATE of `marketing_opted_in`.
-  - `intro_updated_at` TIMESTAMPTZ — set to `now()` when `current_intro` value changes. Managed by `trg_intro_updated_at` BEFORE UPDATE trigger (uses `IS DISTINCT FROM`).
+  - `intro_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Intro. Column exists but no trigger — set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp.
+  - `ask_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Ask. No trigger — set explicitly by portal save action (Phase 4). Admin edits via member detail set this on Ask commit for staleness tracking, but the portal save action is the canonical source.
   - `updated_at` — auto-set by trigger.
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (pending/fulfilled/refunded/credited). Tracks payment source and match confidence.
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
@@ -101,11 +102,19 @@ src/
 │       ├── applications/
 │       │   ├── page.tsx                # Server wrapper
 │       │   ├── applications-table.tsx  # Filter tabs, sortable columns, sticky header, rows link to [id]
-│       │   └── [id]/page.tsx           # Application detail: two-column layout, status pill, conditional fields
+│       │   └── [id]/
+│       │       ├── page.tsx            # Server wrapper: fetches application
+│       │       ├── application-detail.tsx  # Client component: detail layout, approve/reject/link actions
+│       │       └── actions.ts          # Server actions: approveApplication, rejectApplication, linkApplicationToMember, searchMembers
 │       ├── members/
-│       │   ├── page.tsx                # Server wrapper
-│       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id]
-│       │   └── [id]/page.tsx           # Member detail: two-column layout, status pills, emails, intro/ask, dinners
+│       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
+│       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
+│       │   ├── add-member-modal.tsx    # Add Member form modal (client component)
+│       │   ├── actions.ts             # Server actions: checkEmail, addMember (for Add Member modal)
+│       │   └── [id]/
+│       │       ├── page.tsx            # Server wrapper: fetches member + determines admin role
+│       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate
+│       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management
 │       └── credits/
 │           ├── page.tsx                # Server wrapper
 │           └── credits-table.tsx       # Filter, sortable columns, sticky header
@@ -117,7 +126,11 @@ supabase/
 │   ├── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
 │   ├── 20260418000000_add_marketing_opted_out_at.sql  # marketing_opted_out_at column + trigger + backfill
 │   ├── 20260418100000_schema_triggers_and_rename.sql  # first_dinner_attended, has_attended→has_community_access rename, ticket triggers
-│   └── 20260418200000_add_intro_updated_at.sql       # intro_updated_at column + trigger on current_intro change
+│   ├── 20260418200000_add_intro_updated_at.sql       # intro_updated_at column (trigger removed — set explicitly by portal)
+│   ├── 20260418300000_add_member_rpc.sql             # add_member_with_application RPC (Add Member modal)
+│   ├── 20260418400000_swap_primary_email_rpc.sql     # swap_primary_email RPC (atomic primary flip)
+│   ├── 20260418500000_approve_application_rpc.sql    # approve_application RPC v1 (superseded by v2)
+│   └── 20260418600000_approve_v2_and_link_member_rpcs.sql  # approve_application v2 (kicked-out guard, primary flip) + link_application_to_member RPC
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -186,36 +199,38 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Dinner detail: "Approved Without Ticket" list replaces raw applications list. Before dinner date: approved apps whose member has no ticket for this dinner. After dinner date: approved apps whose member had no ticket purchased on or before the dinner date. Ticket rows link to member detail; application rows link to application detail.
 - All list pages: sortable columns (click header to toggle asc/desc), sticky headers
 - Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with full-row strikethrough
-- Member detail page (`/admin/members/[id]`): standalone server-component page (not inline modal). `<name> at <company>` heading with strikethrough for kicked-out. Status pills: green "Team", red "Marketing Opt-Out". Two-column layout — column one: Type, Email Addresses (with primary/bounced/source pills), LinkedIn (clickable), Website (clickable), Intro (with "Last updated" date from `intro_updated_at`), Ask (with "Last updated" date from `ask_updated_at`, yellow "Stale" pill if member has a future dinner ticket purchased after last ask update), Contact Preference. Column two: Application Date (earliest approved), Dinners (all dates from tickets, most recent first). Removed from display: first_dinner_attended, last_dinner_attended, has_community_access, created/updated timestamps.
-- Application detail page (`/admin/applications/[id]`): standalone server-component page. `<name> at <company>` heading with status pill (yellow pending, green approved, red rejected). "View member →" link when `member_id` exists. Two-column layout — column one: Type, Email, LinkedIn (clickable), Website (clickable), Gender, Race/Ethnicity, Orientation, plus "I Am My Startup's CEO" and "My Startup Is NOT A Services Business" (conditional: only shown for Active CEO stage type). Column two: Applied date, Preferred Dinner, Status, Rejection Reason (only if rejected).
-- Detail pages are standalone routes, not inline modals. Table rows use `Link` to navigate to `/admin/members/[id]` or `/admin/applications/[id]`. Browser back button works correctly. Old `?selected=` query param pattern removed.
-- Schema: `intro_updated_at` TIMESTAMPTZ on members, with `trg_intro_updated_at` trigger that sets `now()` when `current_intro` value changes (IS DISTINCT FROM). No backfill — existing rows null.
+- Member detail page (`/admin/members/[id]`): server wrapper + client component. `<name> at <company>` heading with strikethrough for kicked-out (no pills — Team and Marketing Opt-Out are now toggles in column two). Column one: all fields editable inline — edit mode triggered by pencil icon on hover (all fields) or click-on-value (non-URL fields only). LinkedIn and Website remain clickable links; pencil icon is the only way to edit them. Editable fields: Name, Company, Type (dropdown), LinkedIn, Website, Intro (textarea), Ask (textarea — commit sets `ask_updated_at`), Contact Preference (dropdown). Email Addresses section: pencil icon (hover-only) or clicking any email opens the email management modal. Modal supports: add email (with duplicate validation against member_emails and applications), delete email (blocks last email), set primary (via `swap_primary_email` RPC). New emails: `source = 'manual'`. Column two: Application Date (earliest approved), Dinners list, Marketing Opted In toggle (immediate save, triggers `marketing_opted_out_at`), Team toggle (immediate save, admin-only — team members see label), Remove/Reinstate button with confirmation modal. Remove sets `kicked_out = true` + `marketing_opted_in = false`. Reinstate sets `kicked_out = false` + `marketing_opted_in = true`.
+- Add Member modal on members list page: creates member + member_emails + approved application atomically via `add_member_with_application` RPC. Form: Name, Email, Company, Website, LinkedIn, Type, Gender/Race/Orientation dropdowns (default "Prefer not to say"), Preferred Dinner Date. Email validation checks member_emails and applications for duplicates. Success shows "[name] added!" modal.
+- Application detail page (`/admin/applications/[id]`): server wrapper + client component. `<name> at <company>` heading with status pill (yellow pending, green approved, red rejected). "View member →" link when `member_id` exists. Approve button (shown when pending or rejected): `approve_application` RPC creates member + member_emails + updates application in single transaction. If email matches existing member, links without creating duplicate (re-application path) and flips primary email to application email. If existing member is kicked out, blocks with red warning + link to member page. Rejected-to-approved flip supported (clears rejection reason). Reject button (shown when pending): modal with reason dropdown ("Service Provider", "services business", "Other" with freeform input). "Link to existing member" button (shown when pending, no member_id): opens member search modal, links application to selected member via `link_application_to_member` RPC, adds/flips primary email. Blocked if selected member is kicked out. Email TODOs differentiated: template #1 for new member approval, template #2 for re-application/linked existing. Two-column layout unchanged.
+- Detail pages are standalone routes, not inline modals. Table rows use `Link` to navigate to `/admin/members/[id]` or `/admin/applications/[id]`. Browser back button works correctly.
+- Schema: `intro_updated_at` TIMESTAMPTZ on members. No trigger — will be set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp. No backfill — existing rows null.
 - Timezone standardization: all date display and comparison logic uses America/Denver. Shared utilities in `src/lib/format.ts`: `formatDate()` (DATE or TIMESTAMPTZ → display string in MT), `formatTimestamp()` (TIMESTAMPTZ → display with time in MT), `getTodayMT()` (today as YYYY-MM-DD in MT), `toDateMT()` (TIMESTAMPTZ → YYYY-MM-DD in MT for comparisons). No raw `toLocaleDateString()` or `toISOString().slice()` calls remain in the codebase. Stored data is unchanged (TIMESTAMPTZ is UTC internally, DATE columns are timezone-agnostic).
 - Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
 - Members search input text color fixed (was invisible against background)
 
 ## What's NOT done
 
-Phase 1 deliberately excluded these. Don't build them without an explicit prompt:
+Don't build these without an explicit prompt:
 
-- Action buttons (approve/reject/fulfill/refund/credit) — Phase 3+
+- Action buttons: fulfill/refund/credit tickets — Phase 3+
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
-- Attendee portal (intro/ask editor, profile, community directory) — Phase 4
-- Email sending (Resend wiring) — Phase 3+
+- Attendee portal (intro/ask editor, profile, community directory) — Phase 4. Portal save action must explicitly set `intro_updated_at = now()` and `ask_updated_at = now()` when the member updates their own Intro or Ask.
+- Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
 - Ticket purchase integration (Squarespace webhooks or Stripe) — Phase 5, blocked on Squarespace plan upgrade
 - Bulk email templates — Phase 4
 - Streak API integration — Phase 5
 - CoachingOS sync — Phase 6
+- LinkedIn URL matching for automatic duplicate detection across applications and members
+- Side-by-side comparison when re-application has different data than existing member record (name, company, website changes)
+- Automatic member field updates from re-application data
 
 ## Upcoming work
 
 **Phase 3: Admin actions + application form + transactional emails (next up)**
 
-Immediate priority is making the admin UI functional with CRUD actions:
-- Approve/reject applications
+Remaining Phase 3 work:
 - Fulfill/refund/credit tickets
-- Edit members
 - Application form (hosted on Thunderview OS, replacing Squarespace)
 - Transactional emails via Resend (approval notifications, magic links with custom branding)
 
