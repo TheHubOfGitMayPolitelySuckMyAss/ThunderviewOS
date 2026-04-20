@@ -108,7 +108,11 @@ src/
 │   │   │   ├── page.tsx                # Profile editor: all member fields + intro/ask/contact + primary email
 │   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, toast
 │   │   │   └── actions.ts             # Server action: saveProfile (member fields + email swap/insert + timestamps)
-│   │   ├── community/page.tsx          # Placeholder: "Community directory — coming soon"
+│   │   ├── community/
+│   │   │   ├── page.tsx                # Community directory: fetchAll paginated, filtered (has_community_access + not kicked_out)
+│   │   │   └── community-table.tsx     # Client component: searchable, sortable table (Name/Company/Role), rows link to /portal/members/[id]
+│   │   ├── members/
+│   │   │   └── [id]/page.tsx           # Read-only member profile: details + intro/ask. 404 if kicked_out or no community access. Self-view shows Edit Profile button
 │   │   ├── recap/page.tsx              # Placeholder: "Last month's Intros & Asks — coming soon"
 │   │   └── tickets/
 │   │       ├── page.tsx                # Ticket selection: stagetype-based ticket card, target dinner assignment
@@ -273,7 +277,9 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Portal home page** (`/portal`): two-column layout (stacks on mobile). Left column: four full-width nav buttons (Buy A Dinner Ticket → `/portal/tickets`, Update Your Profile → `/portal/profile`, View The Community → `/portal/community`, Check Last Month's Intros & Asks → `/portal/recap`). Right column: inline editable form with Intro/Ask/Contact. Single Save button with toast.
 - **Portal save action** (`savePortalProfile` in `src/app/portal/actions.ts`): compares old vs new values; only writes changed fields. Sets `intro_updated_at = now()` only when Intro text actually changed; sets `ask_updated_at = now()` only when Ask text actually changed. Contact-only changes touch neither timestamp. No-op when nothing changed (no DB write, "No changes" toast). Admin edits elsewhere do NOT touch these timestamps (confirmed: `src/app/admin/members/[id]/actions.ts:15-16` explicitly skips them).
 - **Profile editor** (`/portal/profile`): single-column form with all editable member fields. Profile details section: first_name, last_name, primary email, company_name, company_website, linkedin_profile, attendee_stagetypes (multi-select checkboxes). Intro & Ask section: current_intro (textarea), current_ask (textarea), contact_preference (dropdown: LinkedIn/Email). Single Save button with toast. Same timestamp logic as portal home form — `intro_updated_at`/`ask_updated_at` only set when respective text changes. Primary email change: if new email exists in member_emails, flips primary via `swap_primary_email` RPC; if new email, inserts row with `source = 'manual'` then flips. Old email rows persist as secondary.
-- **Placeholder routes**: `/portal/community`, `/portal/recap` — minimal pages with coming-soon text. All inherit proxy guard from `/portal/*`.
+- **Community directory** (`/portal/community`): searchable, sortable table of members with `has_community_access = true` and `kicked_out = false`. Columns: Name, Company, Role. Search hits: first_name, last_name, full name, company_name, company_website, linkedin_profile, current_intro, current_ask, contact_preference, attendee_stagetypes. Default sort: first_name ascending. All columns sortable. Uses `fetchAll` with `.range()` for pagination past 1,000-row PostgREST cap (470 community members). All rows rendered client-side after full fetch. Row click routes to `/portal/members/[id]`.
+- **Member profile page** (`/portal/members/[id]`): read-only view of a member's profile for other community members. Shows: name, company, website (link), LinkedIn (link), role (formatted), primary email, preferred contact (capitalized), intro, ask. No demographics (gender/race/orientation — those live on applications only). Returns 404 if member is `kicked_out = true` or `has_community_access = false`. Self-view: shows "Edit Profile" button linking to `/portal/profile` when viewer's member_id matches the page's member.
+- **Placeholder route**: `/portal/recap` — minimal coming-soon page. Inherits proxy guard from `/portal/*`.
 
 ## What's NOT done
 
@@ -282,7 +288,7 @@ Don't build these without an explicit prompt:
 - Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — Phase 3+
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
-- Attendee portal: community directory, recap page — Phase 4 (profile editor and portal home done).
+- Attendee portal: recap page — Phase 4 (profile editor, community directory, and portal home done).
 - Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
 - Stripe payment integration for ticket purchases (currently writes ticket row with no payment) — Phase 5
 - Ticket purchase integration via Squarespace webhooks — Phase 5, blocked on Squarespace plan upgrade
