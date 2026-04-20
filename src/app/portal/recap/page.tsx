@@ -64,11 +64,14 @@ export default async function RecapPage() {
       return true;
     })
     .map((r) => r.members)
-    .sort((a, b) =>
-      formatName(a.first_name, a.last_name)
+    .sort((a, b) => {
+      const aHas = a.current_intro || a.current_ask ? 0 : 1;
+      const bHas = b.current_intro || b.current_ask ? 0 : 1;
+      if (aHas !== bHas) return aHas - bHas;
+      return formatName(a.first_name, a.last_name)
         .toLowerCase()
-        .localeCompare(formatName(b.first_name, b.last_name).toLowerCase())
-    );
+        .localeCompare(formatName(b.first_name, b.last_name).toLowerCase());
+    });
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
