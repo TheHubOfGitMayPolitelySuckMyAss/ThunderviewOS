@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
+import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
 import PortalForm from "./portal-form";
 
 export default async function PortalPage() {
@@ -61,9 +61,12 @@ export default async function PortalPage() {
       bannerDinnerDate = dinner.date;
 
       // Has intro or ask been updated since last dinner attended?
+      // Compare dates (lda is DATE, timestamps are TIMESTAMPTZ — convert to DATE for comparison)
       const lda = member.last_dinner_attended;
-      const introTouched = member.intro_updated_at && (!lda || member.intro_updated_at > lda);
-      const askTouched = member.ask_updated_at && (!lda || member.ask_updated_at > lda);
+      const introDate = member.intro_updated_at ? toDateMT(member.intro_updated_at) : null;
+      const askDate = member.ask_updated_at ? toDateMT(member.ask_updated_at) : null;
+      const introTouched = introDate && (!lda || introDate > lda);
+      const askTouched = askDate && (!lda || askDate > lda);
       introAskFresh = !!(introTouched || askTouched);
     }
   }
