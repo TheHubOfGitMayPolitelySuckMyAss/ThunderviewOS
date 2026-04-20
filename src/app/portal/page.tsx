@@ -50,7 +50,7 @@ export default async function PortalPage() {
       .from("tickets")
       .select("dinners!inner(date)")
       .eq("member_id", member.id)
-      .in("fulfillment_status", ["pending", "fulfilled"])
+      .in("fulfillment_status", ["purchased", "fulfilled"])
       .gte("dinners.date", todayMT)
       .order("dinners(date)", { ascending: true })
       .limit(1)

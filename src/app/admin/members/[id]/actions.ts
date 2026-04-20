@@ -169,7 +169,7 @@ export async function applyCredit(
       quantity: 1,
       amount_paid: 0,
       payment_source: "credit",
-      fulfillment_status: "pending",
+      fulfillment_status: "purchased",
       purchased_at: new Date().toISOString(),
     })
     .select("id")
@@ -244,7 +244,7 @@ export async function compTicket(
       quantity: 1,
       amount_paid: 0,
       payment_source: "comp",
-      fulfillment_status: "pending",
+      fulfillment_status: "purchased",
       purchased_at: new Date().toISOString(),
     })
     .select("id")

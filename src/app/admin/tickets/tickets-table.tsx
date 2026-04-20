@@ -54,7 +54,7 @@ function getSortValue(t: TicketRow, key: SortKey): string | number {
 }
 
 const statusColors: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
+  purchased: "bg-yellow-100 text-yellow-800",
   fulfilled: "bg-green-100 text-green-800",
   refunded: "bg-red-100 text-red-800",
   credited: "bg-yellow-100 text-yellow-800",

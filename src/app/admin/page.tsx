@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       .from("tickets")
       .select("quantity")
       .eq("dinner_id", nextDinner.id)
-      .in("fulfillment_status", ["pending", "fulfilled"]);
+      .in("fulfillment_status", ["purchased", "fulfilled"]);
     ticketsSold = (soldTickets || []).reduce((sum, t) => sum + (t.quantity ?? 1), 0);
   }
 

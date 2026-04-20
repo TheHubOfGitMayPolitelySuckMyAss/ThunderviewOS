@@ -26,7 +26,7 @@ type TicketRow = {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    Pending: "bg-yellow-100 text-yellow-800",
+    Purchased: "bg-yellow-100 text-yellow-800",
     Fulfilled: "bg-green-100 text-green-800",
     "Intro/Ask": "bg-purple-100 text-purple-700",
     Refunded: "bg-red-100 text-red-800",
@@ -47,7 +47,7 @@ export default function DinnerTickets({
   tickets: TicketRow[];
 }) {
   const activeTickets = tickets.filter(
-    (t) => t.fulfillmentStatus === "pending" || t.fulfillmentStatus === "fulfilled"
+    (t) => t.fulfillmentStatus === "purchased" || t.fulfillmentStatus === "fulfilled"
   );
   const inactiveTickets = tickets.filter(
     (t) => t.fulfillmentStatus === "refunded" || t.fulfillmentStatus === "credited"

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         ticket_type: metadata.ticket_type,
         quantity: parseInt(metadata.quantity, 10),
         amount_paid: parseInt(metadata.amount_paid, 10),
-        fulfillment_status: "pending",
+        fulfillment_status: "purchased",
         payment_source: "portal",
         purchased_at: new Date().toISOString(),
         stripe_session_id: session.id,

@@ -71,7 +71,7 @@ export default async function TicketSelectionPage() {
     .from("tickets")
     .select("dinner_id")
     .eq("member_id", member.id)
-    .in("fulfillment_status", ["pending", "fulfilled"]);
+    .in("fulfillment_status", ["purchased", "fulfilled"]);
 
   const ticketedDinnerIds = new Set(
     (existingTickets || []).map((t) => t.dinner_id)

@@ -29,7 +29,7 @@ function deriveTicketStatus(
 ): string {
   if (fulfillmentStatus === "refunded") return "Refunded";
   if (fulfillmentStatus === "credited") return "Credited";
-  if (fulfillmentStatus === "pending") return "Pending";
+  if (fulfillmentStatus === "purchased") return "Purchased";
   if (fulfillmentStatus === "fulfilled" && isNextUpcomingDinner && hasFreshIntroAsk(member))
     return "Intro/Ask";
   if (fulfillmentStatus === "fulfilled") return "Fulfilled";
@@ -77,7 +77,7 @@ export default async function DinnerDetailPage({
       .from("tickets")
       .select("member_id, purchased_at")
       .in("member_id", memberIds)
-      .in("fulfillment_status", ["pending", "fulfilled"])
+      .in("fulfillment_status", ["purchased", "fulfilled"])
       .order("purchased_at", { ascending: true });
     for (const ft of firstTickets || []) {
       if (!firstTicketMap[ft.member_id]) {
@@ -196,7 +196,7 @@ export default async function DinnerDetailPage({
         <div className="rounded-lg bg-white px-4 py-3 shadow">
           <p className="text-xs uppercase text-gray-500">Purchased</p>
           <p className="text-2xl font-bold text-gray-900">
-            {(statusCounts["pending"] || 0) + (statusCounts["fulfilled"] || 0)}
+            {(statusCounts["purchased"] || 0) + (statusCounts["fulfilled"] || 0)}
           </p>
         </div>
         <div className="rounded-lg bg-white px-4 py-3 shadow">
