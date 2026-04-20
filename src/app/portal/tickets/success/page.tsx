@@ -1,11 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { formatDinnerDisplay } from "@/lib/format";
 import ConfettiEffect from "@/app/apply/thanks/confetti";
+import Stripe from "stripe";
 
-export default async function TicketSuccessPage() {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export default async function TicketSuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string }>;
+}) {
+  const { session_id } = await searchParams;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,33 +21,38 @@ export default async function TicketSuccessPage() {
 
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
-
-  // Look up member's most recent ticket to show dinner date
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id)")
-    .eq("email", user.email!)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as { id: string } | null;
-
   let dinnerDateDisplay = "an upcoming dinner";
-  if (member) {
-    const { data: latestTicket } = await admin
-      .from("tickets")
-      .select("dinners(date)")
-      .eq("member_id", member.id)
-      .order("purchased_at", { ascending: false })
-      .limit(1)
-      .single();
+  let amountDisplay: string | null = null;
 
-    const dinner = latestTicket?.dinners as unknown as {
-      date: string;
-    } | null;
-    if (dinner?.date) {
-      dinnerDateDisplay = formatDinnerDisplay(dinner.date);
+  if (session_id) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      if (session.metadata?.dinner_id) {
+        // Extract dinner date from line item name or metadata
+        const amountPaid = session.metadata.amount_paid;
+        if (amountPaid) {
+          amountDisplay = `$${amountPaid}`;
+        }
+      }
+      // Get dinner date from the line item name
+      if (session.amount_total) {
+        amountDisplay = `$${session.amount_total / 100}`;
+      }
+      // Fetch dinner date from Supabase using metadata
+      if (session.metadata?.dinner_id) {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const admin = createAdminClient();
+        const { data: dinner } = await admin
+          .from("dinners")
+          .select("date")
+          .eq("id", session.metadata.dinner_id)
+          .single();
+        if (dinner?.date) {
+          dinnerDateDisplay = formatDinnerDisplay(dinner.date);
+        }
+      }
+    } catch {
+      // If fetch fails, show generic message
     }
   }
 
@@ -47,11 +60,18 @@ export default async function TicketSuccessPage() {
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="text-center">
         <h1 className="mb-4 text-2xl font-bold text-gray-900">
-          Ticket Purchased!
+          Thanks, your ticket is confirmed!
         </h1>
         <p className="text-sm leading-relaxed text-gray-700">
-          See you at {dinnerDateDisplay} at the Mercury Cafe. We&rsquo;ll send a
-          reminder a few days before with logistics.
+          See you at {dinnerDateDisplay} at the Mercury Cafe.
+          {amountDisplay && (
+            <span className="block mt-1 text-gray-500">
+              Amount paid: {amountDisplay}
+            </span>
+          )}
+        </p>
+        <p className="mt-3 text-sm text-gray-500">
+          We&rsquo;ll send a reminder a few days before with logistics.
         </p>
         <Link
           href="/portal"

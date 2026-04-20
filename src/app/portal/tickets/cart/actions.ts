@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
+import { formatDinnerDisplay } from "@/lib/format";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function purchaseTicket(formData: FormData) {
   const withGuest = formData.get("with_guest") === "true";
@@ -15,16 +19,16 @@ export async function purchaseTicket(formData: FormData) {
 
   if (!user) redirect("/login");
 
-  // Use admin client for DB operations (tickets table has no INSERT RLS policy for members)
   const admin = createAdminClient();
 
   // Look up member
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, attendee_stagetypes, has_community_access, kicked_out)"
+      "email, members!inner(id, attendee_stagetypes, has_community_access, kicked_out)"
     )
     .eq("email", user.email!)
+    .eq("is_primary", true)
     .limit(1)
     .single();
 
@@ -60,21 +64,41 @@ export async function purchaseTicket(formData: FormData) {
 
   const quantity = actualWithGuest ? 2 : 1;
   const amountPaid = actualWithGuest ? price + 40 : price;
+  const dinnerDisplay = formatDinnerDisplay(targetDinner.date);
 
-  const { error } = await admin.from("tickets").insert({
-    member_id: member.id,
-    dinner_id: targetDinner.id,
-    ticket_type: ticketType,
-    quantity,
-    amount_paid: amountPaid,
-    payment_source: "portal",
-    fulfillment_status: "pending",
-    purchased_at: new Date().toISOString(),
+  const itemName = actualWithGuest
+    ? `Thunderview CEO Dinner — ${dinnerDisplay} (with guest)`
+    : `Thunderview CEO Dinner — ${dinnerDisplay}`;
+
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: itemName },
+          unit_amount: amountPaid * 100,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      member_id: member.id,
+      dinner_id: targetDinner.id,
+      ticket_type: ticketType,
+      quantity: String(quantity),
+      amount_paid: String(amountPaid),
+    },
+    customer_email: memberEmail!.email,
+    success_url: `${origin}/portal/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/portal/tickets`,
   });
 
-  if (error) {
-    throw new Error(`Failed to purchase ticket: ${error.message}`);
+  if (!session.url) {
+    throw new Error("Failed to create Stripe Checkout Session");
   }
 
-  redirect("/portal/tickets/success");
+  redirect(session.url);
 }
