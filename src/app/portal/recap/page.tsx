@@ -96,28 +96,30 @@ export default async function RecapPage() {
               )}
             </div>
 
-            <div className="mt-3 space-y-2">
-              <div>
-                <dt className="text-xs font-medium uppercase text-gray-500">
-                  Intro
-                </dt>
-                <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">
-                  {m.current_intro || (
-                    <span className="italic text-gray-400">(no intro)</span>
-                  )}
-                </dd>
+            {(m.current_intro || m.current_ask) && (
+              <div className="mt-3 space-y-2">
+                {m.current_intro && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">
+                      Intro
+                    </dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">
+                      {m.current_intro}
+                    </dd>
+                  </div>
+                )}
+                {m.current_ask && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">
+                      Ask
+                    </dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">
+                      {m.current_ask}
+                    </dd>
+                  </div>
+                )}
               </div>
-              <div>
-                <dt className="text-xs font-medium uppercase text-gray-500">
-                  Ask
-                </dt>
-                <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">
-                  {m.current_ask || (
-                    <span className="italic text-gray-400">(no ask)</span>
-                  )}
-                </dd>
-              </div>
-            </div>
+            )}
           </div>
         ))}
 
