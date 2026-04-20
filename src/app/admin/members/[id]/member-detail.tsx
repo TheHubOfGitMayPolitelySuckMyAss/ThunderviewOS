@@ -49,7 +49,7 @@ type MemberData = {
   company_name: string | null;
   company_website: string | null;
   linkedin_profile: string | null;
-  attendee_stagetype: string | null;
+  attendee_stagetypes: string[];
   current_intro: string | null;
   intro_updated_at: string | null;
   current_ask: string | null;
@@ -119,13 +119,15 @@ export default function MemberDetail({
           />
           <EditableField
             label="Type"
-            value={m.attendee_stagetype}
+            value={m.attendee_stagetypes[0] ?? null}
             memberId={m.id}
-            field="attendee_stagetype"
+            field="attendee_stagetypes"
             type="select"
             options={STAGE_OPTIONS}
             displayFn={formatStageType}
-            onSaved={(v) => setM({ ...m, attendee_stagetype: v as string })}
+            onSaved={(v) =>
+              setM({ ...m, attendee_stagetypes: v ? [v as string] : [] })
+            }
           />
 
           <EmailsSection member={m} onUpdated={() => router.refresh()} />

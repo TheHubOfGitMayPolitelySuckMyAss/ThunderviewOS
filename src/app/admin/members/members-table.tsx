@@ -23,7 +23,7 @@ type Member = {
   linkedin_profile: string | null;
   company_name: string | null;
   company_website: string | null;
-  attendee_stagetype: string | null;
+  attendee_stagetypes: string[];
   marketing_opted_in: boolean;
   kicked_out: boolean;
   last_dinner_attended: string | null;
@@ -45,7 +45,7 @@ function getSortValue(member: Member, key: SortKey): string {
     case "name": return formatName(member.first_name, member.last_name).toLowerCase();
     case "email": return getPrimaryEmail(member).toLowerCase();
     case "company": return (member.company_name || "").toLowerCase();
-    case "stage": return (member.attendee_stagetype || "").toLowerCase();
+    case "stage": return member.attendee_stagetypes.join(", ").toLowerCase();
     case "lastDinner": return member.last_dinner_attended || "";
     case "marketing": return member.marketing_opted_in ? "yes" : "no";
   }
@@ -193,7 +193,9 @@ export default function MembersTable({
                   {member.company_name || "-"}
                 </td>
                 <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
-                  {formatStageType(member.attendee_stagetype)}
+                  {member.attendee_stagetypes.length > 0
+                    ? member.attendee_stagetypes.map(formatStageType).join(", ")
+                    : "-"}
                 </td>
                 <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
                   {member.last_dinner_attended

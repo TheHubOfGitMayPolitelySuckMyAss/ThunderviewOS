@@ -48,8 +48,8 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 - `dinners` — first-Thursday-of-month events, auto-generated 12 months out via Vercel Cron (`/api/cron/generate-dinner`), skipping Jan/Jul. Date is UNIQUE. Cron fires daily at 1pm UTC; handler runs only on the day after the first Thursday of each month.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `first_name` + `last_name` (same split as members). `member_id` is NULL until approved.
-- `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). Key trigger-managed columns:
-  - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. One-way by default; does not revert on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
+- `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). `attendee_stagetypes` is `TEXT[]` (not null, default `'{}'`) — supports multi-role membership (e.g. Active CEO + Investor). Note: `applications.attendee_stagetype` remains a single TEXT column; the application form is single-select. Key trigger-managed columns:
+  - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. Set to `false` on UPDATE when `kicked_out` flips false→true (trigger `trg_revoke_community_access_on_kickout`). Does NOT auto-restore on un-kick or on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
   - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
   - `last_dinner_attended` DATE — set on ticket fulfillment (`fulfillment_status` → `'fulfilled'`) to the dinner's date if later than the current value. On refund/credit, recalculated as MAX of remaining fulfilled tickets' dinner dates; null if none remain.
   - `marketing_opted_out_at` TIMESTAMPTZ — set to `now()` when `marketing_opted_in` flips to `false`, cleared to null when it flips back to `true`. Managed by trigger on UPDATE of `marketing_opted_in`.
@@ -69,7 +69,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
 5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
 6. Both `/auth/confirm` and `/auth/callback` always redirect to `/portal` after successful auth, regardless of role. Portal page checks role and shows admin button for admin/team.
-7. Proxy (`src/proxy.ts`) refreshes session on every request, protects `/admin/*` routes (unauthenticated → `/login`, non-admin/non-team → `/portal`), and redirects authenticated users from `/login` to `/portal`
+7. Proxy (`src/proxy.ts`) refreshes session on every request, protects `/admin/*` routes (unauthenticated → `/login`, non-admin/non-team → `/portal`), protects `/portal/*` routes (unauthenticated → `/login`, non-admin without `has_community_access = true` → `/`), and redirects authenticated users from `/login` to `/portal`. Since kick-out revokes `has_community_access` via trigger, no separate `kicked_out` check is needed in the portal guard.
 
 **Gotcha:** `/auth/callback` (code exchange flow) also exists but the primary magic link flow uses `/auth/confirm` (token hash flow). Both are needed. The PKCE flow via `@supabase/ssr` generates email templates that use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`.
 
@@ -161,7 +161,8 @@ supabase/
 │   ├── 20260418600000_approve_v2_and_link_member_rpcs.sql  # approve_application v2 (kicked-out guard, primary flip) + link_application_to_member RPC
 │   ├── 20260418700000_split_name_columns.sql              # Split name → first_name + last_name on members + applications, backfill, drop name
 │   ├── 20260418800000_update_rpcs_for_name_split.sql      # Update add_member_with_application, approve_application, link_application_to_member RPCs for first_name/last_name
-│   └── 20260418900000_portal_tickets.sql                  # Add quantity column to tickets, add 'portal' to payment_source CHECK
+│   ├── 20260418900000_portal_tickets.sql                  # Add quantity column to tickets, add 'portal' to payment_source CHECK
+│   └── 20260419000000_phase4_stagetypes_and_kickout.sql   # members.attendee_stagetype → attendee_stagetypes TEXT[]; RPCs write array; kick-out revokes has_community_access trigger
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -255,6 +256,12 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 
 ## What's done (Phase 4, in progress)
 
+- Schema: `members.attendee_stagetype` (TEXT, singular) → `members.attendee_stagetypes` (TEXT[], NOT NULL DEFAULT `'{}'`). All 636 existing members backfilled to single-element arrays. The singular column is dropped. `applications.attendee_stagetype` is unchanged — application form remains single-select.
+- RPCs `add_member_with_application`, `approve_application`, `link_application_to_member` now write `members.attendee_stagetypes = ARRAY[<application stagetype>]`. `link_application_to_member` previously did not touch member stagetype; it now overwrites. Re-approving an application overwrites any multi-role customization the member added — intentional for now.
+- Pricing logic in `getTicketInfo()` (in `src/lib/ticket-assignment.ts`) now takes `string[]` and uses priority ladder: Active CEO → $40 (CEO Ticket); else Investor → $100; else Exited CEO → $40; else Guest → $40; fallback CEO Ticket $40. Active CEO trumps Investor when both are present.
+- Trigger `trg_revoke_community_access_on_kickout` (BEFORE UPDATE OF kicked_out on members): when `kicked_out` flips false→true, sets `has_community_access = false`. Un-kicking does NOT auto-restore — admin must set manually if needed.
+- Proxy `/portal/*` guard now requires `has_community_access = true` (admin email bypasses). Members without it redirect to `/`. With the kick-out trigger above, no separate `kicked_out` check is needed.
+- Member detail Type field still single-select in the admin UI (Phase 4 will introduce multi-select); the admin server action wraps the chosen value in a single-element array when writing `attendee_stagetypes`.
 - **Portal home page** (`/portal`): two-column layout (stacks on mobile). Left column: four full-width nav buttons (Buy A Dinner Ticket → `/portal/tickets`, Update Your Profile → `/portal/profile`, View The Community → `/portal/community`, Check Last Month's Intros & Asks → `/portal/recap`). Right column: inline editable form with Intro (textarea, `members.current_intro`), Ask (textarea, `members.current_ask`), Preferred Contact (dropdown, `members.contact_preference`, options: linkedin/email). Single Save button with inline toast confirmation. Header with Thunderview OS branding, email, Admin button (admin/team only), Sign Out.
 - **Portal save action** (`savePortalProfile`): compares old vs new values; only writes changed fields. Sets `intro_updated_at = now()` only when Intro text actually changed; sets `ask_updated_at = now()` only when Ask text actually changed. Contact-only changes touch neither timestamp. No-op when nothing changed (no DB write, "No changes" toast). Admin edits elsewhere do NOT touch these timestamps (confirmed: `src/app/admin/members/[id]/actions.ts:15-16` explicitly skips them).
 - **Placeholder routes**: `/portal/profile`, `/portal/community`, `/portal/recap` — minimal pages with coming-soon text. All inherit proxy guard from `/portal/*`.
