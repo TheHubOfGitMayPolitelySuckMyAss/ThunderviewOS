@@ -24,12 +24,13 @@ function deriveTicketStatus(
     current_ask: string | null;
     ask_updated_at: string | null;
     last_dinner_attended: string | null;
-  } | null
+  } | null,
+  isNextUpcomingDinner: boolean
 ): string {
   if (fulfillmentStatus === "refunded") return "Refunded";
   if (fulfillmentStatus === "credited") return "Credited";
   if (fulfillmentStatus === "pending") return "Pending";
-  if (fulfillmentStatus === "fulfilled" && hasFreshIntroAsk(member))
+  if (fulfillmentStatus === "fulfilled" && isNextUpcomingDinner && hasFreshIntroAsk(member))
     return "Intro/Ask";
   if (fulfillmentStatus === "fulfilled") return "Fulfilled";
   return fulfillmentStatus;
@@ -65,6 +66,26 @@ export default async function DinnerDetailPage({
     .eq("preferred_dinner_date", dinner.date)
     .order("submitted_on", { ascending: false });
 
+  // Build map of each member's first-ever ticket purchased_at (pending/fulfilled only)
+  const memberIds = [...new Set(
+    (tickets || []).map((t) => t.member_id).filter(Boolean)
+  )];
+  const firstTicketMap: Record<string, string> = {};
+  if (memberIds.length > 0) {
+    // For each member on this dinner, find their earliest pending/fulfilled ticket across ALL dinners
+    const { data: firstTickets } = await supabase
+      .from("tickets")
+      .select("member_id, purchased_at")
+      .in("member_id", memberIds)
+      .in("fulfillment_status", ["pending", "fulfilled"])
+      .order("purchased_at", { ascending: true });
+    for (const ft of firstTickets || []) {
+      if (!firstTicketMap[ft.member_id]) {
+        firstTicketMap[ft.member_id] = ft.purchased_at;
+      }
+    }
+  }
+
   // Count tickets by fulfillment status, summing quantity
   const statusCounts = (tickets || []).reduce(
     (acc, t) => {
@@ -78,6 +99,17 @@ export default async function DinnerDetailPage({
 
   // Build set of member IDs who have tickets for this dinner
   const today = getTodayMT();
+
+  // Determine if this dinner is the next upcoming dinner (for Intro/Ask status)
+  const { data: nextUpcoming } = await supabase
+    .from("dinners")
+    .select("date")
+    .gte("date", today)
+    .order("date", { ascending: true })
+    .limit(1)
+    .single();
+  const isNextUpcomingDinner = nextUpcoming?.date === dinner.date;
+
   const isPast = dinner.date < today;
 
   const ticketMemberIds = new Set(
@@ -121,6 +153,11 @@ export default async function DinnerDetailPage({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const qty: number = (ticket as any).quantity ?? 1;
 
+    // A member's first-ever ticket is one where purchased_at matches their earliest
+    const isFirstTicket = member?.id
+      ? firstTicketMap[member.id] === ticket.purchased_at
+      : false;
+
     return {
       id: ticket.id,
       memberId: member?.id ?? null,
@@ -129,11 +166,13 @@ export default async function DinnerDetailPage({
       memberLastName: member?.last_name ?? "",
       profilePicUrl: member?.profile_pic_url ?? null,
       primaryEmail,
-      displayStatus: deriveTicketStatus(ticket.fulfillment_status, member),
+      displayStatus: deriveTicketStatus(ticket.fulfillment_status, member, isNextUpcomingDinner),
       fulfillmentStatus: ticket.fulfillment_status,
       purchasedAt: ticket.purchased_at,
       quantity: qty,
       amountPaid: Number(ticket.amount_paid),
+      isFirstTicket,
+      paymentSource: ticket.payment_source as string,
     };
   });
 
@@ -154,87 +193,29 @@ export default async function DinnerDetailPage({
 
       {/* Ticket counts */}
       <div className="flex gap-4">
-        {["pending", "fulfilled", "refunded", "credited"].map((status) => (
-          <div
-            key={status}
-            className="rounded-lg bg-white px-4 py-3 shadow"
-          >
-            <p className="text-xs uppercase text-gray-500">{status}</p>
-            <p className="text-2xl font-bold text-gray-900">
-              {statusCounts[status] || 0}
-            </p>
-          </div>
-        ))}
+        <div className="rounded-lg bg-white px-4 py-3 shadow">
+          <p className="text-xs uppercase text-gray-500">Purchased</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {(statusCounts["pending"] || 0) + (statusCounts["fulfilled"] || 0)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-white px-4 py-3 shadow">
+          <p className="text-xs uppercase text-gray-500">Refunded</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {statusCounts["refunded"] || 0}
+          </p>
+        </div>
+        <div className="rounded-lg bg-white px-4 py-3 shadow">
+          <p className="text-xs uppercase text-gray-500">Credited</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {statusCounts["credited"] || 0}
+          </p>
+        </div>
       </div>
 
       {/* Tickets (client component with actions) */}
       <DinnerTickets tickets={ticketRows} />
 
-      {/* Applications table — only approved without tickets */}
-      <div>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900">
-          Approved Without Ticket ({filteredApplications.length})
-        </h3>
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Company
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Stage/Type
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Submitted
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredApplications.map((app) => (
-                <tr key={app.id} className="group relative hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900">
-                    <Link
-                      href={`/admin/applications/${app.id}`}
-                      className="after:absolute after:inset-0"
-                    >
-                      {formatName(app.first_name, app.last_name)}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {app.email}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {app.company_name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {formatStageType(app.attendee_stagetype)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {formatDate(app.submitted_on)}
-                  </td>
-                </tr>
-              ))}
-              {filteredApplications.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center text-sm text-gray-400"
-                  >
-                    No approved applications without tickets.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

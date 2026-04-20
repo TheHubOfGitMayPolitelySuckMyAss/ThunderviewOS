@@ -38,12 +38,13 @@ export default async function DashboardPage() {
       .gt("submitted_on", appCutoff);
     newAppsSinceLastDinner = appCount ?? 0;
 
-    // Tickets sold for next dinner
-    const { count: ticketCount } = await supabase
+    // Tickets sold for next dinner (sum of quantity, excluding refunded/credited)
+    const { data: soldTickets } = await supabase
       .from("tickets")
-      .select("*", { count: "exact", head: true })
-      .eq("dinner_id", nextDinner.id);
-    ticketsSold = ticketCount ?? 0;
+      .select("quantity")
+      .eq("dinner_id", nextDinner.id)
+      .in("fulfillment_status", ["pending", "fulfilled"]);
+    ticketsSold = (soldTickets || []).reduce((sum, t) => sum + (t.quantity ?? 1), 0);
   }
 
   // Days until next dinner

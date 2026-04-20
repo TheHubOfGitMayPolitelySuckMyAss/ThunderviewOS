@@ -20,6 +20,8 @@ type TicketRow = {
   memberFirstName: string;
   memberLastName: string;
   profilePicUrl: string | null;
+  isFirstTicket: boolean;
+  paymentSource: string;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -202,6 +204,11 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
             >
               <MemberAvatar member={{ first_name: ticket.memberFirstName, last_name: ticket.memberLastName, profile_pic_url: ticket.profilePicUrl }} size="sm" />
               {formatTicketName(ticket.memberName, ticket.quantity)}
+              {ticket.isFirstTicket && (
+                <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                  new
+                </span>
+              )}
             </Link>
           ) : (
             "-"
@@ -217,22 +224,24 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
           {formatDate(ticket.purchasedAt)}
         </td>
         <td className="px-4 py-3 text-right text-sm">
-          <div className="flex justify-end gap-2">
-            {!isQty2 && (
+          {ticket.paymentSource !== "comp" && (
+            <div className="flex justify-end gap-2">
+              {!isQty2 && (
+                <button
+                  onClick={() => { setActionError(null); setModal("credit"); }}
+                  className="rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                >
+                  Credit
+                </button>
+              )}
               <button
-                onClick={() => { setActionError(null); setModal("credit"); }}
-                className="rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                onClick={() => { setActionError(null); setModal("refund"); }}
+                className="rounded border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
               >
-                Credit
+                Refund
               </button>
-            )}
-            <button
-              onClick={() => { setActionError(null); setModal("refund"); }}
-              className="rounded border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-            >
-              Refund
-            </button>
-          </div>
+            </div>
+          )}
         </td>
       </tr>
 

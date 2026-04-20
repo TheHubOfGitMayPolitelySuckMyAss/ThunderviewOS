@@ -209,6 +209,67 @@ export async function applyCredit(
   return { success: true };
 }
 
+export async function compTicket(
+  memberId: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient();
+
+  const { data: member } = await admin
+    .from("members")
+    .select("attendee_stagetypes, has_community_access")
+    .eq("id", memberId)
+    .single();
+
+  if (!member || !member.attendee_stagetypes || member.attendee_stagetypes.length === 0) {
+    return { success: false, error: "Member stagetype not set" };
+  }
+
+  const targetDinner = await getTargetDinner(memberId, admin);
+  if (!targetDinner) {
+    return { success: false, error: "No upcoming dinner found" };
+  }
+
+  const { ticketType } = getTicketInfo(
+    member.attendee_stagetypes,
+    member.has_community_access
+  );
+
+  // Insert as pending (fires trg_ticket_insert)
+  const { data: newTicket, error: insertError } = await admin
+    .from("tickets")
+    .insert({
+      member_id: memberId,
+      dinner_id: targetDinner.id,
+      ticket_type: ticketType,
+      quantity: 1,
+      amount_paid: 0,
+      payment_source: "comp",
+      fulfillment_status: "pending",
+      purchased_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !newTicket) {
+    return { success: false, error: insertError?.message || "Failed to create ticket" };
+  }
+
+  // Update to fulfilled (fires trg_ticket_fulfillment_change)
+  const { error: fulfillError } = await admin
+    .from("tickets")
+    .update({
+      fulfillment_status: "fulfilled",
+      fulfilled_at: new Date().toISOString(),
+    })
+    .eq("id", newTicket.id);
+
+  if (fulfillError) {
+    return { success: false, error: fulfillError.message };
+  }
+
+  return { success: true };
+}
+
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
   pendingApp?: { id: string };

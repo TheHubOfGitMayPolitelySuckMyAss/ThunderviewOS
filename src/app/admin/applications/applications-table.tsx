@@ -108,9 +108,6 @@ export default function ApplicationsTable({
               <th className={thClass} onClick={() => toggleSort("stage")}>
                 Stage/Type<SortIndicator col="stage" />
               </th>
-              <th className={thClass} onClick={() => toggleSort("dinner")}>
-                Preferred Dinner<SortIndicator col="dinner" />
-              </th>
               <th className={thClass} onClick={() => toggleSort("status")}>
                 Status<SortIndicator col="status" />
               </th>
@@ -142,9 +139,6 @@ export default function ApplicationsTable({
                 <td className="px-4 py-3 text-sm text-gray-500">
                   {formatStageType(app.attendee_stagetype)}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {formatDate(app.preferred_dinner_date)}
-                </td>
                 <td className="px-4 py-3 text-sm">
                   <StatusBadge status={app.status} />
                 </td>
@@ -156,7 +150,7 @@ export default function ApplicationsTable({
             {sorted.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="px-4 py-6 text-center text-sm text-gray-400"
                 >
                   No applications found.

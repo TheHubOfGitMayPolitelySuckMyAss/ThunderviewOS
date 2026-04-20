@@ -17,14 +17,12 @@ type DinnerStat = {
   introAsk: number;
 };
 
-type SortKey = "date" | "applied" | "approved" | "paid" | "introAsk";
+type SortKey = "date" | "paid" | "introAsk";
 type SortDir = "asc" | "desc";
 
 function getSortValue(d: DinnerStat, key: SortKey): string | number {
   switch (key) {
     case "date": return d.date;
-    case "applied": return d.applied;
-    case "approved": return d.approved;
     case "paid": return d.paid;
     case "introAsk": return d.introAsk;
   }
@@ -68,12 +66,6 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
             <th className={thClass} onClick={() => toggleSort("date")}>
               Date<SortIndicator col="date" />
             </th>
-            <th className={thNumClass} onClick={() => toggleSort("applied")}>
-              Applied<SortIndicator col="applied" />
-            </th>
-            <th className={thNumClass} onClick={() => toggleSort("approved")}>
-              Approved<SortIndicator col="approved" />
-            </th>
             <th className={thNumClass} onClick={() => toggleSort("paid")}>
               Paid<SortIndicator col="paid" />
             </th>
@@ -92,7 +84,7 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
           {dinners.length === 0 && (
             <tr>
               <td
-                colSpan={6}
+                colSpan={4}
                 className="px-6 py-8 text-center text-sm text-gray-400"
               >
                 No dinners found. Run the seed script to generate dinner
@@ -140,12 +132,6 @@ function DinnerRow({ dinner }: { dinner: DinnerStat }) {
           </Link>
         </td>
         <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-          {dinner.applied}
-        </td>
-        <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-          {dinner.approved}
-        </td>
-        <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
           {dinner.paid}
         </td>
         <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
@@ -163,7 +149,7 @@ function DinnerRow({ dinner }: { dinner: DinnerStat }) {
 
       {showModal && (
         <tr>
-          <td colSpan={6} className="p-0">
+          <td colSpan={4} className="p-0">
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
                 <p className="text-sm text-gray-900">

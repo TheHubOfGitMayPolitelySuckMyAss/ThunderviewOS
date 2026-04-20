@@ -15,6 +15,7 @@ import {
   setPrimaryEmail,
   checkEmailForMember,
   applyCredit,
+  compTicket,
 } from "./actions";
 import type { EmailCheckResult } from "./actions";
 
@@ -71,6 +72,7 @@ export default function MemberDetail({
   askIsStale,
   isAdmin,
   unredeemedCredits,
+  nextDinnerDate,
 }: {
   member: MemberData;
   applicationDate: string | null;
@@ -78,6 +80,7 @@ export default function MemberDetail({
   askIsStale: boolean;
   isAdmin: boolean;
   unredeemedCredits: number;
+  nextDinnerDate: string | null;
 }) {
   const router = useRouter();
   const [m, setM] = useState(member);
@@ -226,6 +229,10 @@ export default function MemberDetail({
         <div className="space-y-4">
           {unredeemedCredits > 0 && (
             <ApplyCreditSection member={m} />
+          )}
+
+          {nextDinnerDate && !m.kicked_out && (
+            <CompTicketSection member={m} nextDinnerDate={nextDinnerDate} />
           )}
 
           <DetailField label="Application Date">
@@ -639,6 +646,72 @@ function ApplyCreditSection({ member }: { member: MemberData }) {
                 onClick={handleConfirm}
                 disabled={isPending}
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isPending ? "..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Comp Ticket ──
+
+function CompTicketSection({ member, nextDinnerDate }: { member: MemberData; nextDinnerDate: string }) {
+  const router = useRouter();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  function handleConfirm() {
+    setError("");
+    startTransition(async () => {
+      const result = await compTicket(member.id);
+      if (result.success) {
+        setShowConfirm(false);
+        router.refresh();
+      } else {
+        setError(result.error || "Failed to comp ticket");
+      }
+    });
+  }
+
+  const fullName = formatName(member.first_name, member.last_name);
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowConfirm(true)}
+        className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+      >
+        Comp Ticket
+      </button>
+
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <p className="text-sm text-gray-900">
+              Comp a free ticket to <strong>{fullName}</strong> for{" "}
+              <strong>{formatDate(nextDinnerDate)}</strong>?
+            </p>
+            {error && (
+              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            )}
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowConfirm(false); setError(""); }}
+                className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={isPending}
+                className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
               >
                 {isPending ? "..." : "Confirm"}
               </button>

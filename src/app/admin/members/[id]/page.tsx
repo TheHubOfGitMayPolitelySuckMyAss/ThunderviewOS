@@ -61,8 +61,18 @@ export default async function MemberDetailPage({
     .eq("status", "outstanding")
     .is("redeemed_ticket_id", null);
 
-  // Ask staleness
+  // Next upcoming dinner date (for comp ticket)
   const today = getTodayMT();
+  const { data: nextDinner } = await supabase
+    .from("dinners")
+    .select("date")
+    .gte("date", today)
+    .order("date", { ascending: true })
+    .limit(1)
+    .single();
+  const nextDinnerDate = nextDinner?.date ?? null;
+
+  // Ask staleness
   const futureTickets = tickets.filter(
     (t) => t.dinners?.date && t.dinners.date >= today
   );
@@ -116,6 +126,7 @@ export default async function MemberDetailPage({
         askIsStale={askIsStale}
         isAdmin={isAdmin}
         unredeemedCredits={unredeemedCredits ?? 0}
+        nextDinnerDate={nextDinnerDate}
       />
     </div>
   );

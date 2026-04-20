@@ -232,12 +232,6 @@ export default function ApplicationDetail({
             {formatDate(app.submitted_on)}
           </DetailField>
 
-          <DetailField label="Preferred Dinner">
-            {app.preferred_dinner_date
-              ? formatDate(app.preferred_dinner_date)
-              : "None"}
-          </DetailField>
-
           <DetailField label="Status">{app.status}</DetailField>
 
           {app.status === "rejected" && (
