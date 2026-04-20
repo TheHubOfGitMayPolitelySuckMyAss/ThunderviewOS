@@ -138,12 +138,16 @@ function DinnerRow({ dinner }: { dinner: DinnerStat }) {
           {dinner.introAsk}
         </td>
         <td className="relative z-10 w-20 px-2 py-4 text-center text-sm">
-          <button
-            onClick={() => setShowModal(true)}
-            className={`cursor-pointer font-medium ${dinner.guestsAllowed ? "text-green-600 hover:text-green-800" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            {dinner.guestsAllowed ? "Yes" : "No"}
-          </button>
+          {isPending ? (
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+          ) : (
+            <button
+              onClick={() => setShowModal(true)}
+              className={`cursor-pointer font-medium ${dinner.guestsAllowed ? "text-green-600 hover:text-green-800" : "text-gray-400 hover:text-gray-600"}`}
+            >
+              {dinner.guestsAllowed ? "Yes" : "No"}
+            </button>
+          )}
         </td>
       </tr>
 
