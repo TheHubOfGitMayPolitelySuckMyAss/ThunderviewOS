@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback, forwardRef } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import { toggleGuestsAllowed } from "./actions";
@@ -28,9 +28,29 @@ function getSortValue(d: DinnerStat, key: SortKey): string | number {
   }
 }
 
-export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
+export default function DinnersTable({ dinners, nextDinnerId }: { dinners: DinnerStat[]; nextDinnerId: string | null }) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const nextDinnerRowRef = useRef<HTMLTableRowElement>(null);
+  const hasScrolled = useRef(false);
+
+  // Scroll so the next-upcoming dinner row sits just below the sticky header
+  const scrollToNextDinner = useCallback(() => {
+    if (hasScrolled.current) return;
+    const container = scrollContainerRef.current;
+    const row = nextDinnerRowRef.current;
+    if (!container || !row) return;
+    // Header height = the sticky thead
+    const thead = container.querySelector("thead");
+    const headerHeight = thead?.offsetHeight ?? 0;
+    container.scrollTop = row.offsetTop - headerHeight;
+    hasScrolled.current = true;
+  }, []);
+
+  useEffect(() => {
+    scrollToNextDinner();
+  }, [scrollToNextDinner]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -59,7 +79,7 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
   }
 
   return (
-    <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
+    <div ref={scrollContainerRef} className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="sticky top-0 z-10 bg-gray-50">
           <tr>
@@ -79,7 +99,11 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
         </thead>
         <tbody className="divide-y divide-gray-200">
           {sorted.map((dinner) => (
-            <DinnerRow key={dinner.id} dinner={dinner} />
+            <DinnerRow
+              key={dinner.id}
+              dinner={dinner}
+              ref={dinner.id === nextDinnerId ? nextDinnerRowRef : undefined}
+            />
           ))}
           {dinners.length === 0 && (
             <tr>
@@ -98,7 +122,7 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
   );
 }
 
-function DinnerRow({ dinner }: { dinner: DinnerStat }) {
+const DinnerRow = forwardRef<HTMLTableRowElement, { dinner: DinnerStat }>(function DinnerRow({ dinner }, ref) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -117,7 +141,7 @@ function DinnerRow({ dinner }: { dinner: DinnerStat }) {
 
   return (
     <>
-      <tr className="group relative hover:bg-gray-50">
+      <tr ref={ref} className="group relative hover:bg-gray-50">
         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
           <Link
             href={`/admin/dinners/${dinner.id}`}
@@ -183,4 +207,4 @@ function DinnerRow({ dinner }: { dinner: DinnerStat }) {
       )}
     </>
   );
-}
+});

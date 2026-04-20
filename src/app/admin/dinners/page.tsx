@@ -101,10 +101,14 @@ export default async function DinnersPage() {
     return { id: dinner.id, date: dinner.date, venue: dinner.venue, guestsAllowed: dinner.guests_allowed as boolean, applied, approved, paid, introAsk };
   });
 
+  // Find the next upcoming dinner for auto-scroll
+  const today = (await import("@/lib/format")).getTodayMT();
+  const nextUpcomingId = dinnerStats.find((d) => d.date >= today)?.id ?? null;
+
   return (
     <div>
       <h2 className="mb-4 text-xl font-bold text-gray-900">Dinners</h2>
-      <DinnersTable dinners={dinnerStats} />
+      <DinnersTable dinners={dinnerStats} nextDinnerId={nextUpcomingId} />
     </div>
   );
 }
