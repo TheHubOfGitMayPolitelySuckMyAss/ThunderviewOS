@@ -77,7 +77,7 @@ export default async function TicketSelectionPage() {
     (existingTickets || []).map((t) => t.dinner_id)
   );
 
-  // Fetch eligible dinners: most recent past + up to 3 months ahead
+  // Fetch eligible dinners: most recent past + next 3 upcoming
   const todayMT = getTodayMT();
 
   // Most recent past dinner
@@ -89,17 +89,13 @@ export default async function TicketSelectionPage() {
     .limit(1)
     .single();
 
-  // Upcoming dinners within 3 months
-  const cutoffRef = new Date();
-  cutoffRef.setMonth(cutoffRef.getMonth() + 3);
-  const cutoffDate = `${cutoffRef.getFullYear()}-${String(cutoffRef.getMonth() + 1).padStart(2, "0")}-${String(cutoffRef.getDate()).padStart(2, "0")}`;
-
+  // Next 3 upcoming dinners
   const { data: upcomingDinners } = await admin
     .from("dinners")
     .select("id, date, guests_allowed")
     .gte("date", todayMT)
-    .lte("date", cutoffDate)
-    .order("date", { ascending: true });
+    .order("date", { ascending: true })
+    .limit(3);
 
   // Combine: past dinner (if any) + upcoming
   const dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[] = [];
