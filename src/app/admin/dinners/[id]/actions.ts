@@ -2,6 +2,9 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function refundTicket(
   ticketId: string,
@@ -9,14 +12,54 @@ export async function refundTicket(
 ): Promise<{ success: boolean; error?: string }> {
   const admin = createAdminClient();
 
-  if (mode === "guest_only") {
-    // Decrement quantity from 2 to 1, halve amount_paid
-    const { data: ticket } = await admin
-      .from("tickets")
-      .select("quantity, amount_paid")
-      .eq("id", ticketId)
-      .single();
+  // Fetch ticket with Stripe fields
+  const { data: ticket } = await admin
+    .from("tickets")
+    .select("id, quantity, amount_paid, payment_source, stripe_payment_intent_id")
+    .eq("id", ticketId)
+    .single();
 
+  if (!ticket) return { success: false, error: "Ticket not found" };
+
+  const amountPaid = Number(ticket.amount_paid);
+
+  // Determine refund amount in cents
+  const refundCents =
+    mode === "guest_only"
+      ? Math.round((amountPaid / 2) * 100)
+      : Math.round(amountPaid * 100);
+
+  // Stripe refund logic — only for tickets with a payment intent
+  let stripeRefundId: string | null = null;
+
+  if (ticket.payment_source === "historical") {
+    // Historical ticket — skip Stripe, DB-only
+  } else if (!ticket.stripe_payment_intent_id) {
+    // Non-historical ticket missing payment intent — data anomaly
+    if (ticket.payment_source === "portal") {
+      return {
+        success: false,
+        error: `Data anomaly: portal ticket ${ticketId} has no stripe_payment_intent_id. Cannot issue Stripe refund. Fix the ticket data or refund manually in Stripe dashboard.`,
+      };
+    }
+    // Other payment sources without stripe_payment_intent_id — skip Stripe
+  } else {
+    // Has stripe_payment_intent_id — issue Stripe refund
+    try {
+      const refund = await stripe.refunds.create({
+        payment_intent: ticket.stripe_payment_intent_id,
+        amount: refundCents,
+      });
+      stripeRefundId = refund.id;
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unknown Stripe error";
+      return { success: false, error: `Stripe refund failed: ${message}` };
+    }
+  }
+
+  // DB updates — only after Stripe succeeds (or is skipped)
+  if (mode === "guest_only") {
     if (!ticket || ticket.quantity < 2) {
       return { success: false, error: "Ticket does not have a guest to refund" };
     }
@@ -25,16 +68,19 @@ export async function refundTicket(
       .from("tickets")
       .update({
         quantity: 1,
-        amount_paid: Number(ticket.amount_paid) / 2,
+        amount_paid: amountPaid / 2,
+        ...(stripeRefundId && { stripe_refund_id: stripeRefundId }),
       })
       .eq("id", ticketId);
 
     if (error) return { success: false, error: error.message };
   } else {
-    // Full refund — set fulfillment_status to 'refunded'
     const { error } = await admin
       .from("tickets")
-      .update({ fulfillment_status: "refunded" })
+      .update({
+        fulfillment_status: "refunded",
+        ...(stripeRefundId && { stripe_refund_id: stripeRefundId }),
+      })
       .eq("id", ticketId);
 
     if (error) return { success: false, error: error.message };

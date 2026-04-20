@@ -159,27 +159,34 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
   const router = useRouter();
   const [modal, setModal] = useState<"refund" | "credit" | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const isQty2 = ticket.quantity >= 2;
   const guestRefundAmount = (Number(ticket.amountPaid) / 2).toFixed(2);
   const fullRefundAmount = Number(ticket.amountPaid).toFixed(2);
 
   function handleRefund(mode: "full" | "guest_only") {
+    setActionError(null);
     startTransition(async () => {
       const result = await refundTicket(ticket.id, mode);
       if (result.success) {
         setModal(null);
         router.refresh();
+      } else {
+        setActionError(result.error || "Refund failed");
       }
     });
   }
 
   function handleCredit() {
+    setActionError(null);
     startTransition(async () => {
       const result = await creditTicket(ticket.id);
       if (result.success) {
         setModal(null);
         router.refresh();
+      } else {
+        setActionError(result.error || "Credit failed");
       }
     });
   }
@@ -213,14 +220,14 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
           <div className="flex justify-end gap-2">
             {!isQty2 && (
               <button
-                onClick={() => setModal("credit")}
+                onClick={() => { setActionError(null); setModal("credit"); }}
                 className="rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
               >
                 Credit
               </button>
             )}
             <button
-              onClick={() => setModal("refund")}
+              onClick={() => { setActionError(null); setModal("refund"); }}
               className="rounded border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
             >
               Refund
@@ -235,6 +242,11 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
           <td colSpan={5} className="p-0">
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+                {actionError && (
+                  <div className="mb-3 rounded-md bg-red-50 p-3 text-xs text-red-700">
+                    {actionError}
+                  </div>
+                )}
                 {isQty2 ? (
                   <>
                     <p className="text-sm text-gray-900">
@@ -298,6 +310,11 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
           <td colSpan={5} className="p-0">
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+                {actionError && (
+                  <div className="mb-3 rounded-md bg-red-50 p-3 text-xs text-red-700">
+                    {actionError}
+                  </div>
+                )}
                 <p className="text-sm text-gray-900">
                   Credit this ticket? A credit will be issued to{" "}
                   <strong>{ticket.memberName}</strong> for a future dinner.
