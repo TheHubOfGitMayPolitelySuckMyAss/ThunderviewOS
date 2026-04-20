@@ -63,12 +63,32 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Protect /portal routes
+  // Protect /portal routes — require auth + has_community_access (admin bypasses)
   if (request.nextUrl.pathname.startsWith("/portal")) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       return NextResponse.redirect(url);
+    }
+
+    const email = user.email;
+    const isAdmin = email === "eric@marcoullier.com";
+
+    if (!isAdmin) {
+      const { data: memberRow } = await supabase
+        .from("member_emails")
+        .select("members!inner(has_community_access)")
+        .eq("email", email!)
+        .limit(1)
+        .single();
+
+      const member = (memberRow?.members as unknown as { has_community_access: boolean }) ?? null;
+
+      if (!member?.has_community_access) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        return NextResponse.redirect(url);
+      }
     }
   }
 

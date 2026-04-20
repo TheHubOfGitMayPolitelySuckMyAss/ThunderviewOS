@@ -19,7 +19,7 @@ export default async function TicketSelectionPage() {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, attendee_stagetype, has_community_access, kicked_out, last_dinner_attended)"
+      "members!inner(id, attendee_stagetypes, has_community_access, kicked_out, last_dinner_attended)"
     )
     .eq("email", user.email!)
     .limit(1)
@@ -27,7 +27,7 @@ export default async function TicketSelectionPage() {
 
   const member = memberEmail?.members as unknown as {
     id: string;
-    attendee_stagetype: string | null;
+    attendee_stagetypes: string[];
     has_community_access: boolean;
     kicked_out: boolean;
     last_dinner_attended: string | null;
@@ -39,7 +39,7 @@ export default async function TicketSelectionPage() {
   }
 
   // No stagetype set
-  if (!member.attendee_stagetype) {
+  if (!member.attendee_stagetypes || member.attendee_stagetypes.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
@@ -125,7 +125,7 @@ export default async function TicketSelectionPage() {
   }
 
   const { label, price } = getTicketInfo(
-    member.attendee_stagetype,
+    member.attendee_stagetypes,
     member.has_community_access
   );
 

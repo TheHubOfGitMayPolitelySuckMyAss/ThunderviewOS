@@ -60,20 +60,31 @@ export async function getTargetDinner(
 }
 
 /**
- * Map a member's attendee_stagetype to ticket type, label, and price.
- * CEO types split into new_ceo vs returning_ceo based on has_community_access.
+ * Map a member's attendee_stagetypes (array) to ticket type, label, and price.
+ * Priority (first match wins):
+ *   1. Active CEO → CEO Ticket, $40 (returning_ceo or new_ceo based on has_community_access)
+ *   2. Investor → Investor Ticket, $100
+ *   3. Exited CEO → CEO Ticket, $40
+ *   4. Guest → Guest Ticket, $40
+ *   5. Fallback → CEO Ticket, $40
  */
 export function getTicketInfo(
-  stagetype: string,
+  stagetypes: string[],
   hasCommunityAccess: boolean
 ): { ticketType: string; label: string; price: number } {
-  if (stagetype === "Investor") {
+  const ceoType = hasCommunityAccess ? "returning_ceo" : "new_ceo";
+
+  if (stagetypes.includes("Active CEO (Bootstrapping or VC-Backed)")) {
+    return { ticketType: ceoType, label: "CEO Ticket", price: 40 };
+  }
+  if (stagetypes.includes("Investor")) {
     return { ticketType: "investor", label: "Investor Ticket", price: 100 };
   }
-  if (stagetype === "Guest (Speaker/Press/Etc)") {
+  if (stagetypes.includes("Exited CEO (Acquisition or IPO)")) {
+    return { ticketType: ceoType, label: "CEO Ticket", price: 40 };
+  }
+  if (stagetypes.includes("Guest (Speaker/Press/Etc)")) {
     return { ticketType: "guest", label: "Guest Ticket", price: 40 };
   }
-  // Active CEO or Exited CEO
-  const ticketType = hasCommunityAccess ? "returning_ceo" : "new_ceo";
-  return { ticketType, label: "CEO Ticket", price: 40 };
+  return { ticketType: ceoType, label: "CEO Ticket", price: 40 };
 }

@@ -11,7 +11,10 @@ export async function updateMemberField(
 ): Promise<{ success: boolean; error?: string }> {
   const admin = createAdminClient();
 
-  const updates: Record<string, unknown> = { [field]: value };
+  // attendee_stagetypes is a TEXT[] — the single-select admin UI sends one string.
+  const writeValue: unknown =
+    field === "attendee_stagetypes" ? (value ? [value] : []) : value;
+  const updates: Record<string, unknown> = { [field]: writeValue };
   // intro_updated_at and ask_updated_at are NOT set by admin edits.
   // These timestamps are only set by the portal save action (Phase 4).
 
@@ -134,14 +137,14 @@ export async function applyCredit(
 
   if (!credit) return { success: false, error: "No unredeemed credit found" };
 
-  // Get member stagetype for ticket type mapping
+  // Get member stagetypes for ticket type mapping
   const { data: member } = await admin
     .from("members")
-    .select("attendee_stagetype, has_community_access")
+    .select("attendee_stagetypes, has_community_access")
     .eq("id", memberId)
     .single();
 
-  if (!member || !member.attendee_stagetype) {
+  if (!member || !member.attendee_stagetypes || member.attendee_stagetypes.length === 0) {
     return { success: false, error: "Member stagetype not set" };
   }
 
@@ -152,7 +155,7 @@ export async function applyCredit(
   }
 
   const { ticketType } = getTicketInfo(
-    member.attendee_stagetype,
+    member.attendee_stagetypes,
     member.has_community_access
   );
 

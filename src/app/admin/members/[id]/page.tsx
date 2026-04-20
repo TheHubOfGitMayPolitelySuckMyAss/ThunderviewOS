@@ -80,7 +80,7 @@ export default async function MemberDetailPage({
     company_name: member.company_name,
     company_website: member.company_website,
     linkedin_profile: member.linkedin_profile,
-    attendee_stagetype: member.attendee_stagetype,
+    attendee_stagetypes: (member.attendee_stagetypes ?? []) as string[],
     current_intro: member.current_intro,
     intro_updated_at: member.intro_updated_at,
     current_ask: member.current_ask,

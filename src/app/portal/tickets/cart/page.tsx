@@ -25,7 +25,7 @@ export default async function CartPage({
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, attendee_stagetype, has_community_access, kicked_out)"
+      "members!inner(id, attendee_stagetypes, has_community_access, kicked_out)"
     )
     .eq("email", user.email!)
     .limit(1)
@@ -33,12 +33,17 @@ export default async function CartPage({
 
   const member = memberEmail?.members as unknown as {
     id: string;
-    attendee_stagetype: string | null;
+    attendee_stagetypes: string[];
     has_community_access: boolean;
     kicked_out: boolean;
   } | null;
 
-  if (!member || member.kicked_out || !member.attendee_stagetype) {
+  if (
+    !member ||
+    member.kicked_out ||
+    !member.attendee_stagetypes ||
+    member.attendee_stagetypes.length === 0
+  ) {
     redirect("/portal");
   }
 
@@ -46,7 +51,7 @@ export default async function CartPage({
   if (!targetDinner) redirect("/portal/tickets");
 
   const { label, price } = getTicketInfo(
-    member.attendee_stagetype,
+    member.attendee_stagetypes,
     member.has_community_access
   );
 
