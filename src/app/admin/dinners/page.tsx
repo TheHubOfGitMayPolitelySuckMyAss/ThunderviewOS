@@ -98,7 +98,7 @@ export default async function DinnersPage() {
       })
       .reduce((sum, t) => sum + (t.quantity ?? 1), 0);
 
-    return { id: dinner.id, date: dinner.date, venue: dinner.venue, applied, approved, paid, introAsk };
+    return { id: dinner.id, date: dinner.date, venue: dinner.venue, guestsAllowed: dinner.guests_allowed as boolean, applied, approved, paid, introAsk };
   });
 
   return (

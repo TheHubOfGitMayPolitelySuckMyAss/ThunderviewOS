@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { toggleGuestsAllowed } from "./actions";
+import { useRouter } from "next/navigation";
 
 type DinnerStat = {
   id: string;
   date: string;
   venue: string;
+  guestsAllowed: boolean;
   applied: number;
   approved: number;
   paid: number;
@@ -77,42 +80,19 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
             <th className={thNumClass} onClick={() => toggleSort("introAsk")}>
               Intro/Ask<SortIndicator col="introAsk" />
             </th>
+            <th className="w-20 px-2 py-3 text-center text-xs font-medium uppercase text-gray-500">
+              Guests
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {sorted.map((dinner) => (
-            <tr key={dinner.id} className="group relative hover:bg-gray-50">
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                <Link
-                  href={`/admin/dinners/${dinner.id}`}
-                  className="after:absolute after:inset-0"
-                >
-                  {formatDate(dinner.date, {
-                    weekday: "short",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </Link>
-              </td>
-              <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                {dinner.applied}
-              </td>
-              <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                {dinner.approved}
-              </td>
-              <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                {dinner.paid}
-              </td>
-              <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
-                {dinner.introAsk}
-              </td>
-            </tr>
+            <DinnerRow key={dinner.id} dinner={dinner} />
           ))}
           {dinners.length === 0 && (
             <tr>
               <td
-                colSpan={5}
+                colSpan={6}
                 className="px-6 py-8 text-center text-sm text-gray-400"
               >
                 No dinners found. Run the seed script to generate dinner
@@ -123,5 +103,94 @@ export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DinnerRow({ dinner }: { dinner: DinnerStat }) {
+  const router = useRouter();
+  const [showModal, setShowModal] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const newValue = !dinner.guestsAllowed;
+
+  function handleConfirm() {
+    startTransition(async () => {
+      const result = await toggleGuestsAllowed(dinner.id, newValue);
+      if (result.success) {
+        setShowModal(false);
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <>
+      <tr className="group relative hover:bg-gray-50">
+        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+          <Link
+            href={`/admin/dinners/${dinner.id}`}
+            className="after:absolute after:inset-0"
+          >
+            {formatDate(dinner.date, {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </Link>
+        </td>
+        <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
+          {dinner.applied}
+        </td>
+        <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
+          {dinner.approved}
+        </td>
+        <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
+          {dinner.paid}
+        </td>
+        <td className="w-20 px-2 py-4 text-center text-sm tabular-nums text-gray-500">
+          {dinner.introAsk}
+        </td>
+        <td className="relative z-10 w-20 px-2 py-4 text-center text-sm">
+          <button
+            onClick={() => setShowModal(true)}
+            className={`cursor-pointer font-medium ${dinner.guestsAllowed ? "text-green-600 hover:text-green-800" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            {dinner.guestsAllowed ? "Yes" : "No"}
+          </button>
+        </td>
+      </tr>
+
+      {showModal && (
+        <tr>
+          <td colSpan={6} className="p-0">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+                <p className="text-sm text-gray-900">
+                  Switch guest tickets for{" "}
+                  {formatDate(dinner.date, { month: "long", day: "numeric", year: "numeric" })}{" "}
+                  to <strong>{newValue ? "allowed" : "not allowed"}</strong>?
+                </p>
+                <div className="mt-4 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirm}
+                    disabled={isPending}
+                    className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {isPending ? "..." : "Confirm"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

@@ -54,15 +54,14 @@ export async function purchaseTicket(formData: FormData) {
   // Validate selected dinner exists
   const { data: dinner } = await admin
     .from("dinners")
-    .select("id, date")
+    .select("id, date, guests_allowed")
     .eq("id", selectedDinnerId)
     .single();
 
   if (!dinner) redirect("/portal/tickets");
 
-  // Only allow guest for December dinners
-  const dinnerMonth = new Date(dinner.date + "T00:00:00").getMonth() + 1;
-  const actualWithGuest = withGuest && dinnerMonth === 12;
+  // Only allow guest if the dinner has guests_allowed = true
+  const actualWithGuest = withGuest && dinner.guests_allowed;
 
   const { ticketType, price } = getTicketInfo(
     member.attendee_stagetypes,

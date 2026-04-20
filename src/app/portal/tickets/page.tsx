@@ -102,7 +102,7 @@ export default async function TicketSelectionPage() {
   // Most recent past dinner
   const { data: pastDinner } = await admin
     .from("dinners")
-    .select("id, date")
+    .select("id, date, guests_allowed")
     .lt("date", todayMT)
     .order("date", { ascending: false })
     .limit(1)
@@ -115,13 +115,13 @@ export default async function TicketSelectionPage() {
 
   const { data: upcomingDinners } = await admin
     .from("dinners")
-    .select("id, date")
+    .select("id, date, guests_allowed")
     .gte("date", todayMT)
     .lte("date", cutoffDate)
     .order("date", { ascending: true });
 
   // Combine: past dinner (if any) + upcoming
-  const dinnerOptions: { id: string; date: string; label: string; isPast: boolean }[] = [];
+  const dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[] = [];
 
   if (pastDinner) {
     dinnerOptions.push({
@@ -129,6 +129,7 @@ export default async function TicketSelectionPage() {
       date: pastDinner.date,
       label: formatDinnerDisplay(pastDinner.date),
       isPast: true,
+      guestsAllowed: pastDinner.guests_allowed,
     });
   }
 
@@ -138,6 +139,7 @@ export default async function TicketSelectionPage() {
       date: d.date,
       label: formatDinnerDisplay(d.date),
       isPast: false,
+      guestsAllowed: d.guests_allowed,
     });
   }
 

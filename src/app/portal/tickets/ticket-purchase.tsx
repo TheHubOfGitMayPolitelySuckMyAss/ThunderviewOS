@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { purchaseTicket } from "./cart/actions";
+import { allowsGuestTicket } from "@/lib/ticket-rules";
 
 type DinnerOption = {
   id: string;
   date: string;
   label: string;
   isPast: boolean;
+  guestsAllowed: boolean;
 };
 
 export default function TicketPurchase({
@@ -27,8 +29,8 @@ export default function TicketPurchase({
   const [isPending, startTransition] = useTransition();
 
   const selectedDinner = dinnerOptions.find((d) => d.id === selectedDinnerId);
-  const isDecember = selectedDinner
-    ? new Date(selectedDinner.date + "T00:00:00").getMonth() === 11
+  const showGuestButton = selectedDinner
+    ? allowsGuestTicket({ guests_allowed: selectedDinner.guestsAllowed })
     : false;
 
   function handlePurchase(withGuest: boolean) {
@@ -74,7 +76,7 @@ export default function TicketPurchase({
         )}
 
         <div className="mt-6">
-          {isDecember ? (
+          {showGuestButton ? (
             <div className="flex gap-3">
               <button
                 onClick={() => handlePurchase(false)}
