@@ -145,11 +145,37 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function handleRemovePic() {
-    setRemovePic(true);
+  async function handleRemovePic() {
     setSelectedFile(null);
     setPicPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Save removal immediately (mirrors upload pattern)
+    setSavingPhoto(true);
+    const formData = new FormData();
+    formData.set("remove_pic", "true");
+    formData.set("first_name", firstName);
+    formData.set("last_name", lastName);
+    formData.set("company_name", companyName);
+    formData.set("company_website", companyWebsite);
+    formData.set("linkedin_profile", linkedinProfile);
+    formData.set("attendee_stagetypes", stagetypes.join(","));
+    formData.set("current_intro", intro);
+    formData.set("current_ask", ask);
+    formData.set("contact_preference", contact);
+    formData.set("primary_email", primaryEmail);
+
+    const result = await saveProfile(formData);
+    setSavingPhoto(false);
+
+    if (!result.success) {
+      showToast(result.error || "Remove failed", "error");
+      return;
+    }
+
+    showToast("Photo removed!", "success");
+    setProfilePicUrl(null);
+    setRemovePic(false);
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
