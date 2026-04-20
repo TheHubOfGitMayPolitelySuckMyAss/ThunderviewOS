@@ -70,63 +70,35 @@ export async function purchaseTicket(formData: FormData) {
     ? `Thunderview CEO Dinner — ${dinnerDisplay} (with guest)`
     : `Thunderview CEO Dinner — ${dinnerDisplay}`;
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").trim();
 
-  const successUrl = `${origin}/portal/tickets/success?session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${origin}/portal/tickets`;
-
-  console.error("Stripe URL debug:", {
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    origin_source_value: origin,
-    NEXT_PUBLIC_SITE_URL_raw: process.env.NEXT_PUBLIC_SITE_URL,
-    NEXT_PUBLIC_SITE_URL_type: typeof process.env.NEXT_PUBLIC_SITE_URL,
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: itemName },
+          unit_amount: amountPaid * 100,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      member_id: member.id,
+      dinner_id: targetDinner.id,
+      ticket_type: ticketType,
+      quantity: String(quantity),
+      amount_paid: String(amountPaid),
+    },
+    customer_email: memberEmail!.email,
+    success_url: `${origin}/portal/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/portal/tickets`,
   });
 
-  let sessionUrl: string;
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: { name: itemName },
-            unit_amount: amountPaid * 100,
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        member_id: member.id,
-        dinner_id: targetDinner.id,
-        ticket_type: ticketType,
-        quantity: String(quantity),
-        amount_paid: String(amountPaid),
-      },
-      customer_email: memberEmail!.email,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
-
-    if (!session.url) {
-      throw new Error("Stripe returned no session URL");
-    }
-    sessionUrl = session.url;
-  } catch (err: unknown) {
-    const e = err as Record<string, unknown>;
-    console.error("Stripe Checkout Session creation failed — full error:", {
-      message: e.message,
-      type: e.type,
-      code: e.code,
-      param: e.param,
-      statusCode: e.statusCode,
-      raw: e.raw,
-      constructor_name: e.constructor?.toString?.()?.slice(0, 100),
-      stack: typeof e.stack === "string" ? e.stack.split("\n").slice(0, 5) : undefined,
-    });
-    throw err;
+  if (!session.url) {
+    throw new Error("Failed to create Stripe Checkout Session");
   }
 
-  redirect(sessionUrl);
+  redirect(session.url);
 }
