@@ -2,9 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import TopNav from "@/components/top-nav";
-import AdminShell from "./admin-shell";
 
-export default async function AdminLayout({
+export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -19,11 +18,8 @@ export default async function AdminLayout({
   }
 
   const email = user.email!;
-  const isAdmin = email === "eric@marcoullier.com";
-
   const admin = createAdminClient();
 
-  // Fetch member data for initials and team check
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select("members!inner(first_name, last_name, is_team, kicked_out)")
@@ -38,22 +34,18 @@ export default async function AdminLayout({
     kicked_out: boolean;
   } | null;
 
-  let isTeam = false;
-  if (!isAdmin) {
-    isTeam = member?.is_team === true && member?.kicked_out === false;
-    if (!isTeam) {
-      redirect("/portal");
-    }
-  }
+  const isAdmin = email === "eric@marcoullier.com";
+  const isTeam =
+    !isAdmin && member?.is_team === true && member?.kicked_out === false;
 
-  const firstInitial = member?.first_name?.[0]?.toUpperCase() ?? email[0].toUpperCase();
+  const firstInitial = member?.first_name?.[0]?.toUpperCase() ?? "?";
   const lastInitial = member?.last_name?.[0]?.toUpperCase() ?? "";
   const initials = firstInitial + lastInitial;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} />
-      <AdminShell>{children}</AdminShell>
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

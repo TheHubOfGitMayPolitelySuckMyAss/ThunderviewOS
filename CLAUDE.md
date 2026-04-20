@@ -78,6 +78,8 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 ```
 src/
 ├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect (Next.js 16 "proxy", replaces middleware.ts)
+├── components/
+│   └── top-nav.tsx                     # Global top nav: logo → /portal, center links (Tickets/Community/Recap), avatar dropdown (Profile/Admin/Sign Out)
 ├── lib/supabase/
 │   ├── client.ts                       # Browser client (createBrowserClient)
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
@@ -97,11 +99,15 @@ src/
 │   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler)
 │   │   └── callback/route.ts           # Code exchange flow (secondary)
 │   ├── portal/
+│   │   ├── layout.tsx                  # Portal layout: auth check, TopNav, wraps all /portal/* pages
 │   │   ├── page.tsx                    # Two-column portal home: nav buttons (left) + inline Intro/Ask/Contact form (right)
 │   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas, Contact dropdown, Save with toast
 │   │   ├── actions.ts                  # Server action: savePortalProfile (updates intro/ask/contact, sets timestamps only on change)
-│   │   ├── sign-out-button.tsx         # Client component: sign-out button (inline, not shared with admin-shell)
-│   │   ├── profile/page.tsx            # Placeholder: "Profile editor — coming soon"
+│   │   ├── sign-out-button.tsx         # Client component: sign-out button (unused — sign-out now in TopNav dropdown)
+│   │   ├── profile/
+│   │   │   ├── page.tsx                # Profile editor: all member fields + intro/ask/contact + primary email
+│   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, toast
+│   │   │   └── actions.ts             # Server action: saveProfile (member fields + email swap/insert + timestamps)
 │   │   ├── community/page.tsx          # Placeholder: "Community directory — coming soon"
 │   │   ├── recap/page.tsx              # Placeholder: "Last month's Intros & Asks — coming soon"
 │   │   └── tickets/
@@ -115,8 +121,8 @@ src/
 │   ├── api/cron/generate-dinner/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
 │   └── admin/
-│       ├── layout.tsx                  # Auth check + role detection (server component)
-│       ├── admin-shell.tsx             # Sidebar nav, header, sign-out (client component)
+│       ├── layout.tsx                  # Auth check + role detection + TopNav (server component)
+│       ├── admin-shell.tsx             # Sidebar nav only (client component; header moved to TopNav)
 │       ├── page.tsx                    # Dashboard: next-dinner stats, pending apps, opt-outs
 │       ├── dashboard-accordions.tsx    # Client component: collapsible accordion sections (pending apps, opt-outs)
 │       ├── dinners/
@@ -262,9 +268,12 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Trigger `trg_revoke_community_access_on_kickout` (BEFORE UPDATE OF kicked_out on members): when `kicked_out` flips false→true, sets `has_community_access = false`. Un-kicking does NOT auto-restore — admin must set manually if needed.
 - Proxy `/portal/*` guard now requires `has_community_access = true` (admin email bypasses). Members without it redirect to `/`. With the kick-out trigger above, no separate `kicked_out` check is needed.
 - Member detail Type field still single-select in the admin UI (Phase 4 will introduce multi-select); the admin server action wraps the chosen value in a single-element array when writing `attendee_stagetypes`.
-- **Portal home page** (`/portal`): two-column layout (stacks on mobile). Left column: four full-width nav buttons (Buy A Dinner Ticket → `/portal/tickets`, Update Your Profile → `/portal/profile`, View The Community → `/portal/community`, Check Last Month's Intros & Asks → `/portal/recap`). Right column: inline editable form with Intro (textarea, `members.current_intro`), Ask (textarea, `members.current_ask`), Preferred Contact (dropdown, `members.contact_preference`, options: linkedin/email). Single Save button with inline toast confirmation. Header with Thunderview OS branding, email, Admin button (admin/team only), Sign Out.
-- **Portal save action** (`savePortalProfile`): compares old vs new values; only writes changed fields. Sets `intro_updated_at = now()` only when Intro text actually changed; sets `ask_updated_at = now()` only when Ask text actually changed. Contact-only changes touch neither timestamp. No-op when nothing changed (no DB write, "No changes" toast). Admin edits elsewhere do NOT touch these timestamps (confirmed: `src/app/admin/members/[id]/actions.ts:15-16` explicitly skips them).
-- **Placeholder routes**: `/portal/profile`, `/portal/community`, `/portal/recap` — minimal pages with coming-soon text. All inherit proxy guard from `/portal/*`.
+- **Global top nav** (`src/components/top-nav.tsx`): renders on every authenticated page (portal + admin). Left: "Thunderview OS" logo → `/portal`. Center-left: Tickets → `/portal/tickets`, Community → `/portal/community`, Last Month's Intros & Asks → `/portal/recap`. Active-state highlighting. Right: avatar circle with member initials (first_name[0] + last_name[0]). Avatar dropdown: Update Profile → `/portal/profile`, Admin → `/admin` (admin/team only), Sign Out. Admin sidebar now sits below the top nav (was full-height). Admin shell header removed — top nav replaces it.
+- **Portal layout** (`src/app/portal/layout.tsx`): wraps all `/portal/*` pages with TopNav. Fetches member data for initials + role. Auth check.
+- **Portal home page** (`/portal`): two-column layout (stacks on mobile). Left column: four full-width nav buttons (Buy A Dinner Ticket → `/portal/tickets`, Update Your Profile → `/portal/profile`, View The Community → `/portal/community`, Check Last Month's Intros & Asks → `/portal/recap`). Right column: inline editable form with Intro/Ask/Contact. Single Save button with toast.
+- **Portal save action** (`savePortalProfile` in `src/app/portal/actions.ts`): compares old vs new values; only writes changed fields. Sets `intro_updated_at = now()` only when Intro text actually changed; sets `ask_updated_at = now()` only when Ask text actually changed. Contact-only changes touch neither timestamp. No-op when nothing changed (no DB write, "No changes" toast). Admin edits elsewhere do NOT touch these timestamps (confirmed: `src/app/admin/members/[id]/actions.ts:15-16` explicitly skips them).
+- **Profile editor** (`/portal/profile`): single-column form with all editable member fields. Profile details section: first_name, last_name, primary email, company_name, company_website, linkedin_profile, attendee_stagetypes (multi-select checkboxes). Intro & Ask section: current_intro (textarea), current_ask (textarea), contact_preference (dropdown: LinkedIn/Email). Single Save button with toast. Same timestamp logic as portal home form — `intro_updated_at`/`ask_updated_at` only set when respective text changes. Primary email change: if new email exists in member_emails, flips primary via `swap_primary_email` RPC; if new email, inserts row with `source = 'manual'` then flips. Old email rows persist as secondary.
+- **Placeholder routes**: `/portal/community`, `/portal/recap` — minimal pages with coming-soon text. All inherit proxy guard from `/portal/*`.
 
 ## What's NOT done
 
@@ -273,7 +282,7 @@ Don't build these without an explicit prompt:
 - Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — Phase 3+
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
-- Attendee portal: profile editor, community directory, recap page — Phase 4 (intro/ask/contact editor on portal home is done).
+- Attendee portal: community directory, recap page — Phase 4 (profile editor and portal home done).
 - Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
 - Stripe payment integration for ticket purchases (currently writes ticket row with no payment) — Phase 5
 - Ticket purchase integration via Squarespace webhooks — Phase 5, blocked on Squarespace plan upgrade
