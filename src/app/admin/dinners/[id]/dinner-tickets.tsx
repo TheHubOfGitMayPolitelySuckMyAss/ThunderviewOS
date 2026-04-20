@@ -164,7 +164,7 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const isQty2 = ticket.quantity >= 2;
-  const guestRefundAmount = (Number(ticket.amountPaid) / 2).toFixed(2);
+  const guestRefundAmount = (40).toFixed(2);
   const fullRefundAmount = Number(ticket.amountPaid).toFixed(2);
 
   function handleRefund(mode: "full" | "guest_only") {

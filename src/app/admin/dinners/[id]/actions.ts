@@ -24,9 +24,10 @@ export async function refundTicket(
   const amountPaid = Number(ticket.amount_paid);
 
   // Determine refund amount in cents
+  // Guest-only: refund the $40 guest add-on, not half the total
   const refundCents =
     mode === "guest_only"
-      ? Math.round((amountPaid / 2) * 100)
+      ? 4000
       : Math.round(amountPaid * 100);
 
   // Stripe refund logic — only for tickets with a payment intent
@@ -68,7 +69,7 @@ export async function refundTicket(
       .from("tickets")
       .update({
         quantity: 1,
-        amount_paid: amountPaid / 2,
+        amount_paid: amountPaid - 40,
         ...(stripeRefundId && { stripe_refund_id: stripeRefundId }),
       })
       .eq("id", ticketId);
