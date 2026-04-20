@@ -35,7 +35,8 @@ export default async function DashboardPage() {
     const { count: appCount } = await supabase
       .from("applications")
       .select("*", { count: "exact", head: true })
-      .gt("submitted_on", appCutoff);
+      .gt("submitted_on", appCutoff)
+      .in("status", ["pending", "approved"]);
     newAppsSinceLastDinner = appCount ?? 0;
 
     // Tickets sold for next dinner (sum of quantity, excluding refunded/credited)
