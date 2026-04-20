@@ -62,6 +62,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -106,7 +107,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     // Save photo immediately
-    setSaving(true);
+    setSavingPhoto(true);
     const formData = new FormData();
     formData.set("profile_pic", file);
     // Include current field values so the action can compare correctly
@@ -122,7 +123,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     formData.set("primary_email", primaryEmail);
 
     const result = await saveProfile(formData);
-    setSaving(false);
+    setSavingPhoto(false);
 
     if (!result.success) {
       showToast(result.error || "Upload failed", "error");
@@ -204,20 +205,31 @@ export default function ProfileForm({ member }: ProfileFormProps) {
         <div className="space-y-4">
           {/* Profile picture */}
           <div className="flex items-center gap-4">
-            {picPreview || (!removePic && profilePicUrl) ? (
-              <Image
-                src={picPreview || profilePicUrl!}
-                alt="Profile"
-                width={120}
-                height={120}
-                className="h-[120px] w-[120px] rounded-full object-cover"
-                unoptimized
-              />
-            ) : (
-              <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-gray-900 text-3xl font-medium text-white">
-                {firstName?.[0]?.toUpperCase() ?? "?"}{lastName?.[0]?.toUpperCase() ?? ""}
-              </div>
-            )}
+            <div className="relative">
+              {picPreview || (!removePic && profilePicUrl) ? (
+                <Image
+                  src={picPreview || profilePicUrl!}
+                  alt="Profile"
+                  width={120}
+                  height={120}
+                  className="h-[120px] w-[120px] rounded-full object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-gray-900 text-3xl font-medium text-white">
+                  {firstName?.[0]?.toUpperCase() ?? "?"}{lastName?.[0]?.toUpperCase() ?? ""}
+                </div>
+              )}
+              {savingPhoto && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/60">
+                  <svg className="h-6 w-6 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="mt-1 text-xs font-medium text-white">Saving photo</span>
+                </div>
+              )}
+            </div>
             <div className="flex flex-col gap-1">
               <input
                 ref={fileInputRef}
