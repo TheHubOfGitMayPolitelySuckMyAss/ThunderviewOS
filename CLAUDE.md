@@ -97,8 +97,13 @@ src/
 │   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler)
 │   │   └── callback/route.ts           # Code exchange flow (secondary)
 │   ├── portal/
-│   │   ├── page.tsx                    # Authenticated landing: auth check, role check, Buy Ticket + admin buttons, sign out
+│   │   ├── page.tsx                    # Two-column portal home: nav buttons (left) + inline Intro/Ask/Contact form (right)
+│   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas, Contact dropdown, Save with toast
+│   │   ├── actions.ts                  # Server action: savePortalProfile (updates intro/ask/contact, sets timestamps only on change)
 │   │   ├── sign-out-button.tsx         # Client component: sign-out button (inline, not shared with admin-shell)
+│   │   ├── profile/page.tsx            # Placeholder: "Profile editor — coming soon"
+│   │   ├── community/page.tsx          # Placeholder: "Community directory — coming soon"
+│   │   ├── recap/page.tsx              # Placeholder: "Last month's Intros & Asks — coming soon"
 │   │   └── tickets/
 │   │       ├── page.tsx                # Ticket selection: stagetype-based ticket card, target dinner assignment
 │   │       ├── guest/page.tsx          # December-only guest upsell (+$40 spouse/partner/+1)
@@ -248,6 +253,12 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - `/admin/credits` page removed. Credits now surface contextually: "Credit" button on dinner ticket rows, "Apply Credit" button on member detail. Nav updated: Tickets added between Dinners and Applications, Credits removed.
 - Pagination audit: all admin list queries that could exceed the 1,000-row PostgREST cap now use the `fetchAll` helper with `.range()`. Paginated: applications (718 rows), members (634 rows), tickets (1,350 rows), dinners funnel aggregations (applications + tickets). Bounded queries (`.single()`, `.limit()`, count-only, scoped to single dinner/member) left as-is.
 
+## What's done (Phase 4, in progress)
+
+- **Portal home page** (`/portal`): two-column layout (stacks on mobile). Left column: four full-width nav buttons (Buy A Dinner Ticket → `/portal/tickets`, Update Your Profile → `/portal/profile`, View The Community → `/portal/community`, Check Last Month's Intros & Asks → `/portal/recap`). Right column: inline editable form with Intro (textarea, `members.current_intro`), Ask (textarea, `members.current_ask`), Preferred Contact (dropdown, `members.contact_preference`, options: linkedin/email). Single Save button with inline toast confirmation. Header with Thunderview OS branding, email, Admin button (admin/team only), Sign Out.
+- **Portal save action** (`savePortalProfile`): compares old vs new values; only writes changed fields. Sets `intro_updated_at = now()` only when Intro text actually changed; sets `ask_updated_at = now()` only when Ask text actually changed. Contact-only changes touch neither timestamp. No-op when nothing changed (no DB write, "No changes" toast). Admin edits elsewhere do NOT touch these timestamps (confirmed: `src/app/admin/members/[id]/actions.ts:15-16` explicitly skips them).
+- **Placeholder routes**: `/portal/profile`, `/portal/community`, `/portal/recap` — minimal pages with coming-soon text. All inherit proxy guard from `/portal/*`.
+
 ## What's NOT done
 
 Don't build these without an explicit prompt:
@@ -255,7 +266,7 @@ Don't build these without an explicit prompt:
 - Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — Phase 3+
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
 - Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
-- Attendee portal (intro/ask editor, profile, community directory) — Phase 4. Portal save action must explicitly set `intro_updated_at = now()` and `ask_updated_at = now()` when the member updates their own Intro or Ask.
+- Attendee portal: profile editor, community directory, recap page — Phase 4 (intro/ask/contact editor on portal home is done).
 - Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
 - Stripe payment integration for ticket purchases (currently writes ticket row with no payment) — Phase 5
 - Ticket purchase integration via Squarespace webhooks — Phase 5, blocked on Squarespace plan upgrade
