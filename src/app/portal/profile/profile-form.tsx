@@ -2,7 +2,10 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { saveProfile } from "./actions";
+
+const CropModal = dynamic(() => import("./crop-modal"), { ssr: false });
 
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -55,6 +58,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
   const [picPreview, setPicPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [removePic, setRemovePic] = useState(false);
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
@@ -81,9 +85,32 @@ export default function ProfileForm({ member }: ProfileFormProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // HEIC files can't be rendered in most browsers — skip crop, fall back to sprint 6 flow
+    const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
+    if (isHeic) {
+      setSelectedFile(file);
+      setRemovePic(false);
+      setPicPreview(null); // No preview for HEIC
+      return;
+    }
+
+    // Open crop modal for other image types
+    setCropImageUrl(URL.createObjectURL(file));
+  }
+
+  function handleCropApply(blob: Blob) {
+    const file = new File([blob], "cropped.png", { type: "image/png" });
     setSelectedFile(file);
     setRemovePic(false);
-    setPicPreview(URL.createObjectURL(file));
+    setPicPreview(URL.createObjectURL(blob));
+    setCropImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleCropCancel() {
+    setCropImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleRemovePic() {
@@ -136,6 +163,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
   const labelClass = "block text-sm font-medium text-gray-700";
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Profile details section */}
       <section>
@@ -392,5 +420,14 @@ export default function ProfileForm({ member }: ProfileFormProps) {
         )}
       </div>
     </form>
+
+    {cropImageUrl && (
+      <CropModal
+        imageUrl={cropImageUrl}
+        onApply={handleCropApply}
+        onCancel={handleCropCancel}
+      />
+    )}
+    </>
   );
 }
