@@ -72,33 +72,40 @@ export async function purchaseTicket(formData: FormData) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: { name: itemName },
-          unit_amount: amountPaid * 100,
+  let sessionUrl: string;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: itemName },
+            unit_amount: amountPaid * 100,
+          },
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      metadata: {
+        member_id: member.id,
+        dinner_id: targetDinner.id,
+        ticket_type: ticketType,
+        quantity: String(quantity),
+        amount_paid: String(amountPaid),
       },
-    ],
-    metadata: {
-      member_id: member.id,
-      dinner_id: targetDinner.id,
-      ticket_type: ticketType,
-      quantity: String(quantity),
-      amount_paid: String(amountPaid),
-    },
-    customer_email: memberEmail!.email,
-    success_url: `${origin}/portal/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/portal/tickets`,
-  });
+      customer_email: memberEmail!.email,
+      success_url: `${origin}/portal/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/portal/tickets`,
+    });
 
-  if (!session.url) {
-    throw new Error("Failed to create Stripe Checkout Session");
+    if (!session.url) {
+      throw new Error("Stripe returned no session URL");
+    }
+    sessionUrl = session.url;
+  } catch (err) {
+    console.error("Stripe Checkout Session creation failed:", err);
+    throw err;
   }
 
-  redirect(session.url);
+  redirect(sessionUrl);
 }
