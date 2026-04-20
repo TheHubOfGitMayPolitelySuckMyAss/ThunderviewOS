@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import PortalForm from "./portal-form";
 
 export default async function PortalPage() {
@@ -20,7 +21,7 @@ export default async function PortalPage() {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, first_name, kicked_out, current_intro, current_ask, contact_preference)"
+      "members!inner(id, first_name, kicked_out, current_intro, current_ask, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended)"
     )
     .eq("email", email)
     .limit(1)
@@ -33,9 +34,39 @@ export default async function PortalPage() {
     current_intro: string | null;
     current_ask: string | null;
     contact_preference: string | null;
+    intro_updated_at: string | null;
+    ask_updated_at: string | null;
+    last_dinner_attended: string | null;
   } | null;
 
   const isMember = member !== null && member.kicked_out === false;
+
+  // Fetch next future ticket for banner
+  let bannerDinnerDate: string | null = null;
+  let introAskFresh = false;
+  if (isMember) {
+    const todayMT = getTodayMT();
+    const { data: futureTicket } = await admin
+      .from("tickets")
+      .select("dinners!inner(date)")
+      .eq("member_id", member.id)
+      .in("fulfillment_status", ["pending", "fulfilled"])
+      .gte("dinners.date", todayMT)
+      .order("dinners(date)", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (futureTicket) {
+      const dinner = futureTicket.dinners as unknown as { date: string };
+      bannerDinnerDate = dinner.date;
+
+      // Has intro or ask been updated since last dinner attended?
+      const lda = member.last_dinner_attended;
+      const introTouched = member.intro_updated_at && (!lda || member.intro_updated_at > lda);
+      const askTouched = member.ask_updated_at && (!lda || member.ask_updated_at > lda);
+      introAskFresh = !!(introTouched || askTouched);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
@@ -81,6 +112,8 @@ export default async function PortalPage() {
               initialIntro={member.current_intro}
               initialAsk={member.current_ask}
               initialContact={member.contact_preference}
+              bannerDinnerDate={bannerDinnerDate ? formatDinnerDisplay(bannerDinnerDate) : null}
+              bannerIntroAskFresh={introAskFresh}
             />
           </div>
         )}

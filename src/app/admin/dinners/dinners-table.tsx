@@ -30,7 +30,7 @@ function getSortValue(d: DinnerStat, key: SortKey): string | number {
 
 export default function DinnersTable({ dinners }: { dinners: DinnerStat[] }) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {

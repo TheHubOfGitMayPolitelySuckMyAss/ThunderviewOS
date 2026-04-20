@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getTargetDinner } from "@/lib/ticket-assignment";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -86,21 +87,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update to fulfilled (fires trg_ticket_fulfillment_change: sets last_dinner_attended)
-    const { error: updateError } = await admin
-      .from("tickets")
-      .update({
-        fulfillment_status: "fulfilled",
-        fulfilled_at: new Date().toISOString(),
-      })
-      .eq("id", inserted.id);
+    // Only auto-fulfill if this ticket is for the next upcoming dinner
+    const nextDinner = await getTargetDinner(metadata.member_id, admin);
+    if (nextDinner && metadata.dinner_id === nextDinner.id) {
+      const { error: updateError } = await admin
+        .from("tickets")
+        .update({
+          fulfillment_status: "fulfilled",
+          fulfilled_at: new Date().toISOString(),
+        })
+        .eq("id", inserted.id);
 
-    if (updateError) {
-      console.error("Failed to fulfill ticket from webhook:", updateError.message, updateError.details, updateError.code);
-      return NextResponse.json(
-        { error: "Database update failed" },
-        { status: 500 }
-      );
+      if (updateError) {
+        console.error("Failed to fulfill ticket from webhook:", updateError.message, updateError.details, updateError.code);
+        return NextResponse.json(
+          { error: "Database update failed" },
+          { status: 500 }
+        );
+      }
     }
   }
 

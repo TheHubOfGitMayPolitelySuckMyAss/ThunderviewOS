@@ -9,15 +9,20 @@ export default function PortalForm({
   initialIntro,
   initialAsk,
   initialContact,
+  bannerDinnerDate,
+  bannerIntroAskFresh,
 }: {
   initialIntro: string | null;
   initialAsk: string | null;
   initialContact: string | null;
+  bannerDinnerDate: string | null;
+  bannerIntroAskFresh: boolean;
 }) {
   const [intro, setIntro] = useState(initialIntro ?? "");
   const [ask, setAsk] = useState(initialAsk ?? "");
   const [contact, setContact] = useState(initialContact ?? "linkedin");
   const [saving, setSaving] = useState(false);
+  const [introAskFresh, setIntroAskFresh] = useState(bannerIntroAskFresh);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -45,10 +50,25 @@ export default function PortalForm({
       showToast("No changes to save", "success");
     } else {
       showToast("Saved!", "success");
+      // If intro or ask was just saved, banner switches to welcoming message
+      if (bannerDinnerDate) setIntroAskFresh(true);
     }
   }
 
   return (
+    <div className="space-y-4">
+      {bannerDinnerDate && (
+        <div className="rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <p className="font-medium">
+            You&rsquo;ve got a ticket for {bannerDinnerDate}!
+          </p>
+          <p className="mt-1">
+            {introAskFresh
+              ? "We can\u2019t wait to see you."
+              : "Please update your Intro & Ask when you have a moment."}
+          </p>
+        </div>
+      )}
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="current_intro" className="block text-sm font-medium text-gray-700">
@@ -119,5 +139,6 @@ export default function PortalForm({
         </div>
       )}
     </form>
+    </div>
   );
 }

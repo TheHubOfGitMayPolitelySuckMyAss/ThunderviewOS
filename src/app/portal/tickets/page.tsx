@@ -66,35 +66,16 @@ export default async function TicketSelectionPage() {
     );
   }
 
-  // Check for existing pending ticket
-  const { data: pendingTicket } = await admin
+  // Fetch dinner_ids the member already has active tickets for
+  const { data: existingTickets } = await admin
     .from("tickets")
-    .select("id, dinner_id, dinners(date)")
+    .select("dinner_id")
     .eq("member_id", member.id)
-    .eq("fulfillment_status", "pending")
-    .limit(1)
-    .single();
+    .in("fulfillment_status", ["pending", "fulfilled"]);
 
-  if (pendingTicket) {
-    const dinner = pendingTicket.dinners as unknown as { date: string } | null;
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Buy Your Ticket</h1>
-          <p className="mt-4 text-gray-500">
-            You already have a ticket for{" "}
-            {dinner?.date ? formatDinnerDisplay(dinner.date) : "an upcoming dinner"}.
-          </p>
-          <Link
-            href="/portal"
-            className="mt-6 inline-block text-sm text-blue-600 hover:text-blue-800"
-          >
-            &larr; Back to portal
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const ticketedDinnerIds = new Set(
+    (existingTickets || []).map((t) => t.dinner_id)
+  );
 
   // Fetch eligible dinners: most recent past + up to 10 months ahead
   const todayMT = getTodayMT();
@@ -123,7 +104,7 @@ export default async function TicketSelectionPage() {
   // Combine: past dinner (if any) + upcoming
   const dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[] = [];
 
-  if (pastDinner) {
+  if (pastDinner && !ticketedDinnerIds.has(pastDinner.id)) {
     dinnerOptions.push({
       id: pastDinner.id,
       date: pastDinner.date,
@@ -134,6 +115,7 @@ export default async function TicketSelectionPage() {
   }
 
   for (const d of upcomingDinners || []) {
+    if (ticketedDinnerIds.has(d.id)) continue;
     dinnerOptions.push({
       id: d.id,
       date: d.date,
