@@ -77,7 +77,7 @@ export default async function TicketSelectionPage() {
     (existingTickets || []).map((t) => t.dinner_id)
   );
 
-  // Fetch eligible dinners: most recent past + up to 10 months ahead
+  // Fetch eligible dinners: most recent past + up to 3 months ahead
   const todayMT = getTodayMT();
 
   // Most recent past dinner
@@ -89,9 +89,9 @@ export default async function TicketSelectionPage() {
     .limit(1)
     .single();
 
-  // Upcoming dinners within 10 months
+  // Upcoming dinners within 3 months
   const cutoffRef = new Date();
-  cutoffRef.setMonth(cutoffRef.getMonth() + 10);
+  cutoffRef.setMonth(cutoffRef.getMonth() + 3);
   const cutoffDate = `${cutoffRef.getFullYear()}-${String(cutoffRef.getMonth() + 1).padStart(2, "0")}-${String(cutoffRef.getDate()).padStart(2, "0")}`;
 
   const { data: upcomingDinners } = await admin
