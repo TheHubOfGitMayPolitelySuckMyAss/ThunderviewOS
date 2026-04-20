@@ -99,13 +99,44 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     setCropImageUrl(URL.createObjectURL(file));
   }
 
-  function handleCropApply(blob: Blob) {
+  async function handleCropApply(blob: Blob) {
     const file = new File([blob], "cropped.png", { type: "image/png" });
-    setSelectedFile(file);
-    setRemovePic(false);
-    setPicPreview(URL.createObjectURL(blob));
     setCropImageUrl(null);
+    setPicPreview(URL.createObjectURL(blob));
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Save photo immediately
+    setSaving(true);
+    const formData = new FormData();
+    formData.set("profile_pic", file);
+    // Include current field values so the action can compare correctly
+    formData.set("first_name", firstName);
+    formData.set("last_name", lastName);
+    formData.set("company_name", companyName);
+    formData.set("company_website", companyWebsite);
+    formData.set("linkedin_profile", linkedinProfile);
+    formData.set("attendee_stagetypes", stagetypes.join(","));
+    formData.set("current_intro", intro);
+    formData.set("current_ask", ask);
+    formData.set("contact_preference", contact);
+    formData.set("primary_email", primaryEmail);
+
+    const result = await saveProfile(formData);
+    setSaving(false);
+
+    if (!result.success) {
+      showToast(result.error || "Upload failed", "error");
+      setSelectedFile(file); // Keep for manual retry via Save button
+      return;
+    }
+
+    showToast("Photo saved!", "success");
+    if (result.profilePicUrl) {
+      setProfilePicUrl(result.profilePicUrl);
+    }
+    setSelectedFile(null);
+    setPicPreview(null);
+    setRemovePic(false);
   }
 
   function handleCropCancel() {
