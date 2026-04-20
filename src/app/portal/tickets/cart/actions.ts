@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
+import { getTicketInfo } from "@/lib/ticket-assignment";
 import { formatDinnerDisplay } from "@/lib/format";
 import Stripe from "stripe";
 
@@ -11,6 +11,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function purchaseTicket(formData: FormData) {
   const withGuest = formData.get("with_guest") === "true";
+  const selectedDinnerId = formData.get("dinner_id") as string;
+
+  if (!selectedDinnerId) redirect("/portal/tickets");
 
   const supabase = await createClient();
   const {
@@ -48,13 +51,17 @@ export async function purchaseTicket(formData: FormData) {
     redirect("/portal");
   }
 
-  // Recompute target dinner at submit time
-  const targetDinner = await getTargetDinner(member.id, admin);
-  if (!targetDinner) redirect("/portal/tickets");
+  // Validate selected dinner exists
+  const { data: dinner } = await admin
+    .from("dinners")
+    .select("id, date")
+    .eq("id", selectedDinnerId)
+    .single();
+
+  if (!dinner) redirect("/portal/tickets");
 
   // Only allow guest for December dinners
-  const dinnerMonth =
-    new Date(targetDinner.date + "T00:00:00").getMonth() + 1;
+  const dinnerMonth = new Date(dinner.date + "T00:00:00").getMonth() + 1;
   const actualWithGuest = withGuest && dinnerMonth === 12;
 
   const { ticketType, price } = getTicketInfo(
@@ -64,7 +71,7 @@ export async function purchaseTicket(formData: FormData) {
 
   const quantity = actualWithGuest ? 2 : 1;
   const amountPaid = actualWithGuest ? price + 40 : price;
-  const dinnerDisplay = formatDinnerDisplay(targetDinner.date);
+  const dinnerDisplay = formatDinnerDisplay(dinner.date);
 
   const itemName = actualWithGuest
     ? `Thunderview CEO Dinner — ${dinnerDisplay} (with guest)`
@@ -86,7 +93,7 @@ export async function purchaseTicket(formData: FormData) {
     ],
     metadata: {
       member_id: member.id,
-      dinner_id: targetDinner.id,
+      dinner_id: dinner.id,
       ticket_type: ticketType,
       quantity: String(quantity),
       amount_paid: String(amountPaid),

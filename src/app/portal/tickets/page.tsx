@@ -2,8 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { formatDinnerDisplay } from "@/lib/format";
-import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
+import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
+import { getTicketInfo } from "@/lib/ticket-assignment";
+import TicketPurchase from "./ticket-purchase";
 
 export default async function TicketSelectionPage() {
   const supabase = await createClient();
@@ -19,9 +20,10 @@ export default async function TicketSelectionPage() {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, attendee_stagetypes, has_community_access, kicked_out, last_dinner_attended)"
+      "email, members!inner(id, attendee_stagetypes, has_community_access, kicked_out)"
     )
     .eq("email", user.email!)
+    .eq("is_primary", true)
     .limit(1)
     .single();
 
@@ -30,7 +32,6 @@ export default async function TicketSelectionPage() {
     attendee_stagetypes: string[];
     has_community_access: boolean;
     kicked_out: boolean;
-    last_dinner_attended: string | null;
   } | null;
 
   // Kicked out or not a member → back to portal
@@ -95,10 +96,52 @@ export default async function TicketSelectionPage() {
     );
   }
 
-  // Compute target dinner
-  const targetDinner = await getTargetDinner(member.id, admin);
+  // Fetch eligible dinners: most recent past + up to 3 months ahead
+  const todayMT = getTodayMT();
 
-  if (!targetDinner) {
+  // Most recent past dinner
+  const { data: pastDinner } = await admin
+    .from("dinners")
+    .select("id, date")
+    .lt("date", todayMT)
+    .order("date", { ascending: false })
+    .limit(1)
+    .single();
+
+  // Upcoming dinners within 3 months
+  const threeMonthsOut = new Date();
+  threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3);
+  const cutoffDate = `${threeMonthsOut.getFullYear()}-${String(threeMonthsOut.getMonth() + 1).padStart(2, "0")}-${String(threeMonthsOut.getDate()).padStart(2, "0")}`;
+
+  const { data: upcomingDinners } = await admin
+    .from("dinners")
+    .select("id, date")
+    .gte("date", todayMT)
+    .lte("date", cutoffDate)
+    .order("date", { ascending: true });
+
+  // Combine: past dinner (if any) + upcoming
+  const dinnerOptions: { id: string; date: string; label: string; isPast: boolean }[] = [];
+
+  if (pastDinner) {
+    dinnerOptions.push({
+      id: pastDinner.id,
+      date: pastDinner.date,
+      label: formatDinnerDisplay(pastDinner.date),
+      isPast: true,
+    });
+  }
+
+  for (const d of upcomingDinners || []) {
+    dinnerOptions.push({
+      id: d.id,
+      date: d.date,
+      label: formatDinnerDisplay(d.date),
+      isPast: false,
+    });
+  }
+
+  if (dinnerOptions.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
@@ -124,35 +167,30 @@ export default async function TicketSelectionPage() {
     );
   }
 
+  // Default to first upcoming (non-past) dinner
+  const defaultDinnerId =
+    dinnerOptions.find((d) => !d.isPast)?.id || dinnerOptions[0].id;
+
   const { label, price } = getTicketInfo(
     member.attendee_stagetypes,
     member.has_community_access
   );
 
-  // December dinner → guest page; otherwise → cart
-  const dinnerMonth = new Date(targetDinner.date + "T00:00:00").getMonth() + 1;
-  const nextHref =
-    dinnerMonth === 12
-      ? `/portal/tickets/guest?dinner_id=${targetDinner.id}`
-      : `/portal/tickets/cart?dinner_id=${targetDinner.id}`;
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md text-center">
         <h1 className="text-2xl font-bold text-gray-900">Buy Your Ticket</h1>
-        <p className="mt-2 text-gray-500">
-          {formatDinnerDisplay(targetDinner.date)}
-          <br />
+        <p className="mt-2 text-sm text-gray-500">
           Mercury Cafe, Denver, 6p&ndash;9p
         </p>
 
-        <Link
-          href={nextHref}
-          className="mt-8 block rounded-lg border-2 border-gray-200 bg-white px-6 py-6 shadow-sm transition hover:border-gray-900 hover:shadow-md"
-        >
-          <p className="text-lg font-semibold text-gray-900">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">${price}</p>
-        </Link>
+        <TicketPurchase
+          dinnerOptions={dinnerOptions}
+          defaultDinnerId={defaultDinnerId}
+          ticketLabel={label}
+          ticketPrice={price}
+          memberEmail={memberEmail!.email}
+        />
 
         <Link
           href="/portal"

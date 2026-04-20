@@ -81,18 +81,6 @@ export default async function ApplyPage() {
     }
   }
 
-  // Dinner options for the select dropdown (real dinners only, no Jan/Jul)
-  const dinnerOptions = allDinners
-    .filter((d) => {
-      const month = parseInt(d.date.slice(5, 7));
-      return month !== 1 && month !== 7;
-    })
-    .slice(0, 12)
-    .map((d) => ({
-      value: d.date,
-      label: formatDinnerDate(d.date),
-    }));
-
   return (
     <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-2xl px-4 py-12">
@@ -147,7 +135,7 @@ export default async function ApplyPage() {
           </ul>
         </div>
 
-        <ApplicationForm dinnerOptions={dinnerOptions} />
+        <ApplicationForm />
       </div>
     </div>
   );

@@ -35,18 +35,11 @@ const ORIENTATION_OPTIONS = [
   "Prefer not to say",
 ];
 
-type DinnerOption = { value: string; label: string };
-
-export default function ApplicationForm({
-  dinnerOptions,
-}: {
-  dinnerOptions: DinnerOption[];
-}) {
+export default function ApplicationForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
-  const [preferredDinnerDate, setPreferredDinnerDate] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -79,7 +72,6 @@ export default function ApplicationForm({
         companyName,
         companyWebsite,
         attendeeStagetype,
-        preferredDinnerDate,
         iAmCeo: isActiveCEO ? iAmCeo : null,
         isNotServices: isActiveCEO ? isNotServices : null,
       });
@@ -99,33 +91,6 @@ export default function ApplicationForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-10">
-      {/* SIGN UP HERE! */}
-      <section>
-        <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">
-          Sign Up Here!
-        </h2>
-        <div>
-          <label className={labelClass}>
-            Preferred Dinner Date{requiredStar}
-          </label>
-          <select
-            required
-            value={preferredDinnerDate}
-            onChange={(e) => setPreferredDinnerDate(e.target.value)}
-            className={inputClass}
-          >
-            <option value="" disabled>
-              Select an option
-            </option>
-            {dinnerOptions.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
-
       {/* PERSONAL INFORMATION */}
       <section>
         <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">

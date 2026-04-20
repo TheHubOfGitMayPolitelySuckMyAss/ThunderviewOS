@@ -13,7 +13,6 @@ export async function submitApplication(formData: {
   companyName: string;
   companyWebsite: string;
   attendeeStagetype: string;
-  preferredDinnerDate: string;
   iAmCeo: string | null;
   isNotServices: string | null;
 }): Promise<{ success: boolean; error?: string }> {
@@ -30,7 +29,6 @@ export async function submitApplication(formData: {
     company_name: formData.companyName.trim(),
     company_website: formData.companyWebsite.trim(),
     attendee_stagetype: formData.attendeeStagetype,
-    preferred_dinner_date: formData.preferredDinnerDate,
     i_am_my_startups_ceo: formData.iAmCeo,
     my_startup_is_not_a_services_business: formData.isNotServices,
     status: "pending",
