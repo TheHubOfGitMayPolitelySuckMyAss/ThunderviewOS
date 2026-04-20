@@ -60,13 +60,21 @@ export default async function PortalPage() {
       const dinner = futureTicket.dinners as unknown as { date: string };
       bannerDinnerDate = dinner.date;
 
-      // Has intro or ask been updated since last dinner attended?
-      // Compare dates (lda is DATE, timestamps are TIMESTAMPTZ — convert to DATE for comparison)
-      const lda = member.last_dinner_attended;
+      // Has intro or ask been updated since the most recent past dinner?
+      // Use the most recent past dinner date as the cutoff (not last_dinner_attended,
+      // which can be a future date from auto-fulfilled next-dinner tickets).
+      const { data: mostRecentPast } = await admin
+        .from("dinners")
+        .select("date")
+        .lt("date", todayMT)
+        .order("date", { ascending: false })
+        .limit(1)
+        .single();
+      const cutoff = mostRecentPast?.date ?? null;
       const introDate = member.intro_updated_at ? toDateMT(member.intro_updated_at) : null;
       const askDate = member.ask_updated_at ? toDateMT(member.ask_updated_at) : null;
-      const introTouched = introDate && (!lda || introDate > lda);
-      const askTouched = askDate && (!lda || askDate > lda);
+      const introTouched = introDate && (!cutoff || introDate > cutoff);
+      const askTouched = askDate && (!cutoff || askDate > cutoff);
       introAskFresh = !!(introTouched || askTouched);
     }
   }
