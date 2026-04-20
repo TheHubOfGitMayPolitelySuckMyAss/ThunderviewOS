@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatName, formatStageType } from "@/lib/format";
+import MemberAvatar from "@/components/member-avatar";
 
 type Member = {
   id: string;
@@ -15,6 +16,7 @@ type Member = {
   current_intro: string | null;
   current_ask: string | null;
   contact_preference: string | null;
+  profile_pic_url: string | null;
 };
 
 type SortKey = "name" | "company" | "role";
@@ -120,8 +122,9 @@ export default function CommunityTable({ members }: { members: Member[] }) {
                 <td className="px-4 py-3 text-sm text-gray-900">
                   <Link
                     href={`/portal/members/${member.id}`}
-                    className="after:absolute after:inset-0"
+                    className="flex items-center gap-2 after:absolute after:inset-0"
                   >
+                    <MemberAvatar member={member} size="sm" />
                     {formatName(member.first_name, member.last_name)}
                   </Link>
                 </td>

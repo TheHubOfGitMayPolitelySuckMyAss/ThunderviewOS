@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { formatDate, formatTicketName } from "@/lib/format";
+import MemberAvatar from "@/components/member-avatar";
 import { refundTicket, creditTicket } from "./actions";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +17,9 @@ type TicketRow = {
   purchasedAt: string;
   quantity: number;
   amountPaid: number;
+  memberFirstName: string;
+  memberLastName: string;
+  profilePicUrl: string | null;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -187,8 +191,9 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
           {ticket.memberId ? (
             <Link
               href={`/admin/members/${ticket.memberId}`}
-              className="text-blue-600 hover:text-blue-800"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
             >
+              <MemberAvatar member={{ first_name: ticket.memberFirstName, last_name: ticket.memberLastName, profile_pic_url: ticket.profilePicUrl }} size="sm" />
               {formatTicketName(ticket.memberName, ticket.quantity)}
             </Link>
           ) : (

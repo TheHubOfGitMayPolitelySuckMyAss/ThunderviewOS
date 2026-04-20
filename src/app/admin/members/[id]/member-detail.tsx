@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
+import MemberAvatar from "@/components/member-avatar";
 import {
   updateMemberField,
   toggleMemberFlag,
@@ -59,6 +60,7 @@ type MemberData = {
   is_team: boolean;
   kicked_out: boolean;
   last_dinner_attended: string | null;
+  profile_pic_url: string | null;
   member_emails: MemberEmail[];
 };
 
@@ -289,11 +291,14 @@ function Heading({ member }: { member: MemberData }) {
     : fullName;
 
   return (
-    <h3
-      className={`text-lg font-semibold ${member.kicked_out ? "line-through text-gray-400" : "text-gray-900"}`}
-    >
-      {heading}
-    </h3>
+    <div className="flex items-center gap-4">
+      <MemberAvatar member={member} size="lg" />
+      <h3
+        className={`text-lg font-semibold ${member.kicked_out ? "line-through text-gray-400" : "text-gray-900"}`}
+      >
+        {heading}
+      </h3>
+    </div>
   );
 }
 

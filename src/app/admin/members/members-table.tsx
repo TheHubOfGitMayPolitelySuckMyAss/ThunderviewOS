@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
+import MemberAvatar from "@/components/member-avatar";
 import AddMemberModal from "./add-member-modal";
 
 type MemberEmail = {
@@ -27,6 +28,7 @@ type Member = {
   marketing_opted_in: boolean;
   kicked_out: boolean;
   last_dinner_attended: string | null;
+  profile_pic_url: string | null;
 };
 
 function getPrimaryEmail(member: Member): string {
@@ -181,8 +183,9 @@ export default function MembersTable({
                 <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-900"}`}>
                   <Link
                     href={`/admin/members/${member.id}`}
-                    className="after:absolute after:inset-0"
+                    className="flex items-center gap-2 after:absolute after:inset-0"
                   >
+                    <MemberAvatar member={member} size="sm" />
                     {formatName(member.first_name, member.last_name)}
                   </Link>
                 </td>

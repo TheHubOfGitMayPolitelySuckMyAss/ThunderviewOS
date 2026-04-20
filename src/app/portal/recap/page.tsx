@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDinnerDisplay, formatName } from "@/lib/format";
 import { getTodayMT } from "@/lib/format";
 import Link from "next/link";
+import MemberAvatar from "@/components/member-avatar";
 
 export default async function RecapPage() {
   const admin = createAdminClient();
@@ -31,7 +32,7 @@ export default async function RecapPage() {
   const { data: tickets } = await admin
     .from("tickets")
     .select(
-      "member_id, members!inner(id, first_name, last_name, company_name, current_intro, current_ask, has_community_access, kicked_out)"
+      "member_id, members!inner(id, first_name, last_name, company_name, current_intro, current_ask, has_community_access, kicked_out, profile_pic_url)"
     )
     .eq("dinner_id", dinner.id)
     .eq("fulfillment_status", "fulfilled");
@@ -47,6 +48,7 @@ export default async function RecapPage() {
       current_ask: string | null;
       has_community_access: boolean;
       kicked_out: boolean;
+      profile_pic_url: string | null;
     };
   };
 
@@ -84,7 +86,9 @@ export default async function RecapPage() {
 
       <div className="mt-6 space-y-6">
         {attendees.map((m) => (
-          <div key={m.id} className="rounded-lg border bg-white p-5">
+          <div key={m.id} className="flex gap-4 rounded-lg border bg-white p-5">
+            <MemberAvatar member={m} size="lg" />
+            <div className="flex-1">
             <div className="flex items-baseline gap-2">
               <Link
                 href={`/portal/members/${m.id}`}
@@ -123,6 +127,7 @@ export default async function RecapPage() {
                 )}
               </div>
             )}
+            </div>
           </div>
         ))}
 

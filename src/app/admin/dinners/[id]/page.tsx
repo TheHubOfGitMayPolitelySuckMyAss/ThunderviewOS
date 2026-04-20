@@ -55,7 +55,7 @@ export default async function DinnerDetailPage({
 
   const { data: tickets } = await supabase
     .from("tickets")
-    .select("*, members(id, first_name, last_name, current_intro, current_ask, ask_updated_at, last_dinner_attended, member_emails(email, is_primary))")
+    .select("*, members(id, first_name, last_name, current_intro, current_ask, ask_updated_at, last_dinner_attended, profile_pic_url, member_emails(email, is_primary))")
     .eq("dinner_id", id)
     .order("purchased_at", { ascending: false });
 
@@ -111,6 +111,7 @@ export default async function DinnerDetailPage({
       current_ask: string | null;
       ask_updated_at: string | null;
       last_dinner_attended: string | null;
+      profile_pic_url: string | null;
       member_emails: { email: string; is_primary: boolean }[];
     } | null;
     const primaryEmail =
@@ -124,6 +125,9 @@ export default async function DinnerDetailPage({
       id: ticket.id,
       memberId: member?.id ?? null,
       memberName: member ? formatName(member.first_name, member.last_name) : "-",
+      memberFirstName: member?.first_name ?? "",
+      memberLastName: member?.last_name ?? "",
+      profilePicUrl: member?.profile_pic_url ?? null,
       primaryEmail,
       displayStatus: deriveTicketStatus(ticket.fulfillment_status, member),
       fulfillmentStatus: ticket.fulfillment_status,

@@ -90,6 +90,7 @@ export default async function MemberDetailPage({
     is_team: member.is_team,
     kicked_out: member.kicked_out,
     last_dinner_attended: member.last_dinner_attended,
+    profile_pic_url: member.profile_pic_url ?? null,
     member_emails: member.member_emails as {
       id: string;
       email: string;

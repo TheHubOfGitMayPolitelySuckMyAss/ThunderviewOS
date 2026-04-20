@@ -26,7 +26,7 @@ export default async function AdminLayout({
   // Fetch member data for initials and team check
   const { data: memberEmail } = await admin
     .from("member_emails")
-    .select("members!inner(first_name, last_name, is_team, kicked_out)")
+    .select("members!inner(first_name, last_name, is_team, kicked_out, profile_pic_url)")
     .eq("email", email)
     .limit(1)
     .single();
@@ -36,6 +36,7 @@ export default async function AdminLayout({
     last_name: string;
     is_team: boolean;
     kicked_out: boolean;
+    profile_pic_url: string | null;
   } | null;
 
   let isTeam = false;
@@ -52,7 +53,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex h-screen flex-col">
-      <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} />
+      <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} profilePicUrl={member?.profile_pic_url ?? null} />
       <AdminShell>{children}</AdminShell>
     </div>
   );

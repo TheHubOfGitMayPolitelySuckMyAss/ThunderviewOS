@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatName, formatStageType } from "@/lib/format";
+import MemberAvatar from "@/components/member-avatar";
 
 export default async function MemberProfilePage({
   params,
@@ -16,7 +17,7 @@ export default async function MemberProfilePage({
   const { data: member } = await admin
     .from("members")
     .select(
-      "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, has_community_access, kicked_out"
+      "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, has_community_access, kicked_out, profile_pic_url"
     )
     .eq("id", id)
     .single();
@@ -64,8 +65,9 @@ export default async function MemberProfilePage({
       </Link>
 
       <div className="rounded-lg border bg-white p-6">
-        <div className="mb-6 flex items-start justify-between">
-          <div>
+        <div className="mb-6 flex items-center gap-4">
+          <MemberAvatar member={member} size="lg" />
+          <div className="flex-1">
             <h2 className="text-2xl font-bold text-gray-900">{name}</h2>
             {member.company_name && (
               <p className="text-gray-500">{member.company_name}</p>

@@ -2,6 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import sharp from "sharp";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
 const VALID_STAGETYPES = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -26,7 +30,7 @@ export async function saveProfile(formData: FormData) {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference)"
+      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, profile_pic_url)"
     )
     .eq("email", user.email!)
     .limit(1)
@@ -43,6 +47,7 @@ export async function saveProfile(formData: FormData) {
     current_intro: string | null;
     current_ask: string | null;
     contact_preference: string | null;
+    profile_pic_url: string | null;
   } | null;
 
   if (!member) return { success: false, error: "Member not found" };
@@ -159,6 +164,55 @@ export async function saveProfile(formData: FormData) {
     }
   }
 
+  // Handle profile pic upload
+  const profilePicFile = formData.get("profile_pic") as File | null;
+  const removePic = formData.get("remove_pic") === "true";
+
+  if (removePic && member.profile_pic_url) {
+    // Remove from storage
+    await admin.storage.from("profile-pics").remove([`${member.id}.webp`]);
+    updates.profile_pic_url = null;
+    anyChange = true;
+  } else if (profilePicFile && profilePicFile.size > 0) {
+    // Validate size
+    if (profilePicFile.size > MAX_FILE_SIZE) {
+      return { success: false, error: "Image must be under 5MB" };
+    }
+    // Validate type
+    if (!ALLOWED_TYPES.includes(profilePicFile.type)) {
+      return { success: false, error: "Image must be JPEG, PNG, WebP, or HEIC" };
+    }
+
+    // Process with sharp: resize, crop, convert to webp, strip EXIF
+    const buffer = Buffer.from(await profilePicFile.arrayBuffer());
+    const processed = await sharp(buffer)
+      .resize(400, 400, { fit: "cover", position: "centre" })
+      .webp({ quality: 80 })
+      .rotate() // auto-rotate based on EXIF, then strip
+      .toBuffer();
+
+    // Upload to storage (overwrite)
+    const filePath = `${member.id}.webp`;
+    const { error: uploadError } = await admin.storage
+      .from("profile-pics")
+      .upload(filePath, processed, {
+        contentType: "image/webp",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return { success: false, error: `Upload failed: ${uploadError.message}` };
+    }
+
+    // Build public URL with cache-bust
+    const { data: urlData } = admin.storage
+      .from("profile-pics")
+      .getPublicUrl(filePath);
+
+    updates.profile_pic_url = `${urlData.publicUrl}?v=${Date.now()}`;
+    anyChange = true;
+  }
+
   if (!anyChange && !emailChanged) {
     return { success: true, noChanges: true };
   }
@@ -172,5 +226,5 @@ export async function saveProfile(formData: FormData) {
     if (error) return { success: false, error: error.message };
   }
 
-  return { success: true, noChanges: false };
+  return { success: true, noChanges: false, profilePicUrl: updates.profile_pic_url as string | null | undefined };
 }

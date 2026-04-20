@@ -24,7 +24,7 @@ export default async function CommunityPage() {
     admin
       .from("members")
       .select(
-        "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference"
+        "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, profile_pic_url"
       )
       .eq("has_community_access", true)
       .eq("kicked_out", false)

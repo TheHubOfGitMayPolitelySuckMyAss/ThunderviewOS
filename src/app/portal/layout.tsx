@@ -22,7 +22,7 @@ export default async function PortalLayout({
 
   const { data: memberEmail } = await admin
     .from("member_emails")
-    .select("members!inner(first_name, last_name, is_team, kicked_out)")
+    .select("members!inner(first_name, last_name, is_team, kicked_out, profile_pic_url)")
     .eq("email", email)
     .limit(1)
     .single();
@@ -32,6 +32,7 @@ export default async function PortalLayout({
     last_name: string;
     is_team: boolean;
     kicked_out: boolean;
+    profile_pic_url: string | null;
   } | null;
 
   const isAdmin = email === "eric@marcoullier.com";
@@ -44,7 +45,7 @@ export default async function PortalLayout({
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
-      <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} />
+      <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} profilePicUrl={member?.profile_pic_url ?? null} />
       <main className="flex-1">{children}</main>
     </div>
   );

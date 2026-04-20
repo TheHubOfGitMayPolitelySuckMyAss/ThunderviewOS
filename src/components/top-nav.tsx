@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,9 +10,10 @@ type TopNavProps = {
   initials: string;
   isAdmin: boolean;
   isTeam: boolean;
+  profilePicUrl?: string | null;
 };
 
-export default function TopNav({ initials, isAdmin, isTeam }: TopNavProps) {
+export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: TopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -76,9 +78,13 @@ export default function TopNav({ initials, isAdmin, isTeam }: TopNavProps) {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white hover:bg-gray-800"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white hover:bg-gray-800 overflow-hidden"
         >
-          {initials}
+          {profilePicUrl ? (
+            <Image src={profilePicUrl} alt={initials} width={32} height={32} className="h-8 w-8 rounded-full object-cover" unoptimized />
+          ) : (
+            initials
+          )}
         </button>
 
         {dropdownOpen && (

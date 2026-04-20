@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { saveProfile } from "./actions";
 
 const STAGE_OPTIONS = [
@@ -27,6 +28,7 @@ type ProfileFormProps = {
     currentAsk: string | null;
     contactPreference: string | null;
     primaryEmail: string;
+    profilePicUrl: string | null;
   };
 };
 
@@ -49,6 +51,11 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     member.contactPreference ?? "linkedin"
   );
   const [primaryEmail, setPrimaryEmail] = useState(member.primaryEmail);
+  const [profilePicUrl, setProfilePicUrl] = useState(member.profilePicUrl);
+  const [picPreview, setPicPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [removePic, setRemovePic] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
@@ -71,11 +78,32 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     );
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+    setRemovePic(false);
+    setPicPreview(URL.createObjectURL(file));
+  }
+
+  function handleRemovePic() {
+    setRemovePic(true);
+    setSelectedFile(null);
+    setPicPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
 
     const formData = new FormData(e.currentTarget);
+    if (selectedFile) {
+      formData.set("profile_pic", selectedFile);
+    }
+    if (removePic) {
+      formData.set("remove_pic", "true");
+    }
     const result = await saveProfile(formData);
 
     setSaving(false);
@@ -89,6 +117,17 @@ export default function ProfileForm({ member }: ProfileFormProps) {
       showToast("No changes to save", "success");
     } else {
       showToast("Saved!", "success");
+      // Update pic state after successful save
+      if (result.profilePicUrl !== undefined) {
+        setProfilePicUrl(result.profilePicUrl ?? null);
+      }
+      if (removePic) {
+        setProfilePicUrl(null);
+      }
+      setSelectedFile(null);
+      setPicPreview(null);
+      setRemovePic(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -104,6 +143,54 @@ export default function ProfileForm({ member }: ProfileFormProps) {
           Profile Details
         </h3>
         <div className="space-y-4">
+          {/* Profile picture */}
+          <div className="flex items-center gap-4">
+            {picPreview || (!removePic && profilePicUrl) ? (
+              <Image
+                src={picPreview || profilePicUrl!}
+                alt="Profile"
+                width={120}
+                height={120}
+                className="h-[120px] w-[120px] rounded-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-gray-900 text-3xl font-medium text-white">
+                {firstName?.[0]?.toUpperCase() ?? "?"}{lastName?.[0]?.toUpperCase() ?? ""}
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                {profilePicUrl && !removePic ? "Change Photo" : "Upload Photo"}
+              </button>
+              {profilePicUrl && !removePic && !picPreview && (
+                <button
+                  type="button"
+                  onClick={handleRemovePic}
+                  className="text-sm text-red-600 hover:text-red-800"
+                >
+                  Remove
+                </button>
+              )}
+              {picPreview && (
+                <span className="text-xs text-gray-500">
+                  New photo selected — save to apply
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="first_name" className={labelClass}>
