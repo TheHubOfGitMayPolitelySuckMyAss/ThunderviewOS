@@ -23,6 +23,7 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 - **Next.js 16.2.3**, App Router, TypeScript
 - **Tailwind CSS 4** (via `@tailwindcss/postcss`)
 - **Supabase**: `@supabase/supabase-js` ^2.103.2, `@supabase/ssr` ^0.10.2
+- **Stripe**: `stripe` ^22.0.2 (Checkout Sessions + refunds, sandbox mode)
 - **Resend** ^6.11.0 (installed, not yet wired)
 - **Hosting**: Vercel (production: https://thunderview-os.vercel.app)
 - **Database**: Supabase project `volrbqcolrqarmquaqvy` (us-west-2)
@@ -117,15 +118,18 @@ src/
 │   │   │   └── [id]/page.tsx           # Read-only member profile: details + intro/ask. 404 if kicked_out or no community access. Self-view shows Edit Profile button
 │   │   ├── recap/page.tsx              # Last month's recap: fulfilled attendees of most recent past dinner with intro/ask cards
 │   │   └── tickets/
-│   │       ├── page.tsx                # Ticket selection: stagetype-based ticket card, target dinner assignment
-│   │       ├── guest/page.tsx          # December-only guest upsell (+$40 spouse/partner/+1)
+│   │       ├── page.tsx                # Ticket selection: dinner dropdown + buy buttons (server component)
+│   │       ├── ticket-purchase.tsx     # Client component: dinner dropdown, guest-aware buy buttons, calls purchaseTicket action
+│   │       ├── guest/page.tsx          # Legacy guest upsell page (orphaned — no longer navigated to)
 │   │       ├── cart/
-│   │       │   ├── page.tsx            # Order review: line items, total, purchase button
-│   │       │   ├── actions.ts          # Server action: purchaseTicket (recomputes dinner, inserts ticket row)
-│   │       │   └── purchase-button.tsx # Client component: form with pending state
-│   │       └── success/page.tsx        # Post-purchase confirmation with confetti (reuses /apply/thanks/confetti)
+│   │       │   ├── page.tsx            # Legacy cart page (orphaned — no longer navigated to)
+│   │       │   ├── actions.ts          # Server action: purchaseTicket (creates Stripe Checkout Session, redirects to Stripe)
+│   │       │   └── purchase-button.tsx # Legacy purchase button (orphaned — no longer navigated to)
+│   │       └── success/page.tsx        # Post-purchase confirmation: fetches Stripe session for details, confetti
 │   ├── api/cron/generate-dinner/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
+│   ├── api/webhooks/stripe/
+│   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
 │   └── admin/
 │       ├── layout.tsx                  # Auth check + role detection + TopNav (server component)
 │       ├── admin-shell.tsx             # Sidebar nav only (client component; header moved to TopNav)
@@ -159,7 +163,8 @@ src/
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management
 ├── lib/
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
-│   └── ticket-assignment.ts            # Target dinner logic (getTargetDinner) + ticket type/price mapping (getTicketInfo)
+│   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
+│   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
@@ -175,7 +180,13 @@ supabase/
 │   ├── 20260418800000_update_rpcs_for_name_split.sql      # Update add_member_with_application, approve_application, link_application_to_member RPCs for first_name/last_name
 │   ├── 20260418900000_portal_tickets.sql                  # Add quantity column to tickets, add 'portal' to payment_source CHECK
 │   ├── 20260419000000_phase4_stagetypes_and_kickout.sql   # members.attendee_stagetype → attendee_stagetypes TEXT[]; RPCs write array; kick-out revokes has_community_access trigger
-│   └── 20260420000000_profile_pic.sql                    # Add profile_pic_url TEXT NULL to members
+│   ├── 20260420000000_profile_pic.sql                    # Add profile_pic_url TEXT NULL to members
+│   ├── 20260420100000_stripe_columns.sql                # Add stripe_session_id, stripe_payment_intent_id to tickets (partial unique index)
+│   ├── 20260420200000_stripe_refund_id.sql              # Add stripe_refund_id TEXT NULL to tickets
+│   ├── 20260420300000_guests_allowed.sql                # Add dinners.guests_allowed BOOLEAN NOT NULL DEFAULT false; backfill December → true
+│   ├── 20260420400000_comp_payment_source.sql           # Add 'comp' to tickets.payment_source CHECK constraint
+│   ├── 20260420500000_nullable_preferred_dinner_date.sql # Allow NULL on applications.preferred_dinner_date
+│   └── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -190,10 +201,13 @@ Required in `.env.local` (see `.env.local.example` at repo root):
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (server-side only)
-- `NEXT_PUBLIC_SITE_URL` — App origin URL (`http://localhost:3000` for dev, `https://thunderview-os.vercel.app` for production)
+- `NEXT_PUBLIC_SITE_URL` — App origin URL (`http://localhost:3000` for dev, `https://thunderview-os.vercel.app` for production). **Gotcha:** always `.trim()` when reading — a trailing newline in Vercel env vars broke Stripe URLs in Sprint 8.
+- `STRIPE_SECRET_KEY` — Stripe sandbox secret key (`sk_test_...`). Server-side only.
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe sandbox publishable key (`pk_test_...`). Currently unused client-side (Checkout is redirect-based, not embedded).
+- `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret. For local dev: comes from `stripe listen` output. For production: from the registered webhook endpoint (`we_1TOKwXBZUujGbd3L93xKwlDl`).
 - `RESEND_API_KEY` — TBD, not yet wired. Not yet in `.env.local.example`; add when Resend is integrated.
 
-Production values are set in Vercel dashboard. Preview scope is missing anon key and service role key (Vercel CLI plugin bug — add manually in dashboard if needed).
+Production values are set in Vercel dashboard (Production + Development scopes). **Note:** Stripe sandbox keys are in both Production and Development scopes — no live keys yet. A future sprint will swap Production to live-mode keys.
 
 ## Supabase configuration (manual, not in code)
 
@@ -222,7 +236,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
 - 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter — later removed in Phase 3)
 - Admin dinners list columns (Paid, Intro/Ask, Guests) with clickable rows linking to dinner detail. Paid = sum of quantity where `fulfillment_status IN ('purchased', 'fulfilled')` — includes purchased-but-not-yet-fulfilled future-dinner tickets. Applied/Approved columns removed in Sprint 11.
-- Derived "Intro/Ask" ticket status on dinner detail page: shown when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance)
+- Derived "Intro/Ask" ticket status on dinner detail page: shown ONLY on the next upcoming dinner, when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance). All other dinners show "Fulfilled" for fulfilled tickets.
 - Portal placeholder ("Portal Coming Soon")
 - Seed data applied to Supabase (10 dinners, 5 members, 3 applications, 5 tickets, 1 credit — replaced by Phase 2 import)
 
@@ -259,7 +273,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Admin display: dinner detail and dinners list sum `quantity` for attendee counts (not row count). Ticket rows with `quantity > 1` display as "Name +1". Shared helper `formatTicketName()` in `src/lib/format.ts`.
 - Dashboard: removed "Unfulfilled Tickets" accordion (no longer needed with portal ticket flow). Only pending applications and marketing opt-outs remain.
 - Dinner detail redesigned: active tickets table (purchased/fulfilled) with Credit and Refund action buttons per row; Type and Amount columns removed. Refunded/credited tickets shown in a separate bottom section with full-row strikethrough and status pills. Refund-only (no Credit) for qty=2 tickets.
-- Refund flow: qty=1 sets `fulfillment_status = 'refunded'`, existing triggers recalculate dates. qty=2 offers "Refund Guest Only" (decrements quantity to 1, halves amount_paid, keeps status) or "Refund Both" (sets status to refunded). Confirmation modal for all refunds.
+- Refund flow: calls `stripe.refunds.create()` before flipping DB status (skips Stripe for historical tickets or tickets without `stripe_payment_intent_id`). qty=1 full refund sets `fulfillment_status = 'refunded'`, existing triggers recalculate dates. qty=2 offers "Refund Guest Only" ($40 refund, decrements quantity to 1, reduces amount_paid by $40, keeps status) or "Refund Both" (full refund, sets status to refunded). `stripe_refund_id` stored on ticket. Portal tickets missing `stripe_payment_intent_id` flagged as data anomaly. Comp tickets (`payment_source = 'comp'`) hide Credit/Refund buttons. Confirmation modal for all refunds; Stripe errors surface inline in the modal.
 - Credit flow: sets ticket `fulfillment_status = 'credited'`, creates a `credits` row with `source_ticket_id` and `status = 'outstanding'`. Confirmation modal.
 - Apply Credit on member detail page: "Apply Credit" button shown at top of column two when member has unredeemed credits (`credits.status = 'outstanding'` AND `redeemed_ticket_id IS NULL`). On confirm: computes target dinner via `getTargetDinner()`, inserts ticket as purchased then updates to fulfilled (fires both insert and fulfillment triggers), sets `payment_source = 'credit'`, `amount_paid = 0`, marks oldest unredeemed credit as redeemed. Button stays visible if multiple credits remain.
 - Kicked-out member exclusion from dinner views: approved applications whose linked member has `kicked_out = true` are excluded from dinner funnel counts (Applied/Approved columns on dinners list) and "Approved Without Ticket" lists on dinner detail pages. Applications inbox and tickets are unaffected.
@@ -283,20 +297,29 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Community directory** (`/portal/community`): searchable, sortable table of members with `has_community_access = true` and `kicked_out = false`. Columns: Name, Company, Role. Search hits: first_name, last_name, full name, company_name, company_website, linkedin_profile, current_intro, current_ask, contact_preference, attendee_stagetypes. Default sort: first_name ascending. All columns sortable. Uses `fetchAll` with `.range()` for pagination past 1,000-row PostgREST cap (470 community members). All rows rendered client-side after full fetch. Row click routes to `/portal/members/[id]`.
 - **Member profile page** (`/portal/members/[id]`): read-only view of a member's profile for other community members. Shows: name, company, website (link), LinkedIn (link), role (formatted), primary email, preferred contact (capitalized), intro, ask. No demographics (gender/race/orientation — those live on applications only). Returns 404 if member is `kicked_out = true` or `has_community_access = false`. Self-view: shows "Edit Profile" button linking to `/portal/profile` when viewer's member_id matches the page's member.
 - **Recap page** (`/portal/recap`): shows attendees of the most recent completed dinner (latest `dinners.date < today` in MT). Attendees = members with a `fulfillment_status = 'fulfilled'` ticket for that dinner. Excluded: kicked-out, `has_community_access = false`, refunded, credited, purchased (not yet fulfilled) tickets. Marketing-opted-out still shown. Deduplicated by member_id (qty=2 tickets show one row for the primary member). Each card shows name (links to `/portal/members/[id]`), company, full intro text, full ask text. Empty intro/ask hidden (only show what they have). Header: "Thunderview Dinner — [formatted date]" with attendee count. Members with intros/asks sorted first, then others. Empty state for no past dinners.
-- **Profile pictures** (Sprints 6–7): Supabase Storage bucket `profile-pics` (public-read, authenticated-write, RLS: members can only upload at their own member_id path). Column `members.profile_pic_url` TEXT NULL stores full public URL with `?v={timestamp}` cache-bust. Upload on `/portal/profile`: client-side crop via `react-easy-crop` (square aspect, zoom 1–3) in a modal (`crop-modal.tsx`), then server-side processing via `sharp` — resize to 400×400, convert to WebP, strip EXIF. HEIC files skip client crop (browser can't render) and fall back to server center-crop. Max 5MB, accepts JPEG/PNG/WebP/HEIC. Stored at `profile-pics/{member_id}.webp` (upsert overwrites). Photo saves immediately on crop Apply (spinner overlay shown). Reusable `<MemberAvatar>` component (`src/components/member-avatar.tsx`): shows pic if set, initials circle if not. Sizes: sm (28px), md (40px), lg (120px). Displayed in 7 locations: portal profile upload, portal member profile page, community table rows, recap cards, top-nav dropdown trigger, admin member detail heading, admin members table rows, admin dinner detail ticket rows.
+- **Profile pictures** (Sprints 6–7): Supabase Storage bucket `profile-pics` (public-read, authenticated-write, RLS: members can only upload at their own member_id path). Column `members.profile_pic_url` TEXT NULL stores full public URL with `?v={timestamp}` cache-bust. Upload on `/portal/profile`: client-side crop via `react-easy-crop` (square aspect, zoom 1–3) in a modal (`crop-modal.tsx`), then server-side processing via `sharp` — resize to 400×400, convert to WebP, strip EXIF. HEIC files skip client crop (browser can't render) and fall back to server center-crop. Max 5MB, accepts JPEG/PNG/WebP/HEIC. Stored at `profile-pics/{member_id}.webp` (upsert overwrites). Photo upload and removal both save immediately (spinner overlay shown, no need to click Save). Reusable `<MemberAvatar>` component (`src/components/member-avatar.tsx`): shows pic if set, initials circle if not. Sizes: sm (28px), md (40px), lg (120px). Displayed in 7 locations: portal profile upload, portal member profile page, community table rows, recap cards, top-nav dropdown trigger, admin member detail heading, admin members table rows, admin dinner detail ticket rows.
+
+## What's done (Sprints 8–12)
+
+- **Stripe Checkout** (Sprint 8): `purchaseTicket` server action creates a Stripe Checkout Session with inline `price_data` (no pre-configured Products). Metadata includes `member_id`, `dinner_id`, `ticket_type`, `quantity`, `amount_paid`. Webhook at `/api/webhooks/stripe` handles `checkout.session.completed` — inserts ticket as `purchased`, auto-fulfills only if dinner is the next upcoming (via `getTargetDinner()`). Idempotency via `stripe_session_id` partial unique index. Stripe columns on tickets: `stripe_session_id`, `stripe_payment_intent_id`, `stripe_refund_id`.
+- **Stripe refunds** (Sprint 9): Refund button calls `stripe.refunds.create()` before DB status flip. Guest-only refund = $40 (fixed, not half). Historical tickets and tickets without `stripe_payment_intent_id` skip Stripe. Errors surface inline in refund modal.
+- **Ticket purchase flow redesign** (Sprint 10): Application form no longer asks for preferred dinner date (`preferred_dinner_date` column made nullable, no longer written). Portal `/portal/tickets` shows explicit dinner dropdown (most recent past dinner + next 3 upcoming) instead of auto-assignment. Member picks dinner, clicks Buy. December guest upsell collapsed into two side-by-side buttons on same page (no intermediate guest/cart pages). `getTargetDinner()` simplified to just return next upcoming dinner.
+- **Per-dinner guests_allowed** (Sprint 10.5): `dinners.guests_allowed` BOOLEAN replaces hardcoded December month check. `allowsGuestTicket()` predicate in `src/lib/ticket-rules.ts`. Admin toggle on `/admin/dinners` list (Guests column, click Yes/No → confirmation modal, spinner while saving). Backfilled: 4 December dinners = true.
+- **Admin surface cleanup** (Sprint 11): Removed Preferred Dinner from applications UI. Removed Applied/Approved columns from dinners list. Dinner detail: removed Pending square, renamed Fulfilled → Purchased (counts purchased + fulfilled), removed Approved Without Ticket section. Newest-first ticket sort + blue "new" pill for first-time members. Intro/Ask status scoped to next upcoming dinner only. Dashboard: Tickets Sold now sums quantity excluding refunded/credited; New Apps excludes rejected. Comp Ticket button on member detail (payment_source='comp', amount_paid=0, auto-fulfilled, no Credit/Refund buttons shown). `payment_source` CHECK: squarespace, credit, historical, portal, comp.
+- **Fulfillment logic** (Sprint 12): Tickets auto-fulfill only when `dinner_id` matches next upcoming dinner. Future-beyond-next tickets stay `purchased`. Dinner dropdown filters out dinners where member already has a purchased/fulfilled ticket. `/admin/dinners` default sort = date DESC with auto-scroll to next upcoming dinner. Portal home shows upcoming-ticket banner with intro/ask freshness nudge (updates on save without reload). `fulfillment_status` values renamed: `pending` → `purchased` throughout code and DB.
 
 ## What's NOT done
 
 Don't build these without an explicit prompt:
 
-- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — Phase 3+
-- `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (Phase 3+)
-- Application form (will be hosted on Thunderview OS, not Squarespace) — Phase 3
+- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — future sprint. Fulfillment cron (~27 days before dinner) not yet built.
+- `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
+- ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
 - Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
-- Stripe payment integration for ticket purchases (currently writes ticket row with no payment) — Phase 5
+- ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
 - Ticket purchase integration via Squarespace webhooks — Phase 5, blocked on Squarespace plan upgrade
-- Bulk email templates — Phase 4
+- Bulk email templates — future sprint
 - Streak API integration — Phase 5
 - CoachingOS sync — Phase 6
 - LinkedIn URL matching for automatic duplicate detection across applications and members
@@ -305,11 +328,10 @@ Don't build these without an explicit prompt:
 
 ## Upcoming work
 
-**Phase 3: Admin actions + application form + transactional emails (next up)**
-
-Remaining Phase 3 work:
-- Application form (hosted on Thunderview OS, replacing Squarespace)
 - Transactional emails via Resend (approval notifications, magic links with custom branding)
+- Fulfillment cron: ~27 days before each dinner, flip `purchased` → `fulfilled` and send dinner-details email
+- Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
+- Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
 
 ## Pre-launch checklist (before real users hit this)
 
