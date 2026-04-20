@@ -36,21 +36,21 @@ export default function DinnersTable({ dinners, nextDinnerId }: { dinners: Dinne
   const hasScrolled = useRef(false);
 
   // Scroll so the next-upcoming dinner row sits just below the sticky header
-  const scrollToNextDinner = useCallback(() => {
+  useEffect(() => {
     if (hasScrolled.current) return;
     const container = scrollContainerRef.current;
     const row = nextDinnerRowRef.current;
     if (!container || !row) return;
-    // Header height = the sticky thead
-    const thead = container.querySelector("thead");
-    const headerHeight = thead?.offsetHeight ?? 0;
-    container.scrollTop = row.offsetTop - headerHeight;
-    hasScrolled.current = true;
+    // Use requestAnimationFrame to ensure layout is complete
+    requestAnimationFrame(() => {
+      const thead = container.querySelector("thead");
+      const headerHeight = thead?.getBoundingClientRect().height ?? 0;
+      const rowTop = row.getBoundingClientRect().top;
+      const containerTop = container.getBoundingClientRect().top;
+      container.scrollTop += (rowTop - containerTop - headerHeight);
+      hasScrolled.current = true;
+    });
   }, []);
-
-  useEffect(() => {
-    scrollToNextDinner();
-  }, [scrollToNextDinner]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
