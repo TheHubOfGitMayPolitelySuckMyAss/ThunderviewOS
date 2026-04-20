@@ -214,7 +214,7 @@ export default async function DinnerDetailPage({
       </div>
 
       {/* Tickets (client component with actions) */}
-      <DinnerTickets tickets={ticketRows} />
+      <DinnerTickets tickets={ticketRows} dinnerDate={dinner.date} />
 
     </div>
   );

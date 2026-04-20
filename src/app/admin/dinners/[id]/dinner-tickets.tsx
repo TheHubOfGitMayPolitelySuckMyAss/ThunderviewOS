@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { formatDate, formatTicketName } from "@/lib/format";
+import { formatDate, formatTicketName, getTodayMT } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
 import { refundTicket, creditTicket } from "./actions";
 import { useRouter } from "next/navigation";
@@ -43,8 +43,10 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function DinnerTickets({
   tickets,
+  dinnerDate,
 }: {
   tickets: TicketRow[];
+  dinnerDate: string;
 }) {
   const activeTickets = tickets.filter(
     (t) => t.fulfillmentStatus === "purchased" || t.fulfillmentStatus === "fulfilled"
@@ -81,7 +83,7 @@ export default function DinnerTickets({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {activeTickets.map((ticket) => (
-                <ActiveTicketRow key={ticket.id} ticket={ticket} />
+                <ActiveTicketRow key={ticket.id} ticket={ticket} dinnerDate={dinnerDate} />
               ))}
               {activeTickets.length === 0 && (
                 <tr>
@@ -157,11 +159,14 @@ export default function DinnerTickets({
   );
 }
 
-function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
+function ActiveTicketRow({ ticket, dinnerDate }: { ticket: TicketRow; dinnerDate: string }) {
   const router = useRouter();
   const [modal, setModal] = useState<"refund" | "credit" | null>(null);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // No refunds or credits for past dinners
+  const isPastDinner = dinnerDate < getTodayMT();
 
   const isQty2 = ticket.quantity >= 2;
   const guestRefundAmount = (40).toFixed(2);
@@ -224,7 +229,7 @@ function ActiveTicketRow({ ticket }: { ticket: TicketRow }) {
           {formatDate(ticket.purchasedAt)}
         </td>
         <td className="px-4 py-3 text-right text-sm">
-          {ticket.paymentSource !== "comp" && (
+          {ticket.paymentSource !== "comp" && !isPastDinner && (
             <div className="flex justify-end gap-2">
               {!isQty2 && (
                 <button
