@@ -78,7 +78,7 @@ export default async function DinnersPage() {
     ).length;
 
     const paid = dinnerTickets
-      .filter((t) => t.fulfillment_status === "fulfilled")
+      .filter((t) => t.fulfillment_status === "fulfilled" || t.fulfillment_status === "pending")
       .reduce((sum, t) => sum + (t.quantity ?? 1), 0);
 
     const introAsk = dinnerTickets

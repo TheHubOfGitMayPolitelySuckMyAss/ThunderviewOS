@@ -221,7 +221,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Supabase auth email templates updated to use PKCE token hash pattern (`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`)
 - Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
 - 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter — later removed in Phase 3)
-- Admin dinners list funnel columns (Applied, Approved, Paid, Intro/Ask) with clickable rows linking to dinner detail
+- Admin dinners list columns (Paid, Intro/Ask, Guests) with clickable rows linking to dinner detail. Paid = sum of quantity where `fulfillment_status IN ('pending', 'fulfilled')` — includes purchased-but-not-yet-fulfilled future-dinner tickets. Applied/Approved columns removed in Sprint 11.
 - Derived "Intro/Ask" ticket status on dinner detail page: shown when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance)
 - Portal placeholder ("Portal Coming Soon")
 - Seed data applied to Supabase (10 dinners, 5 members, 3 applications, 5 tickets, 1 credit — replaced by Phase 2 import)
