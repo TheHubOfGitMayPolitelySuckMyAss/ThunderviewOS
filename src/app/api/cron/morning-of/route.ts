@@ -90,7 +90,7 @@ export async function GET(request: Request) {
   // Check if today is a dinner
   const { data: dinner } = await admin
     .from("dinners")
-    .select("id, date, venue, address")
+    .select("id, date, venue, address, morning_of_sent_at")
     .eq("date", today)
     .single();
 
@@ -100,6 +100,17 @@ export async function GET(request: Request) {
       sent: 0,
       reason: "no dinner today",
       today,
+    });
+  }
+
+  // Idempotency guard: skip if already sent for this dinner
+  if (dinner.morning_of_sent_at) {
+    return NextResponse.json({
+      ran: true,
+      sent: 0,
+      reason: "morning-of already sent",
+      dinnerDate: dinner.date,
+      sentAt: dinner.morning_of_sent_at,
     });
   }
 
@@ -173,6 +184,12 @@ export async function GET(request: Request) {
     );
     sent++;
   }
+
+  // Mark dinner as sent so retries don't duplicate
+  await admin
+    .from("dinners")
+    .update({ morning_of_sent_at: new Date().toISOString() })
+    .eq("id", dinner.id);
 
   console.log(`[morning-of] Sent ${sent} emails for dinner ${dinner.date}`);
   return NextResponse.json({
