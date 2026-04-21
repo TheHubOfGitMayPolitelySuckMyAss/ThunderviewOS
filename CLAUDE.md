@@ -169,10 +169,14 @@ src/
 │       │   │   ├── page.tsx            # Server wrapper: fetches rejection template
 │       │   │   ├── template-editor.tsx # Thin wrapper
 │       │   │   └── actions.ts          # Server actions: sendTestEmail ([applicant.firstname] from member record for test), saveTemplate
-│       │   └── fulfillment/
-│       │       ├── page.tsx            # Server wrapper: fetches fulfillment template
-│       │       ├── template-editor.tsx # Thin wrapper
-│       │       └── actions.ts          # Server actions: sendTestEmail ([member.firstname], [dinner.date/venue/address] from next dinner), saveTemplate
+│       │   ├── fulfillment/
+│       │   │   ├── page.tsx            # Server wrapper: fetches fulfillment template
+│       │   │   ├── template-editor.tsx # Thin wrapper
+│       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname], [dinner.date/venue/address] from next dinner), saveTemplate
+│       │   └── morning-of/
+│       │       ├── page.tsx            # Server wrapper: fetches template + next dinner attendees
+│       │       ├── morning-of-editor.tsx # Client component: template editor + attendee preview cards + Preview Full Email button
+│       │       └── actions.ts          # Server actions: sendTestEmail, sendPreviewEmail (saved template + live attendees), saveTemplate
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
