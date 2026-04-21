@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
+import { sendFulfillmentEmail } from "@/lib/email-send";
 
 export async function updateMemberField(
   memberId: string,
@@ -266,6 +267,8 @@ export async function compTicket(
   if (fulfillError) {
     return { success: false, error: fulfillError.message };
   }
+
+  sendFulfillmentEmail(memberId, targetDinner.id);
 
   return { success: true };
 }

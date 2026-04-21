@@ -131,6 +131,8 @@ src/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
 │   ├── api/cron/post-dinner/
 │   │   └── route.ts                    # Vercel Cron: day after each dinner, sets last_dinner_attended for all fulfilled attendees
+│   ├── api/cron/morning-of/
+│   │   └── route.ts                    # Vercel Cron: morning of dinner (7am MT), sends morning-of email to all fulfilled attendees
 │   ├── api/webhooks/stripe/
 │   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
 │   └── admin/
@@ -190,6 +192,7 @@ src/
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management
 ├── lib/
 │   ├── email.ts                        # Shared email constants (EMAIL_FROM) and helpers (bodyToHtml)
+│   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of)
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
 │   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
 │   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
@@ -347,7 +350,7 @@ Don't build these without an explicit prompt:
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
 - ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
-- Email sending (Resend wiring) — Phase 5. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection. Template #4: fulfillment email (fires when a ticket transitions to fulfilled — two trigger paths: Stripe webhook auto-fulfill for next-upcoming dinner, and cron ~27 days before each dinner). Template #5: morning-of-dinner email (intros & asks for tonight's attendees only; transactional, no unsubscribe). Refund confirmations handled natively by Stripe — no custom template needed.
+- ~~Email sending (Resend wiring)~~ Done (Phase 5). All transactional emails wired: approval (on approve), re-application (on approve existing / link), rejection (on reject), fulfillment (on Stripe webhook auto-fulfill + comp ticket), morning-of (cron at 7am MT on dinner day). Templates editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Refund confirmations handled natively by Stripe.
 - ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
 - Bulk email templates — future sprint
 - Streak API integration — Phase 7

@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
+import { sendApprovalEmail, sendReApplicationEmail, sendRejectionEmail } from "@/lib/email-send";
 
 type ApproveResult = {
   success: boolean;
@@ -41,9 +42,9 @@ export async function approveApplication(
   }
 
   if (result.is_existing) {
-    // TODO: Send re-application email (template #2 — "you're already in, just buy a ticket next time")
+    sendReApplicationEmail(result.member_id);
   } else {
-    // TODO: Send approval email (template #1 — "you're approved, buy a ticket")
+    sendApprovalEmail(result.member_id);
   }
 
   return {
@@ -70,7 +71,7 @@ export async function rejectApplication(
 
   if (error) return { success: false, error: error.message };
 
-  // TODO: Send rejection email via Resend (Phase 3 email wiring)
+  sendRejectionEmail(applicationId);
 
   return { success: true };
 }
@@ -111,7 +112,7 @@ export async function linkApplicationToMember(
     };
   }
 
-  // TODO: Send re-application email (template #2 — "you're already in, just buy a ticket next time")
+  sendReApplicationEmail(result.member_id);
 
   return {
     success: true,

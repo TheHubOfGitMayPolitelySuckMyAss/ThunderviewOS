@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTargetDinner } from "@/lib/ticket-assignment";
+import { sendFulfillmentEmail } from "@/lib/email-send";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -105,6 +106,9 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
+
+      // Send fulfillment email (dinner details)
+      sendFulfillmentEmail(metadata.member_id, metadata.dinner_id);
     }
   }
 
