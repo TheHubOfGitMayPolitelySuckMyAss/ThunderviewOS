@@ -131,6 +131,8 @@ src/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
 │   ├── api/cron/post-dinner/
 │   │   └── route.ts                    # Vercel Cron: day after each dinner, sets last_dinner_attended for all fulfilled attendees
+│   ├── api/cron/fulfill-tickets/
+│   │   └── route.ts                    # Vercel Cron: 27 days before each dinner, flips purchased→fulfilled + sends fulfillment email
 │   ├── api/cron/morning-of/
 │   │   └── route.ts                    # Vercel Cron: morning of dinner (7am MT), sends morning-of email to all fulfilled attendees
 │   ├── api/webhooks/stripe/
@@ -346,7 +348,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 
 Don't build these without an explicit prompt:
 
-- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — future sprint. Fulfillment cron (~27 days before dinner) not yet built.
+- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — future sprint. ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets` flips purchased→fulfilled 27 days before each dinner and sends fulfillment email.
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
 - ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
@@ -361,8 +363,8 @@ Don't build these without an explicit prompt:
 
 ## Upcoming work
 
-- Transactional emails via Resend (approval notifications, magic links with custom branding)
-- Fulfillment cron: ~27 days before each dinner, flip `purchased` → `fulfilled` and send dinner-details email
+- ~~Transactional emails via Resend~~ Done — all five templates wired to events
+- ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets`
 - Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
 - Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
 
