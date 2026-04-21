@@ -107,7 +107,7 @@ export default function TemplateEditor({
       <div className="flex items-center gap-3">
         <button
           onClick={handleSendTest}
-          disabled={!hasEdited || isSending}
+          disabled={!hasEdited || testSent || isSending}
           className="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isSending ? "Sending..." : "Send Test Email"}
