@@ -9,6 +9,7 @@ const navItems = [
   { href: "/admin/members", label: "Members" },
   { href: "/admin/applications", label: "Applications" },
   { href: "/admin/tickets", label: "Tickets" },
+  { href: "/admin/emails", label: "Emails" },
 ];
 
 export default function AdminShell({

@@ -58,7 +58,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
   - `ask_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Ask. No trigger — set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp.
   - `profile_pic_url` TEXT NULL — full public URL to profile pic in Supabase Storage bucket `profile-pics`. Null = no pic. Set by portal profile save action.
   - `updated_at` — auto-set by trigger.
-- `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (purchased/fulfilled/refunded/credited). Tracks payment source and match confidence. `fulfillment_status = 'fulfilled'` means "eligible for or already sent the dinner-details email." It does NOT mean "attended." Attendance is not tracked. The only reason fulfilled exists is to gate the fulfillment email. All paid tickets for future-beyond-next dinners stay `purchased` until ~27 days before their dinner, when a cron flips them and sends the email (Phase 5, not yet built). Tickets for the next upcoming dinner auto-fulfill immediately on purchase. The webhook and comp ticket action only flip to fulfilled if `dinner_id` matches `getTargetDinner()`.
+- `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (purchased/fulfilled/refunded/credited). Tracks payment source and match confidence. `fulfillment_status = 'fulfilled'` means "dinner-details email has been sent." It does NOT mean "attended." Attendance is not tracked. The only reason fulfilled exists is to gate the fulfillment email. All paid tickets for future-beyond-next dinners stay `purchased` until ~27 days before their dinner, when a cron flips them and sends the email (Phase 5, not yet built). Tickets for the next upcoming dinner auto-fulfill immediately on purchase. The webhook and comp ticket action only flip to fulfilled if `dinner_id` matches `getTargetDinner()`.
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
 - `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default) or `'bounced'`.
@@ -152,6 +152,8 @@ src/
 │       ├── tickets/
 │       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
 │       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
+│       ├── emails/
+│       │   └── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Refund Confirmation)
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
@@ -205,7 +207,7 @@ Required in `.env.local` (see `.env.local.example` at repo root):
 - `STRIPE_SECRET_KEY` — Stripe sandbox secret key (`sk_test_...`). Server-side only.
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe sandbox publishable key (`pk_test_...`). Currently unused client-side (Checkout is redirect-based, not embedded).
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret. For local dev: comes from `stripe listen` output. For production: from the registered webhook endpoint (`we_1TOKwXBZUujGbd3L93xKwlDl`).
-- `RESEND_API_KEY` — TBD, not yet wired. Not yet in `.env.local.example`; add when Resend is integrated.
+- `RESEND_API_KEY` — Resend API key for transactional and marketing emails. Set in Vercel (Production + Preview scopes) and `.env.local`.
 
 Production values are set in Vercel dashboard (Production + Development scopes). **Note:** Stripe sandbox keys are in both Production and Development scopes — no live keys yet. A future sprint will swap Production to live-mode keys.
 
@@ -316,12 +318,11 @@ Don't build these without an explicit prompt:
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
 - ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
-- Email sending (Resend wiring) — Phase 3+. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection.
+- Email sending (Resend wiring) — Phase 5. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection. Template #4: fulfillment email (fires when a ticket transitions to fulfilled — two trigger paths: Stripe webhook auto-fulfill for next-upcoming dinner, and cron ~27 days before each dinner). Template #5: refund confirmation email (fires on successful Stripe refund).
 - ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
-- Ticket purchase integration via Squarespace webhooks — Phase 5, blocked on Squarespace plan upgrade
 - Bulk email templates — future sprint
-- Streak API integration — Phase 5
-- CoachingOS sync — Phase 6
+- Streak API integration — Phase 7
+- CoachingOS sync — Phase 10+
 - LinkedIn URL matching for automatic duplicate detection across applications and members
 - Side-by-side comparison when re-application has different data than existing member record (name, company, website changes)
 - Automatic member field updates from re-application data
