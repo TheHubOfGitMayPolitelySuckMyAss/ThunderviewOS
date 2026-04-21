@@ -23,10 +23,12 @@ type Attendee = {
   first_name: string;
   last_name: string;
   company_name: string | null;
+  company_website: string | null;
+  linkedin_profile: string | null;
+  contact_preference: string | null;
+  primary_email: string | null;
   current_intro: string | null;
   current_ask: string | null;
-  ask_updated_at: string | null;
-  last_dinner_attended: string | null;
   has_community_access: boolean;
   kicked_out: boolean;
 };
@@ -39,18 +41,31 @@ function buildAttendeeHtml(attendees: Attendee[]): string {
   return attendees
     .map((a) => {
       const name = formatName(a.first_name, a.last_name);
-      const company = a.company_name ? `<em>${a.company_name}</em>` : "";
+      // Name links to LinkedIn or mailto based on contact preference
+      let nameHtml: string;
+      if (a.contact_preference === "linkedin" && a.linkedin_profile) {
+        nameHtml = `<a href="${a.linkedin_profile}"><strong>${name}</strong></a>`;
+      } else if (a.primary_email) {
+        nameHtml = `<a href="mailto:${a.primary_email}"><strong>${name}</strong></a>`;
+      } else {
+        nameHtml = `<strong>${name}</strong>`;
+      }
+      // Company links to website if available
+      let companyHtml = "";
+      if (a.company_name) {
+        if (a.company_website) {
+          const url = a.company_website.startsWith("http") ? a.company_website : `https://${a.company_website}`;
+          companyHtml = ` — <a href="${url}"><em>${a.company_name}</em></a>`;
+        } else {
+          companyHtml = ` — <em>${a.company_name}</em>`;
+        }
+      }
       const lines: string[] = [];
-      lines.push(`<strong>${name}</strong>${company ? " — " + company : ""}`);
+      lines.push(`${nameHtml}${companyHtml}`);
       if (a.current_intro) {
         lines.push(`<br>Intro: ${a.current_intro}`);
       }
-      // Show ask if: ask_updated_at > last_dinner_attended, OR never attended before and has an ask
-      const showAsk = a.current_ask && (
-        !a.last_dinner_attended ||
-        (a.ask_updated_at && a.ask_updated_at > a.last_dinner_attended)
-      );
-      if (showAsk) {
+      if (a.current_ask) {
         lines.push(`<br>Ask: ${a.current_ask}`);
       }
       return lines.join("");
@@ -73,14 +88,14 @@ async function getNextDinnerWithAttendees(admin: ReturnType<typeof createAdminCl
   const { data: tickets } = await admin
     .from("tickets")
     .select(
-      "member_id, members!inner(id, first_name, last_name, company_name, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out)"
+      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, has_community_access, kicked_out, member_emails(email, is_primary))"
     )
     .eq("dinner_id", dinner.id)
     .eq("fulfillment_status", "fulfilled");
 
   type TicketRow = {
     member_id: string;
-    members: Attendee & { id: string };
+    members: Attendee & { id: string; member_emails: { email: string; is_primary: boolean }[] };
   };
 
   const rows = (tickets ?? []) as unknown as TicketRow[];
@@ -93,7 +108,11 @@ async function getNextDinnerWithAttendees(admin: ReturnType<typeof createAdminCl
       seen.add(m.id);
       return true;
     })
-    .map((r) => r.members)
+    .map((r) => {
+      const m = r.members;
+      const primaryEmail = m.member_emails?.find((e) => e.is_primary)?.email ?? m.member_emails?.[0]?.email ?? null;
+      return { ...m, primary_email: primaryEmail } as Attendee;
+    })
     .sort((a, b) => {
       const aHasContent = a.current_intro || a.current_ask ? 0 : 1;
       const bHasContent = b.current_intro || b.current_ask ? 0 : 1;

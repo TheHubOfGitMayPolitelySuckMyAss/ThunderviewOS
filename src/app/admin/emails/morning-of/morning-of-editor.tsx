@@ -10,10 +10,24 @@ type Attendee = {
   first_name: string;
   last_name: string;
   company_name: string | null;
+  company_website: string | null;
+  linkedin_profile: string | null;
+  contact_preference: string | null;
+  primary_email: string | null;
   current_intro: string | null;
   current_ask: string | null;
-  showAsk: boolean;
 };
+
+function getNameLink(a: Attendee): { href: string; label: string } | null {
+  const name = formatName(a.first_name, a.last_name);
+  if (a.contact_preference === "linkedin" && a.linkedin_profile) {
+    return { href: a.linkedin_profile, label: name };
+  }
+  if (a.primary_email) {
+    return { href: `mailto:${a.primary_email}`, label: name };
+  }
+  return null;
+}
 
 interface MorningOfEditorProps {
   slug: string;
@@ -109,34 +123,59 @@ export default function MorningOfEditor({
           </p>
         ) : (
           <div className="space-y-4">
-            {attendees.map((a) => (
-              <div key={a.id} className="rounded-lg border bg-white p-4">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-semibold text-gray-900">
-                    {formatName(a.first_name, a.last_name)}
-                  </span>
-                  {a.company_name && (
-                    <span className="text-sm text-gray-500">at {a.company_name}</span>
-                  )}
-                </div>
-                {(a.current_intro || a.showAsk) && (
-                  <div className="mt-2 space-y-1.5">
-                    {a.current_intro && (
-                      <div>
-                        <span className="text-xs font-medium uppercase text-gray-500">Intro</span>
-                        <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_intro}</p>
-                      </div>
+            {attendees.map((a) => {
+              const link = getNameLink(a);
+              return (
+                <div key={a.id} className="rounded-lg border bg-white p-4">
+                  <div className="flex items-baseline gap-2">
+                    {link ? (
+                      <a
+                        href={link.href}
+                        target={link.href.startsWith("mailto:") ? undefined : "_blank"}
+                        rel="noopener noreferrer"
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-gray-900">
+                        {formatName(a.first_name, a.last_name)}
+                      </span>
                     )}
-                    {a.showAsk && a.current_ask && (
-                      <div>
-                        <span className="text-xs font-medium uppercase text-gray-500">Ask</span>
-                        <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_ask}</p>
-                      </div>
+                    {a.company_name && (
+                      a.company_website ? (
+                        <a
+                          href={a.company_website.startsWith("http") ? a.company_website : `https://${a.company_website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-500 hover:text-blue-700 hover:underline"
+                        >
+                          at {a.company_name}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-gray-500">at {a.company_name}</span>
+                      )
                     )}
                   </div>
-                )}
-              </div>
-            ))}
+                  {(a.current_intro || a.current_ask) && (
+                    <div className="mt-2 space-y-1.5">
+                      {a.current_intro && (
+                        <div>
+                          <span className="text-xs font-medium uppercase text-gray-500">Intro</span>
+                          <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_intro}</p>
+                        </div>
+                      )}
+                      {a.current_ask && (
+                        <div>
+                          <span className="text-xs font-medium uppercase text-gray-500">Ask</span>
+                          <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_ask}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
