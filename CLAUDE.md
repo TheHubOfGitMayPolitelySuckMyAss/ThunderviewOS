@@ -153,7 +153,7 @@ src/
 │       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
 │       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
 │       ├── emails/
-│       │   └── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Refund Confirmation)
+│       │   └── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Morning Of)
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
@@ -318,7 +318,7 @@ Don't build these without an explicit prompt:
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
 - ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
-- Email sending (Resend wiring) — Phase 5. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection. Template #4: fulfillment email (fires when a ticket transitions to fulfilled — two trigger paths: Stripe webhook auto-fulfill for next-upcoming dinner, and cron ~27 days before each dinner). Template #5: refund confirmation email (fires on successful Stripe refund).
+- Email sending (Resend wiring) — Phase 5. TODOs in approve/reject actions mark where emails should fire. Template #1: new member approval ("you're approved, buy a ticket"). Template #2: re-application/linked ("you're already in, just buy a ticket next time"). Template #3: rejection. Template #4: fulfillment email (fires when a ticket transitions to fulfilled — two trigger paths: Stripe webhook auto-fulfill for next-upcoming dinner, and cron ~27 days before each dinner). Template #5: morning-of-dinner email (intros & asks for tonight's attendees only; transactional, no unsubscribe). Refund confirmations handled natively by Stripe — no custom template needed.
 - ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
 - Bulk email templates — future sprint
 - Streak API integration — Phase 7

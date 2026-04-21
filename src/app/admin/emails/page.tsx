@@ -37,9 +37,10 @@ const transactionalEmails = [
     description: "Ticket transitions to fulfilled — dinner details email",
   },
   {
-    href: "/admin/emails/refund-confirmation",
-    label: "Refund Confirmation",
-    description: "Successful Stripe refund",
+    href: "/admin/emails/morning-of",
+    label: "Morning Of",
+    description:
+      "Morning-of-dinner email — intros & asks for tonight's attendees only",
   },
 ];
 
