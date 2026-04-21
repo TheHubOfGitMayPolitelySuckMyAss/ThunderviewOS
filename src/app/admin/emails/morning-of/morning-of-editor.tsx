@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import TemplateEditor from "../template-editor";
-import { sendTestEmail, saveTemplate, sendPreviewEmail } from "./actions";
+import { sendTestEmail, saveTemplate } from "./actions";
 import { formatName } from "@/lib/format";
 
 type Attendee = {
@@ -49,21 +48,6 @@ export default function MorningOfEditor({
   attendees,
   dinnerDisplay,
 }: MorningOfEditorProps) {
-  const [previewMessage, setPreviewMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [isSendingPreview, startPreview] = useTransition();
-
-  function handleSendPreview() {
-    startPreview(async () => {
-      setPreviewMessage(null);
-      const result = await sendPreviewEmail();
-      if (result.success) {
-        setPreviewMessage({ type: "success", text: "Preview email sent!" });
-      } else {
-        setPreviewMessage({ type: "error", text: result.error || "Failed to send preview" });
-      }
-    });
-  }
-
   return (
     <div>
       {/* Template editor */}
@@ -82,29 +66,6 @@ export default function MorningOfEditor({
         sendTestEmail={sendTestEmail}
         saveTemplate={saveTemplate}
       />
-
-      {/* Preview Full Email button */}
-      <div className="mt-6 max-w-2xl border-t pt-4">
-        <button
-          onClick={handleSendPreview}
-          disabled={isSendingPreview}
-          className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {isSendingPreview ? "Sending..." : "Preview Full Email"}
-        </button>
-        <span className="ml-3 text-xs text-gray-500">
-          Sends saved template + live attendee data to you
-        </span>
-        {previewMessage && (
-          <p
-            className={`mt-2 text-sm ${
-              previewMessage.type === "success" ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {previewMessage.text}
-          </p>
-        )}
-      </div>
 
       {/* Attendee preview section */}
       <div className="mt-10 max-w-2xl">
@@ -159,19 +120,10 @@ export default function MorningOfEditor({
                     )}
                   </div>
                   {(a.current_intro || a.showAsk) && (
-                    <div className="mt-2 space-y-1.5">
-                      {a.current_intro && (
-                        <div>
-                          <span className="text-xs font-medium uppercase text-gray-500">Intro</span>
-                          <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_intro}</p>
-                        </div>
-                      )}
-                      {a.showAsk && a.current_ask && (
-                        <div>
-                          <span className="text-xs font-medium uppercase text-gray-500">Ask</span>
-                          <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_ask}</p>
-                        </div>
-                      )}
+                    <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">
+                      {a.current_intro}
+                      {a.current_intro && a.showAsk && a.current_ask && <><br /><br /></>}
+                      {a.showAsk && a.current_ask}
                     </div>
                   )}
                 </div>

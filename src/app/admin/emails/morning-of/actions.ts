@@ -64,15 +64,18 @@ function buildAttendeeHtml(attendees: Attendee[]): string {
       }
       const lines: string[] = [];
       lines.push(`${nameHtml}${companyHtml}`);
-      if (a.current_intro) {
-        lines.push(`<br>Intro: ${a.current_intro}`);
-      }
       const showAsk = a.current_ask && (
         !a.last_dinner_attended ||
         (a.ask_updated_at && a.ask_updated_at > a.last_dinner_attended)
       );
+      if (a.current_intro) {
+        lines.push(`<br>${a.current_intro}`);
+      }
+      if (a.current_intro && showAsk) {
+        lines.push("<br>");
+      }
       if (showAsk) {
-        lines.push(`<br>Ask: ${a.current_ask}`);
+        lines.push(`${a.current_ask}`);
       }
       return lines.join("");
     })
@@ -176,71 +179,6 @@ export async function sendTestEmail(
 
   const renderedSubject = renderTemplate(subject, vars);
   const renderedBody = renderTemplate(body, vars);
-  const templateHtml = bodyToHtml(renderedBody);
-  const attendeeHtml = buildAttendeeHtml(attendees);
-
-  const fullHtml = `${templateHtml}<br><br><hr><br><strong>Tonight's Attendees</strong><br><br>${attendeeHtml}`;
-
-  const { error } = await resend.emails.send({
-    from: EMAIL_FROM,
-    to: memberEmail.email,
-    subject: renderedSubject,
-    html: fullHtml,
-  });
-
-  if (error) return { success: false, error: error.message };
-  return { success: true };
-}
-
-export async function sendPreviewEmail(): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { success: false, error: "Not authenticated" };
-
-  const admin = createAdminClient();
-
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("email, members!inner(id, first_name, last_name)")
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-
-  if (!memberEmail) return { success: false, error: "Member not found" };
-
-  const member = memberEmail.members as unknown as {
-    id: string;
-    first_name: string;
-    last_name: string;
-  };
-
-  // Load saved template from DB
-  const { data: template } = await admin
-    .from("email_templates")
-    .select("subject, body")
-    .eq("slug", "morning-of")
-    .single();
-
-  if (!template) return { success: false, error: "Template not found" };
-
-  const result = await getNextDinnerWithAttendees(admin);
-  if (!result) return { success: false, error: "No upcoming dinner found" };
-
-  const { dinner, attendees } = result;
-
-  const vars = {
-    firstName: member.first_name,
-    dinnerDate: formatDateFriendly(dinner.date),
-    venue: dinner.venue,
-    address: dinner.address,
-  };
-
-  const renderedSubject = renderTemplate(template.subject, vars);
-  const renderedBody = renderTemplate(template.body, vars);
   const templateHtml = bodyToHtml(renderedBody);
   const attendeeHtml = buildAttendeeHtml(attendees);
 
