@@ -7,8 +7,8 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-function renderTemplate(text: string, member: { first_name: string }): string {
-  return text.replace(/\[member\.firstname\]/g, member.first_name);
+function renderTemplate(text: string, firstName: string): string {
+  return text.replace(/\[applicant\.firstname\]/g, firstName);
 }
 
 export async function sendTestEmail(
@@ -26,6 +26,7 @@ export async function sendTestEmail(
 
   const admin = createAdminClient();
 
+  // For test sends, use the team member's own first_name as [applicant.firstname]
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select("email, members!inner(id, first_name, last_name)")
@@ -42,8 +43,8 @@ export async function sendTestEmail(
     last_name: string;
   };
 
-  const renderedSubject = renderTemplate(subject, member);
-  const renderedBody = renderTemplate(body, member);
+  const renderedSubject = renderTemplate(subject, member.first_name);
+  const renderedBody = renderTemplate(body, member.first_name);
   const html = bodyToHtml(renderedBody);
 
   const { error } = await resend.emails.send({

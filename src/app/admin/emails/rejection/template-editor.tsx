@@ -3,7 +3,7 @@
 import TemplateEditor from "../template-editor";
 import { sendTestEmail, saveTemplate } from "./actions";
 
-interface ApprovalEditorProps {
+interface Props {
   slug: string;
   initialSubject: string;
   initialBody: string;
@@ -11,11 +11,11 @@ interface ApprovalEditorProps {
   lastUpdatedByName: string | null;
 }
 
-export default function ApprovalEditor(props: ApprovalEditorProps) {
+export default function RejectionEditor(props: Props) {
   return (
     <TemplateEditor
       {...props}
-      availableVariables={["[member.firstname]"]}
+      availableVariables={["[applicant.firstname]"]}
       sendTestEmail={sendTestEmail}
       saveTemplate={saveTemplate}
     />

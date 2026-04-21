@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
 import DinnerTickets from "./dinner-tickets";
+import DinnerVenue from "./dinner-venue";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -188,7 +189,7 @@ export default async function DinnerDetailPage({
             day: "numeric",
           })}
         </h2>
-        <p className="text-sm text-gray-500">Venue: {dinner.venue}</p>
+        <DinnerVenue dinnerId={dinner.id} venue={dinner.venue} address={dinner.address} />
       </div>
 
       {/* Ticket counts */}

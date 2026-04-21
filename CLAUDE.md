@@ -47,7 +47,7 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 
 Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`. Phase 2 schema additions (`email_status`, historical enum values) applied via `tmp/import.sql`.
 
-- `dinners` — first-Thursday-of-month events, auto-generated 12 months out via Vercel Cron (`/api/cron/generate-dinner`), skipping Jan/Jul. Date is UNIQUE. Cron fires daily at 1pm UTC; handler runs only on the day after the first Thursday of each month.
+- `dinners` — first-Thursday-of-month events, auto-generated 12 months out via Vercel Cron (`/api/cron/generate-dinner`), skipping Jan/Jul. Date is UNIQUE. Cron fires daily at 1pm UTC; handler runs only on the day after the first Thursday of each month. `venue` TEXT NOT NULL DEFAULT `'ID345'`, `address` TEXT NOT NULL DEFAULT `'3960 High St, Denver, CO 80205'` — both inline-editable on dinner detail page.
 - `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `first_name` + `last_name` (same split as members). `member_id` is NULL until approved.
 - `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). `attendee_stagetypes` is `TEXT[]` (not null, default `'{}'`) — supports multi-role membership (e.g. Active CEO + Investor). Note: `applications.attendee_stagetype` remains a single TEXT column; the application form is single-select. Key trigger-managed columns:
   - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. Set to `false` on UPDATE when `kicked_out` flips false→true (trigger `trg_revoke_community_access_on_kickout`). Does NOT auto-restore on un-kick or on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
@@ -142,7 +142,8 @@ src/
 │       │   └── [id]/
 │       │       ├── page.tsx            # Server wrapper: fetches dinner + tickets + applications
 │       │       ├── dinner-tickets.tsx  # Client component: active ticket table with Credit/Refund buttons, inactive section with strikethrough
-│       │       └── actions.ts          # Server actions: refundTicket (full/guest_only), creditTicket
+│       │       ├── dinner-venue.tsx   # Client component: inline-editable venue + address
+│       │       └── actions.ts          # Server actions: refundTicket (full/guest_only), creditTicket, updateDinnerField
 │       ├── applications/
 │       │   ├── page.tsx                # Server wrapper
 │       │   ├── applications-table.tsx  # Filter tabs, sortable columns, sticky header, rows link to [id]
@@ -155,10 +156,23 @@ src/
 │       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
 │       ├── emails/
 │       │   ├── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Morning Of)
-│       │   └── approval/
-│       │       ├── page.tsx            # Server wrapper: fetches approval template from email_templates table
-│       │       ├── template-editor.tsx # Client component: subject/body editing, Send Test Email (Resend), Save Changes
-│       │       └── actions.ts          # Server actions: sendTestEmail (renders template + sends via Resend), saveTemplate (updates DB)
+│       │   ├── template-editor.tsx     # Shared client component: subject/body editing, Send Test Email, Save Changes (used by all template pages)
+│       │   ├── approval/
+│       │   │   ├── page.tsx            # Server wrapper: fetches approval template
+│       │   │   ├── template-editor.tsx # Thin wrapper passing actions + variables to shared editor
+│       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname]), saveTemplate
+│       │   ├── re-application/
+│       │   │   ├── page.tsx            # Server wrapper: fetches re-application template
+│       │   │   ├── template-editor.tsx # Thin wrapper
+│       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname]), saveTemplate
+│       │   ├── rejection/
+│       │   │   ├── page.tsx            # Server wrapper: fetches rejection template
+│       │   │   ├── template-editor.tsx # Thin wrapper
+│       │   │   └── actions.ts          # Server actions: sendTestEmail ([applicant.firstname] from member record for test), saveTemplate
+│       │   └── fulfillment/
+│       │       ├── page.tsx            # Server wrapper: fetches fulfillment template
+│       │       ├── template-editor.tsx # Thin wrapper
+│       │       └── actions.ts          # Server actions: sendTestEmail ([member.firstname], [dinner.date/venue/address] from next dinner), saveTemplate
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
@@ -169,6 +183,7 @@ src/
 │       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management
 ├── lib/
+│   ├── email.ts                        # Shared email constants (EMAIL_FROM) and helpers (bodyToHtml)
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
 │   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
 │   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
@@ -194,7 +209,8 @@ supabase/
 │   ├── 20260420400000_comp_payment_source.sql           # Add 'comp' to tickets.payment_source CHECK constraint
 │   ├── 20260420500000_nullable_preferred_dinner_date.sql # Allow NULL on applications.preferred_dinner_date
 │   ├── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
-│   └── 20260420700000_email_templates.sql               # email_templates table + RLS + approval template seed
+│   ├── 20260420700000_email_templates.sql               # email_templates table + RLS + approval template seed
+│   └── 20260420800000_dinner_venue_address.sql          # Add address column, update venue default to 'ID345', backfill future dinners
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)

@@ -125,3 +125,19 @@ export async function creditTicket(
   revalidatePath("/admin/dinners");
   return { success: true };
 }
+
+export async function updateDinnerField(
+  dinnerId: string,
+  field: "venue" | "address",
+  value: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("dinners")
+    .update({ [field]: value })
+    .eq("id", dinnerId);
+
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/dinners");
+  return { success: true };
+}

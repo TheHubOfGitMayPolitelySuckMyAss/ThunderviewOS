@@ -3,12 +3,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
+import { formatDate, getTodayMT } from "@/lib/format";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-function renderTemplate(text: string, member: { first_name: string }): string {
-  return text.replace(/\[member\.firstname\]/g, member.first_name);
+function renderTemplate(
+  text: string,
+  vars: { firstName: string; dinnerDate: string; venue: string; address: string }
+): string {
+  return text
+    .replace(/\[member\.firstname\]/g, vars.firstName)
+    .replace(/\[dinner\.date\]/g, vars.dinnerDate)
+    .replace(/\[dinner\.venue\]/g, vars.venue)
+    .replace(/\[dinner\.address\]/g, vars.address);
 }
 
 export async function sendTestEmail(
@@ -42,8 +50,27 @@ export async function sendTestEmail(
     last_name: string;
   };
 
-  const renderedSubject = renderTemplate(subject, member);
-  const renderedBody = renderTemplate(body, member);
+  // Get next upcoming dinner for test data
+  const todayMT = getTodayMT();
+  const { data: nextDinner } = await admin
+    .from("dinners")
+    .select("date, venue, address")
+    .gte("date", todayMT)
+    .order("date", { ascending: true })
+    .limit(1)
+    .single();
+
+  if (!nextDinner) return { success: false, error: "No upcoming dinner found for test data" };
+
+  const vars = {
+    firstName: member.first_name,
+    dinnerDate: formatDate(nextDinner.date),
+    venue: nextDinner.venue,
+    address: nextDinner.address,
+  };
+
+  const renderedSubject = renderTemplate(subject, vars);
+  const renderedBody = renderTemplate(body, vars);
   const html = bodyToHtml(renderedBody);
 
   const { error } = await resend.emails.send({
