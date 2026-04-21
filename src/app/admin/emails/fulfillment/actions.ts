@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
-import { formatDate, getTodayMT } from "@/lib/format";
+import { formatDateFriendly, getTodayMT } from "@/lib/format";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -64,7 +64,7 @@ export async function sendTestEmail(
 
   const vars = {
     firstName: member.first_name,
-    dinnerDate: formatDate(nextDinner.date),
+    dinnerDate: formatDateFriendly(nextDinner.date),
     venue: nextDinner.venue,
     address: nextDinner.address,
   };

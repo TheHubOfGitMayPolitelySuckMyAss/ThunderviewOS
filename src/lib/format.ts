@@ -33,6 +33,24 @@ export function formatDate(
 }
 
 /**
+ * Format a DATE (YYYY-MM-DD) as "May 7th" or "December 6th" — for emails.
+ */
+export function formatDateFriendly(dateString: string): string {
+  const d = new Date(dateString + "T00:00:00");
+  const month = d.toLocaleDateString("en-US", { month: "long" });
+  const day = d.getDate();
+  const suffix =
+    day % 10 === 1 && day !== 11
+      ? "st"
+      : day % 10 === 2 && day !== 12
+        ? "nd"
+        : day % 10 === 3 && day !== 13
+          ? "rd"
+          : "th";
+  return `${month} ${day}${suffix}`;
+}
+
+/**
  * Format a TIMESTAMPTZ string for display in Mountain Time, including time.
  */
 export function formatTimestamp(dateString: string): string {
