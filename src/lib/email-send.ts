@@ -170,6 +170,51 @@ export async function sendFulfillmentEmail(memberId: string, dinnerId: string): 
 }
 
 /**
+ * Send notification to admin(s) when a new application is submitted.
+ */
+export async function sendNewApplicationNotification(application: {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  companyName: string;
+  companyWebsite: string;
+  linkedinProfile: string;
+  attendeeStagetype: string;
+}): Promise<void> {
+  try {
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+    const adminUrl = `${siteUrl}/admin/applications/${application.id}`;
+
+    const subject = `New Application: ${application.firstName} ${application.lastName} (${application.companyName})`;
+    const body = [
+      `<a href="${adminUrl}">Review Application →</a>`,
+      ``,
+      `<strong>${application.firstName} ${application.lastName}</strong>`,
+      `${application.companyName}`,
+      application.companyWebsite ? `Website: ${application.companyWebsite}` : null,
+      application.linkedinProfile ? `LinkedIn: ${application.linkedinProfile}` : null,
+      `Email: ${application.email}`,
+      `Type: ${application.attendeeStagetype}`,
+    ]
+      .filter(Boolean)
+      .join("<br>");
+
+    // Admin is hard-coded (no is_admin column in DB)
+    const recipients = ["eric@marcoullier.com"];
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: recipients,
+      subject,
+      html: body,
+    });
+  } catch (err) {
+    console.error("[email] Failed to send new application notification:", err);
+  }
+}
+
+/**
  * Send morning-of email to a member (template + attendee section).
  */
 export async function sendMorningOfEmail(

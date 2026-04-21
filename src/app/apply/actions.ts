@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendNewApplicationNotification } from "@/lib/email-send";
 
 export async function submitApplication(formData: {
   firstName: string;
@@ -18,7 +19,7 @@ export async function submitApplication(formData: {
 }): Promise<{ success: boolean; error?: string }> {
   const admin = createAdminClient();
 
-  const { error } = await admin.from("applications").insert({
+  const { data, error } = await admin.from("applications").insert({
     first_name: formData.firstName.trim(),
     last_name: formData.lastName.trim(),
     email: formData.email.trim().toLowerCase(),
@@ -34,8 +35,21 @@ export async function submitApplication(formData: {
     status: "pending",
     submitted_on: new Date().toISOString(),
     member_id: null,
-  });
+  }).select("id").single();
 
   if (error) return { success: false, error: error.message };
+
+  // Notify admin — fire and forget, don't block the applicant
+  sendNewApplicationNotification({
+    id: data.id,
+    firstName: formData.firstName.trim(),
+    lastName: formData.lastName.trim(),
+    email: formData.email.trim().toLowerCase(),
+    companyName: formData.companyName.trim(),
+    companyWebsite: formData.companyWebsite.trim(),
+    linkedinProfile: formData.linkedinProfile.trim(),
+    attendeeStagetype: formData.attendeeStagetype,
+  });
+
   return { success: true };
 }
