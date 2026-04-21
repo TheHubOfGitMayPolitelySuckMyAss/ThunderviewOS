@@ -62,6 +62,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
 - `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default) or `'bounced'`.
+- `email_templates` — editable email templates. `slug` (unique, e.g. `'approval'`), `subject`, `body` (with `[member.fieldname]` variable placeholders), `updated_at` (trigger-managed), `updated_by` (FK to members). RLS: admin/team read + update.
 
 ## Auth flow
 
@@ -153,7 +154,11 @@ src/
 │       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
 │       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
 │       ├── emails/
-│       │   └── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Morning Of)
+│       │   ├── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Morning Of)
+│       │   └── approval/
+│       │       ├── page.tsx            # Server wrapper: fetches approval template from email_templates table
+│       │       ├── template-editor.tsx # Client component: subject/body editing, Send Test Email (Resend), Save Changes
+│       │       └── actions.ts          # Server actions: sendTestEmail (renders template + sends via Resend), saveTemplate (updates DB)
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
@@ -188,7 +193,8 @@ supabase/
 │   ├── 20260420300000_guests_allowed.sql                # Add dinners.guests_allowed BOOLEAN NOT NULL DEFAULT false; backfill December → true
 │   ├── 20260420400000_comp_payment_source.sql           # Add 'comp' to tickets.payment_source CHECK constraint
 │   ├── 20260420500000_nullable_preferred_dinner_date.sql # Allow NULL on applications.preferred_dinner_date
-│   └── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
+│   ├── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
+│   └── 20260420700000_email_templates.sql               # email_templates table + RLS + approval template seed
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
