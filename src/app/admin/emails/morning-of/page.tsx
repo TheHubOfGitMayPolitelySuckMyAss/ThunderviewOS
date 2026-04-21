@@ -50,6 +50,7 @@ export default async function MorningOfTemplatePage() {
     primary_email: string | null;
     current_intro: string | null;
     current_ask: string | null;
+    showAsk: boolean;
   }[] = [];
 
   if (dinner) {
@@ -58,7 +59,7 @@ export default async function MorningOfTemplatePage() {
     const { data: tickets } = await admin
       .from("tickets")
       .select(
-        "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, has_community_access, kicked_out, member_emails(email, is_primary))"
+        "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, member_emails(email, is_primary))"
       )
       .eq("dinner_id", dinner.id)
       .eq("fulfillment_status", "fulfilled");
@@ -75,6 +76,8 @@ export default async function MorningOfTemplatePage() {
         contact_preference: string | null;
         current_intro: string | null;
         current_ask: string | null;
+        ask_updated_at: string | null;
+        last_dinner_attended: string | null;
         has_community_access: boolean;
         kicked_out: boolean;
         member_emails: { email: string; is_primary: boolean }[];
@@ -95,6 +98,11 @@ export default async function MorningOfTemplatePage() {
       .map((r) => {
         const m = r.members;
         const primaryEmail = m.member_emails?.find((e) => e.is_primary)?.email ?? m.member_emails?.[0]?.email ?? null;
+        const showAsk = !!(
+          m.current_ask &&
+          (!m.last_dinner_attended ||
+            (m.ask_updated_at && m.ask_updated_at > m.last_dinner_attended))
+        );
         return {
           id: m.id,
           first_name: m.first_name,
@@ -106,11 +114,12 @@ export default async function MorningOfTemplatePage() {
           primary_email: primaryEmail,
           current_intro: m.current_intro,
           current_ask: m.current_ask,
+          showAsk,
         };
       })
       .sort((a, b) => {
-        const aHas = a.current_intro || a.current_ask ? 0 : 1;
-        const bHas = b.current_intro || b.current_ask ? 0 : 1;
+        const aHas = a.current_intro || a.showAsk ? 0 : 1;
+        const bHas = b.current_intro || b.showAsk ? 0 : 1;
         if (aHas !== bHas) return aHas - bHas;
         return formatName(a.first_name, a.last_name)
           .toLowerCase()

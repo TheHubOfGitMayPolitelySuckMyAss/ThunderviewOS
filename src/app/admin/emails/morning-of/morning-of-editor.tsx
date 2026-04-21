@@ -16,6 +16,7 @@ type Attendee = {
   primary_email: string | null;
   current_intro: string | null;
   current_ask: string | null;
+  showAsk: boolean;
 };
 
 function getNameLink(a: Attendee): { href: string; label: string } | null {
@@ -157,7 +158,7 @@ export default function MorningOfEditor({
                       )
                     )}
                   </div>
-                  {(a.current_intro || a.current_ask) && (
+                  {(a.current_intro || a.showAsk) && (
                     <div className="mt-2 space-y-1.5">
                       {a.current_intro && (
                         <div>
@@ -165,7 +166,7 @@ export default function MorningOfEditor({
                           <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_intro}</p>
                         </div>
                       )}
-                      {a.current_ask && (
+                      {a.showAsk && a.current_ask && (
                         <div>
                           <span className="text-xs font-medium uppercase text-gray-500">Ask</span>
                           <p className="whitespace-pre-wrap text-sm text-gray-700">{a.current_ask}</p>

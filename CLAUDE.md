@@ -52,7 +52,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 - `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). `attendee_stagetypes` is `TEXT[]` (not null, default `'{}'`) — supports multi-role membership (e.g. Active CEO + Investor). Note: `applications.attendee_stagetype` remains a single TEXT column; the application form is single-select. Key trigger-managed columns:
   - `has_community_access` BOOLEAN (renamed from `has_attended`) — set to `true` on ticket INSERT. Set to `false` on UPDATE when `kicked_out` flips false→true (trigger `trg_revoke_community_access_on_kickout`). Does NOT auto-restore on un-kick or on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
   - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
-  - `last_dinner_attended` DATE — set by `trg_ticket_fulfillment_change` when `fulfillment_status` transitions to `'fulfilled'` (not on INSERT — only on UPDATE). Set to the dinner's date if later than the current value. On refund/credit, recalculated as MAX of remaining fulfilled tickets' dinner dates; null if none remain. Because future-dinner tickets stay `purchased` until auto-fulfill, `last_dinner_attended` only advances when the fulfillment cron or next-dinner auto-fulfill fires.
+  - `last_dinner_attended` DATE — set by `post-dinner` cron (fires daily, checks if yesterday was a dinner, updates all members with fulfilled tickets for that dinner). NOT set by the fulfillment trigger (removed — fulfillment can happen for future dinners, which would incorrectly advance this date). On refund/credit, recalculated as MAX of remaining fulfilled tickets for past dinners; null if none remain.
   - `marketing_opted_out_at` TIMESTAMPTZ — set to `now()` when `marketing_opted_in` flips to `false`, cleared to null when it flips back to `true`. Managed by trigger on UPDATE of `marketing_opted_in`.
   - `intro_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Intro. Column exists but no trigger — set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp.
   - `ask_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Ask. No trigger — set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp.
@@ -129,6 +129,8 @@ src/
 │   │       └── success/page.tsx        # Post-purchase confirmation: fetches Stripe session for details, confetti
 │   ├── api/cron/generate-dinner/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
+│   ├── api/cron/post-dinner/
+│   │   └── route.ts                    # Vercel Cron: day after each dinner, sets last_dinner_attended for all fulfilled attendees
 │   ├── api/webhooks/stripe/
 │   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
 │   └── admin/
@@ -214,7 +216,8 @@ supabase/
 │   ├── 20260420500000_nullable_preferred_dinner_date.sql # Allow NULL on applications.preferred_dinner_date
 │   ├── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
 │   ├── 20260420700000_email_templates.sql               # email_templates table + RLS + approval template seed
-│   └── 20260420800000_dinner_venue_address.sql          # Add address column, update venue default to 'ID345', backfill future dinners
+│   ├── 20260420800000_dinner_venue_address.sql          # Add address column, update venue default to 'ID345', backfill future dinners
+│   └── 20260420900000_post_dinner_cron_and_trigger_fix.sql  # Remove last_dinner_attended from fulfillment trigger; now set by post-dinner cron
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)

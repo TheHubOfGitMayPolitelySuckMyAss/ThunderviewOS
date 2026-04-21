@@ -29,6 +29,8 @@ type Attendee = {
   primary_email: string | null;
   current_intro: string | null;
   current_ask: string | null;
+  ask_updated_at: string | null;
+  last_dinner_attended: string | null;
   has_community_access: boolean;
   kicked_out: boolean;
 };
@@ -65,7 +67,11 @@ function buildAttendeeHtml(attendees: Attendee[]): string {
       if (a.current_intro) {
         lines.push(`<br>Intro: ${a.current_intro}`);
       }
-      if (a.current_ask) {
+      const showAsk = a.current_ask && (
+        !a.last_dinner_attended ||
+        (a.ask_updated_at && a.ask_updated_at > a.last_dinner_attended)
+      );
+      if (showAsk) {
         lines.push(`<br>Ask: ${a.current_ask}`);
       }
       return lines.join("");
@@ -88,7 +94,7 @@ async function getNextDinnerWithAttendees(admin: ReturnType<typeof createAdminCl
   const { data: tickets } = await admin
     .from("tickets")
     .select(
-      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, has_community_access, kicked_out, member_emails(email, is_primary))"
+      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, member_emails(email, is_primary))"
     )
     .eq("dinner_id", dinner.id)
     .eq("fulfillment_status", "fulfilled");
