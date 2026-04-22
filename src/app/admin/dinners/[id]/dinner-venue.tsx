@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateDinnerField } from "./actions";
+import { Button } from "@/components/ui/button";
 
 export default function DinnerVenue({
   dinnerId,
@@ -13,7 +14,7 @@ export default function DinnerVenue({
   address: string;
 }) {
   return (
-    <p className="text-sm text-gray-500">
+    <p className="text-sm text-fg3">
       <InlineField dinnerId={dinnerId} field="venue" value={venue} />
       {" @ "}
       <InlineField dinnerId={dinnerId} field="address" value={address} />
@@ -57,23 +58,19 @@ function InlineField({
           type="text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          className="rounded border border-gray-300 px-2 py-0.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+          className="rounded-md border border-border px-2 py-0.5 text-sm text-fg1 bg-cream-50 focus:border-clay-500 focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
             if (e.key === "Escape") handleCancel();
           }}
         />
-        <button
-          onClick={handleSave}
-          disabled={isPending}
-          className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        <Button size="sm" onClick={handleSave} disabled={isPending}>
           Save
-        </button>
+        </Button>
         <button
           onClick={handleCancel}
-          className="rounded px-2 py-0.5 text-xs font-medium text-gray-600 hover:text-gray-800"
+          className="rounded px-2 py-0.5 text-xs font-medium text-fg3 cursor-pointer hover:text-fg1"
         >
           Cancel
         </button>
@@ -84,7 +81,7 @@ function InlineField({
   return (
     <span
       onClick={() => setEditing(true)}
-      className="cursor-pointer hover:text-gray-700 hover:underline"
+      className="cursor-pointer hover:text-fg2 hover:underline"
     >
       {current}
     </span>

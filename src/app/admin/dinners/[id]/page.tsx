@@ -178,37 +178,40 @@ export default async function DinnerDetailPage({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1280px] space-y-6">
       {/* Dinner header */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900">
+        <Link href="/admin/dinners" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
+          &larr; Dinners
+        </Link>
+        <h1 className="tv-h2 !text-[36px]">
           {formatDate(dinner.date, {
             weekday: "long",
             year: "numeric",
             month: "long",
             day: "numeric",
           })}
-        </h2>
+        </h1>
         <DinnerVenue dinnerId={dinner.id} venue={dinner.venue} address={dinner.address} />
       </div>
 
       {/* Ticket counts */}
       <div className="flex gap-4">
-        <div className="rounded-lg bg-white px-4 py-3 shadow">
-          <p className="text-xs uppercase text-gray-500">Purchased</p>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="rounded-xl border border-line-200 bg-cream-50 px-5 py-4 shadow-xs">
+          <p className="tv-eyebrow mb-1">Purchased</p>
+          <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
             {(statusCounts["purchased"] || 0) + (statusCounts["fulfilled"] || 0)}
           </p>
         </div>
-        <div className="rounded-lg bg-white px-4 py-3 shadow">
-          <p className="text-xs uppercase text-gray-500">Refunded</p>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="rounded-xl border border-line-200 bg-cream-50 px-5 py-4 shadow-xs">
+          <p className="tv-eyebrow mb-1">Refunded</p>
+          <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
             {statusCounts["refunded"] || 0}
           </p>
         </div>
-        <div className="rounded-lg bg-white px-4 py-3 shadow">
-          <p className="text-xs uppercase text-gray-500">Credited</p>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="rounded-xl border border-line-200 bg-cream-50 px-5 py-4 shadow-xs">
+          <p className="tv-eyebrow mb-1">Credited</p>
+          <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
             {statusCounts["credited"] || 0}
           </p>
         </div>
