@@ -106,8 +106,11 @@ export default async function DinnersPage() {
   const nextUpcomingId = dinnerStats.find((d) => d.date >= today)?.id ?? null;
 
   return (
-    <div>
-      <h2 className="mb-4 text-xl font-bold text-gray-900">Dinners</h2>
+    <div className="max-w-[1280px]">
+      <div className="flex items-baseline justify-between mb-6">
+        <h1 className="tv-h2 !text-[36px]">Dinners</h1>
+        <span className="text-fg3 text-[14px]">{dinnerStats.length} past &middot; scheduled</span>
+      </div>
       <DinnersTable dinners={dinnerStats} nextDinnerId={nextUpcomingId} />
     </div>
   );
