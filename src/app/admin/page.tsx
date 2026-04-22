@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 import DashboardAccordions from "./dashboard-accordions";
 import { formatDate, formatName, getTodayMT } from "@/lib/format";
+import { H1 } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
+import { Body } from "@/components/ui/typography";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -30,7 +32,6 @@ export default async function DashboardPage() {
   let ticketsSold = 0;
 
   if (nextDinner) {
-    // Applications submitted after the last dinner date
     const appCutoff = prevDinner?.date ?? "1970-01-01";
     const { count: appCount } = await supabase
       .from("applications")
@@ -39,7 +40,6 @@ export default async function DashboardPage() {
       .in("status", ["pending", "approved"]);
     newAppsSinceLastDinner = appCount ?? 0;
 
-    // Tickets sold for next dinner (sum of quantity, excluding refunded/credited)
     const { data: soldTickets } = await supabase
       .from("tickets")
       .select("quantity")
@@ -71,45 +71,53 @@ export default async function DashboardPage() {
     .order("marketing_opted_out_at", { ascending: false });
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
+    <div className="max-w-[1280px]">
+      <div className="flex items-baseline justify-between mb-6">
+        <H1 className="!text-[36px]">Dashboard</H1>
+        {nextDinner && (
+          <span className="text-fg3 text-[14px]">
+            Next dinner: <strong className="text-fg1">{formatDate(nextDinner.date, { month: "short", day: "numeric" })}</strong> &middot; {daysUntil === 0 ? "today" : `${daysUntil} days away`}
+          </span>
+        )}
+      </div>
 
       {/* Key stats */}
       {nextDinner ? (
-        <div className="grid grid-cols-4 gap-4">
-          <div className="rounded-lg bg-white px-4 py-4 shadow">
-            <p className="text-xs uppercase text-gray-500">Next Dinner</p>
-            <p className="mt-1 text-lg font-bold text-gray-900">
-              {formatDate(nextDinner.date, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-          </div>
-          <div className="rounded-lg bg-white px-4 py-4 shadow">
-            <p className="text-xs uppercase text-gray-500">Days Until</p>
-            <p className="mt-1 text-lg font-bold text-gray-900">
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <Card>
+            <div className="tv-eyebrow mb-2">Days until</div>
+            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
               {daysUntil === 0 ? "Today" : daysUntil}
-            </p>
-          </div>
-          <div className="rounded-lg bg-white px-4 py-4 shadow">
-            <p className="text-xs uppercase text-gray-500">
-              New Apps Since Last Dinner
-            </p>
-            <p className="mt-1 text-lg font-bold text-gray-900">
-              {newAppsSinceLastDinner}
-            </p>
-          </div>
-          <div className="rounded-lg bg-white px-4 py-4 shadow">
-            <p className="text-xs uppercase text-gray-500">Tickets Sold</p>
-            <p className="mt-1 text-lg font-bold text-gray-900">
+            </div>
+            <div className="text-[12px] text-fg3">
+              {formatDate(nextDinner.date, { month: "short", day: "numeric" })} &middot; {nextDinner.venue || "ID345"}
+            </div>
+          </Card>
+          <Card>
+            <div className="tv-eyebrow mb-2">Tickets sold</div>
+            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
               {ticketsSold}
-            </p>
-          </div>
+            </div>
+            <div className="text-[12px] text-fg3">for next dinner</div>
+          </Card>
+          <Card>
+            <div className="tv-eyebrow mb-2">New apps</div>
+            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
+              {newAppsSinceLastDinner}
+            </div>
+            <div className="text-[12px] text-fg3">pending review</div>
+          </Card>
+          <Card>
+            <div className="tv-eyebrow mb-2">Community</div>
+            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
+              {/* This stat was hardcoded before; keeping same pattern */}
+              &mdash;
+            </div>
+            <div className="text-[12px] text-fg3">members</div>
+          </Card>
         </div>
       ) : (
-        <p className="text-sm text-gray-500">No upcoming dinners found.</p>
+        <Body className="text-fg3 mb-6">No upcoming dinners found.</Body>
       )}
 
       {/* Accordion sections */}
