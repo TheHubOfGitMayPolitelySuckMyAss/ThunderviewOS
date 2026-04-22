@@ -268,7 +268,7 @@ export async function compTicket(
     return { success: false, error: fulfillError.message };
   }
 
-  sendFulfillmentEmail(memberId, targetDinner.id);
+  await sendFulfillmentEmail(memberId, targetDinner.id);
 
   return { success: true };
 }

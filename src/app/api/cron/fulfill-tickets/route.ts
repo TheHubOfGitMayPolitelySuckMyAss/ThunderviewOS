@@ -82,7 +82,7 @@ export async function GET(request: Request) {
     }
 
     // Send fulfillment email
-    sendFulfillmentEmail(ticket.member_id, dinner.id);
+    await sendFulfillmentEmail(ticket.member_id, dinner.id);
     fulfilled++;
   }
 

@@ -42,9 +42,9 @@ export async function approveApplication(
   }
 
   if (result.is_existing) {
-    sendReApplicationEmail(result.member_id);
+    await sendReApplicationEmail(result.member_id);
   } else {
-    sendApprovalEmail(result.member_id);
+    await sendApprovalEmail(result.member_id);
   }
 
   return {
@@ -71,7 +71,7 @@ export async function rejectApplication(
 
   if (error) return { success: false, error: error.message };
 
-  sendRejectionEmail(applicationId);
+  await sendRejectionEmail(applicationId);
 
   return { success: true };
 }
@@ -112,7 +112,7 @@ export async function linkApplicationToMember(
     };
   }
 
-  sendReApplicationEmail(result.member_id);
+  await sendReApplicationEmail(result.member_id);
 
   return {
     success: true,

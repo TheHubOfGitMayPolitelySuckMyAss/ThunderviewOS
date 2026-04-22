@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Send fulfillment email (dinner details)
-      sendFulfillmentEmail(metadata.member_id, metadata.dinner_id);
+      await sendFulfillmentEmail(metadata.member_id, metadata.dinner_id);
     }
   }
 

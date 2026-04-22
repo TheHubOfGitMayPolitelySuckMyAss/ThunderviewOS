@@ -39,8 +39,8 @@ export async function submitApplication(formData: {
 
   if (error) return { success: false, error: error.message };
 
-  // Notify admin — fire and forget, don't block the applicant
-  sendNewApplicationNotification({
+  // Notify admin — must await or serverless may terminate before send completes
+  await sendNewApplicationNotification({
     id: data.id,
     firstName: formData.firstName.trim(),
     lastName: formData.lastName.trim(),
