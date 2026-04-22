@@ -4,6 +4,13 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { saveProfile } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Eyebrow, H1 } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
 
 const CropModal = dynamic(() => import("./crop-modal"), { ssr: false });
 
@@ -87,16 +94,14 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // HEIC files can't be rendered in most browsers — skip crop, fall back to sprint 6 flow
     const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
     if (isHeic) {
       setSelectedFile(file);
       setRemovePic(false);
-      setPicPreview(null); // No preview for HEIC
+      setPicPreview(null);
       return;
     }
 
-    // Open crop modal for other image types
     setCropImageUrl(URL.createObjectURL(file));
   }
 
@@ -106,11 +111,9 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     setPicPreview(URL.createObjectURL(blob));
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    // Save photo immediately
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("profile_pic", file);
-    // Include current field values so the action can compare correctly
     formData.set("first_name", firstName);
     formData.set("last_name", lastName);
     formData.set("company_name", companyName);
@@ -127,7 +130,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
 
     if (!result.success) {
       showToast(result.error || "Upload failed", "error");
-      setSelectedFile(file); // Keep for manual retry via Save button
+      setSelectedFile(file);
       return;
     }
 
@@ -150,7 +153,6 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     setPicPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    // Save removal immediately (mirrors upload pattern)
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("remove_pic", "true");
@@ -202,7 +204,6 @@ export default function ProfileForm({ member }: ProfileFormProps) {
       showToast("No changes to save", "success");
     } else {
       showToast("Saved!", "success");
-      // Update pic state after successful save
       if (result.profilePicUrl !== undefined) {
         setProfilePicUrl(result.profilePicUrl ?? null);
       }
@@ -216,287 +217,236 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     }
   }
 
-  const inputClass =
-    "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:ring-1 focus:ring-gray-500 focus:outline-none";
-  const labelClass = "block text-sm font-medium text-gray-700";
-
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Profile details section */}
-      <section>
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          Profile Details
-        </h3>
-        <div className="space-y-4">
-          {/* Profile picture */}
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              {picPreview || (!removePic && profilePicUrl) ? (
-                <Image
-                  src={picPreview || profilePicUrl!}
-                  alt="Profile"
-                  width={120}
-                  height={120}
-                  className="h-[120px] w-[120px] rounded-full object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-gray-900 text-3xl font-medium text-white">
-                  {firstName?.[0]?.toUpperCase() ?? "?"}{lastName?.[0]?.toUpperCase() ?? ""}
-                </div>
-              )}
-              {savingPhoto && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/60">
-                  <svg className="h-6 w-6 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <span className="mt-1 text-xs font-medium text-white">Saving photo</span>
-                </div>
-              )}
+      {/* Profile head */}
+      <div className="flex items-center gap-5 mb-6">
+        <div className="relative">
+          {picPreview || (!removePic && profilePicUrl) ? (
+            <Image
+              src={picPreview || profilePicUrl!}
+              alt="Profile"
+              width={120}
+              height={120}
+              className="h-[120px] w-[120px] rounded-full object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-clay-500 font-display font-medium text-[40px] text-cream-50">
+              {firstName?.[0]?.toUpperCase() ?? "?"}{lastName?.[0]?.toUpperCase() ?? ""}
             </div>
-            <div className="flex flex-col gap-1">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+          )}
+          {savingPhoto && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/60">
+              <svg className="h-6 w-6 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="mt-1 text-xs font-medium text-white">Saving photo</span>
+            </div>
+          )}
+        </div>
+        <div>
+          <H1 className="!m-0">{firstName} {lastName}</H1>
+          <p className="text-[15px] text-fg2 mt-1">
+            {stagetypes.length > 0
+              ? stagetypes.map(s => s.replace(/ \(.*\)/, "")).join(", ")
+              : "Member"}
+          </p>
+          <div className="flex gap-2 mt-2.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {profilePicUrl && !removePic ? "Change photo" : "Upload photo"}
+            </Button>
+            {profilePicUrl && !removePic && !picPreview && (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+                onClick={handleRemovePic}
+                className="text-sm text-ember-600 cursor-pointer hover:underline"
               >
-                {profilePicUrl && !removePic ? "Change Photo" : "Upload Photo"}
+                Remove
               </button>
-              {profilePicUrl && !removePic && !picPreview && (
-                <button
-                  type="button"
-                  onClick={handleRemovePic}
-                  className="text-sm text-red-600 hover:text-red-800"
-                >
-                  Remove
-                </button>
-              )}
-              {picPreview && (
-                <span className="text-xs text-gray-500">
-                  New photo selected — save to apply
-                </span>
-              )}
-            </div>
+            )}
           </div>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit}>
+        <Card>
+          <Eyebrow className="mb-4">Profile details</Eyebrow>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label htmlFor="first_name" className={labelClass}>
-                First Name
-              </label>
-              <input
-                type="text"
+              <Label htmlFor="first_name">First name</Label>
+              <Input
                 id="first_name"
                 name="first_name"
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className={inputClass}
               />
             </div>
             <div>
-              <label htmlFor="last_name" className={labelClass}>
-                Last Name
-              </label>
-              <input
-                type="text"
+              <Label htmlFor="last_name">Last name</Label>
+              <Input
                 id="last_name"
                 name="last_name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className={inputClass}
               />
             </div>
           </div>
 
-          <div>
-            <label htmlFor="primary_email" className={labelClass}>
-              Primary Email
-            </label>
-            <input
+          <div className="mt-4">
+            <Label htmlFor="primary_email">Primary email</Label>
+            <Input
               type="email"
               id="primary_email"
               name="primary_email"
               value={primaryEmail}
               onChange={(e) => setPrimaryEmail(e.target.value)}
-              className={inputClass}
             />
           </div>
 
-          <div>
-            <label htmlFor="company_name" className={labelClass}>
-              Company
-            </label>
-            <input
-              type="text"
+          <div className="mt-4">
+            <Label htmlFor="company_name">Company name</Label>
+            <Input
               id="company_name"
               name="company_name"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              className={inputClass}
             />
           </div>
 
-          <div>
-            <label htmlFor="company_website" className={labelClass}>
-              Website
-            </label>
-            <input
-              type="text"
+          <div className="mt-4">
+            <Label htmlFor="company_website">Company website</Label>
+            <Input
               id="company_website"
               name="company_website"
               placeholder="https://"
               value={companyWebsite}
               onChange={(e) => setCompanyWebsite(e.target.value)}
-              className={inputClass}
             />
           </div>
 
-          <div>
-            <label htmlFor="linkedin_profile" className={labelClass}>
-              LinkedIn
-            </label>
-            <input
-              type="text"
+          <div className="mt-4">
+            <Label htmlFor="linkedin_profile">LinkedIn</Label>
+            <Input
               id="linkedin_profile"
               name="linkedin_profile"
               placeholder="https://linkedin.com/in/..."
               value={linkedinProfile}
               onChange={(e) => setLinkedinProfile(e.target.value)}
-              className={inputClass}
             />
           </div>
 
-          <div>
-            <label className={labelClass}>Role</label>
-            <p className="mb-2 text-xs text-gray-500">
-              Select all that apply.
-            </p>
-            {/* Hidden field to transmit selected stagetypes */}
+          <div className="mt-4">
+            <Label>Attendee type</Label>
             <input
               type="hidden"
               name="attendee_stagetypes"
               value={stagetypes.join(",")}
             />
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-3.5 text-[14px] text-fg2 mt-1">
               {STAGE_OPTIONS.map((option) => {
                 const checked = stagetypes.includes(option);
                 return (
                   <label
                     key={option}
-                    className="flex items-center gap-2 text-sm text-gray-700"
+                    className="inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleStagetype(option)}
-                      className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+                      className="h-4 w-4 rounded accent-clay-500"
                     />
-                    {option}
+                    {option.replace(/ \(.*\)/, "")}
                   </label>
                 );
               })}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Intro / Ask / Contact section */}
-      <section>
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          Intro &amp; Ask
-        </h3>
-        <div className="space-y-4">
+          <Eyebrow className="mt-8 mb-4">Intro & Ask</Eyebrow>
+
           <div>
-            <label htmlFor="current_intro" className={labelClass}>
-              Intro
-            </label>
-            <textarea
+            <Label htmlFor="current_intro">Intro</Label>
+            <Textarea
               id="current_intro"
               name="current_intro"
               rows={4}
               value={intro}
               onChange={(e) => setIntro(e.target.value)}
               placeholder="How would you introduce yourself to the group?"
-              className={inputClass}
             />
           </div>
 
-          <div>
-            <label htmlFor="current_ask" className={labelClass}>
-              Ask
-            </label>
-            <textarea
+          <div className="mt-4">
+            <Label htmlFor="current_ask">Ask</Label>
+            <Textarea
               id="current_ask"
               name="current_ask"
               rows={4}
               value={ask}
               onChange={(e) => setAsk(e.target.value)}
               placeholder="What can the group help you with?"
-              className={inputClass}
             />
           </div>
 
-          <div>
-            <label htmlFor="contact_preference" className={labelClass}>
-              Preferred Contact
-            </label>
-            <select
+          <div className="mt-4">
+            <Label htmlFor="contact_preference">Preferred contact</Label>
+            <Select
               id="contact_preference"
               name="contact_preference"
               value={contact}
               onChange={(e) => setContact(e.target.value)}
-              className={inputClass}
             >
               {CONTACT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-        </div>
-      </section>
 
-      <div>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
+          <div className="mt-6">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving\u2026" : "Save Changes"}
+            </Button>
 
-        {toast && (
-          <div
-            className={`mt-3 rounded-md px-4 py-2 text-sm ${
-              toast.type === "success"
-                ? "bg-green-50 text-green-700"
-                : "bg-red-50 text-red-700"
-            }`}
-          >
-            {toast.message}
+            {toast && (
+              <div
+                className={`mt-3 rounded-md px-4 py-2 text-sm ${
+                  toast.type === "success"
+                    ? "bg-[#E4E9D4] text-moss-600"
+                    : "bg-[#F2D4CB] text-ember-600"
+                }`}
+              >
+                {toast.message}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </form>
+        </Card>
+      </form>
 
-    {cropImageUrl && (
-      <CropModal
-        imageUrl={cropImageUrl}
-        onApply={handleCropApply}
-        onCancel={handleCropCancel}
-      />
-    )}
+      {cropImageUrl && (
+        <CropModal
+          imageUrl={cropImageUrl}
+          onApply={handleCropApply}
+          onCancel={handleCropCancel}
+        />
+      )}
     </>
   );
 }

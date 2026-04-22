@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { H1, Body } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
 import ProfileForm from "./profile-form";
 
 export default async function ProfilePage() {
@@ -50,27 +54,25 @@ export default async function ProfilePage() {
     emails?.find((e) => e.is_primary)?.email ?? user.email!;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
-      <h2 className="mb-6 text-2xl font-bold text-gray-900">
-        Update Your Profile
-      </h2>
-      <div className="rounded-lg border bg-white p-6">
-        <ProfileForm
-          member={{
-            firstName: member.first_name,
-            lastName: member.last_name,
-            companyName: member.company_name,
-            companyWebsite: member.company_website,
-            linkedinProfile: member.linkedin_profile,
-            attendeeStagetypes: member.attendee_stagetypes ?? [],
-            currentIntro: member.current_intro,
-            currentAsk: member.current_ask,
-            contactPreference: member.contact_preference,
-            primaryEmail,
-            profilePicUrl: member.profile_pic_url,
-          }}
-        />
-      </div>
+    <div className="max-w-[980px] mx-auto px-8 py-10">
+      <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
+        <ArrowLeft size={14} /> Portal home
+      </Link>
+      <ProfileForm
+        member={{
+          firstName: member.first_name,
+          lastName: member.last_name,
+          companyName: member.company_name,
+          companyWebsite: member.company_website,
+          linkedinProfile: member.linkedin_profile,
+          attendeeStagetypes: member.attendee_stagetypes ?? [],
+          currentIntro: member.current_intro,
+          currentAsk: member.current_ask,
+          contactPreference: member.contact_preference,
+          primaryEmail,
+          profilePicUrl: member.profile_pic_url,
+        }}
+      />
     </div>
   );
 }
