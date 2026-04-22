@@ -48,23 +48,26 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
   const showAdminLink = isAdmin || isTeam;
 
   return (
-    <nav className="flex items-center justify-between border-b bg-white px-6 py-3">
+    <nav className="sticky top-0 z-10 flex items-center justify-between border-b border-line-200 bg-cream-50 px-7 py-3.5">
       {/* Left: logo + links */}
-      <div className="flex items-center gap-6">
-        <Link href="/portal" className="text-lg font-bold text-gray-900">
-          Thunderview OS
+      <div className="flex items-center gap-7">
+        <Link
+          href="/portal"
+          className="font-display font-medium text-[20px] tracking-[-0.01em] text-fg1 no-underline"
+        >
+          Thunderview
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium ${
+                className={`text-sm font-medium no-underline ${
                   active
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "text-fg1 border-b-2 border-clay-500 pb-[3px]"
+                    : "text-fg2 hover:text-fg1"
                 }`}
               >
                 {link.label}
@@ -78,21 +81,21 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white hover:bg-gray-800 overflow-hidden"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-clay-500 text-[13px] font-semibold text-cream-50 cursor-pointer overflow-hidden transition-colors duration-[var(--tv-dur-fast)]"
         >
           {profilePicUrl ? (
-            <Image src={profilePicUrl} alt={initials} width={32} height={32} className="h-8 w-8 rounded-full object-cover" unoptimized />
+            <Image src={profilePicUrl} alt={initials} width={36} height={36} className="h-9 w-9 rounded-full object-cover" unoptimized />
           ) : (
             initials
           )}
         </button>
 
         {dropdownOpen && (
-          <div className="absolute right-0 z-50 mt-2 w-48 rounded-md border bg-white py-1 shadow-lg">
+          <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-line-200 bg-cream-50 py-1 shadow-md">
             <Link
               href="/portal/profile"
               onClick={() => setDropdownOpen(false)}
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="block px-4 py-2 text-sm text-fg2 no-underline hover:bg-cream-100"
             >
               Update Profile
             </Link>
@@ -100,14 +103,14 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
               <Link
                 href="/admin"
                 onClick={() => setDropdownOpen(false)}
-                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                className="block px-4 py-2 text-sm text-fg2 no-underline hover:bg-cream-100"
               >
                 Admin
               </Link>
             )}
             <button
               onClick={handleSignOut}
-              className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+              className="block w-full px-4 py-2 text-left text-sm text-fg2 cursor-pointer hover:bg-cream-100"
             >
               Sign Out
             </button>
