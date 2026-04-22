@@ -44,7 +44,7 @@ export default async function PortalLayout({
   const initials = firstInitial + lastInitial;
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-bg tv-surface">
       <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} profilePicUrl={member?.profile_pic_url ?? null} />
       <main className="flex-1">{children}</main>
     </div>
