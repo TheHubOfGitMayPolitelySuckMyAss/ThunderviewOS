@@ -79,25 +79,19 @@ export default function TicketPurchase({
           </div>
         </button>
 
-        <button
-          onClick={() => showGuestButton && handlePurchase(true)}
-          disabled={isPending || !showGuestButton}
-          className={`flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left transition-all duration-[var(--tv-dur-fast)] ${
-            showGuestButton
-              ? "cursor-pointer hover:border-clay-500 hover:bg-cream-100"
-              : "opacity-55 cursor-not-allowed"
-          } disabled:opacity-55 disabled:cursor-not-allowed`}
-        >
-          <div className="font-semibold text-[15px] text-fg1 mb-1">Buy ticket + guest</div>
-          <div className="text-[13px] text-fg3">
-            {showGuestButton
-              ? "Bring someone along."
-              : "Guest spots not open for this dinner."}
-          </div>
-          <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
-            {showGuestButton ? `$${ticketPrice + 40}` : "\u2014"}
-          </div>
-        </button>
+        {showGuestButton && (
+          <button
+            onClick={() => handlePurchase(true)}
+            disabled={isPending}
+            className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="font-semibold text-[15px] text-fg1 mb-1">Buy ticket + guest</div>
+            <div className="text-[13px] text-fg3">Bring someone along.</div>
+            <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
+              {isPending ? "Processing…" : `$${ticketPrice + 40}`}
+            </div>
+          </button>
+        )}
       </div>
 
       <p className="text-[12.5px] text-fg3 leading-[1.5]">
