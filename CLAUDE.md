@@ -349,6 +349,11 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
   - Morning-of cron idempotency: `dinners.morning_of_sent_at` column prevents duplicate sends on retry.
   - Admin notification on new application: emails `eric@marcoullier.com` with applicant details + link to `/admin/applications/[id]`.
   - **Bug fix: `has_community_access` was `false` on member creation.** All three member-creation RPCs now set `true`. Backfilled 161 existing members. Root cause: column was renamed from `has_attended` (ticket-triggered) to `has_community_access` (approval-triggered) but the RPCs and import were never updated to match the new semantics.
+  - **Bug fix: all email sends must be `await`ed.** Every `sendXxxEmail()` call was fire-and-forget (no `await`). On Vercel serverless, the function terminates when the response is sent — unawaited promises get killed. All 8 call sites now awaited. Crons already awaited correctly.
+  - **Bug fix: proxy used session client for member lookups.** The proxy queried `member_emails` with the session client (anon key + user cookies), subject to RLS. RLS blocked queries for non-admin users, so no non-admin user could ever reach `/portal` or `/admin` as team. Only `eric@marcoullier.com` worked because the hardcoded admin check bypasses the query. Fixed: proxy now uses the service role client for team and community access checks.
+  - **Bug fix: auth cookie propagation on redirects.** `/auth/confirm` and `/auth/callback` set session cookies via `cookieStore.set()` but returned a separate `NextResponse.redirect()` that didn't carry them. Now explicitly applies cookies to the redirect response.
+  - **Switched Supabase auth SMTP to Resend custom SMTP.** Configured in Supabase dashboard (not code). Eliminates the 4/hour rate limit and the injected unsubscribe footer. Sender: `team@thunderviewceodinners.com`.
+  - Login input text color fixed (was near-invisible on white background).
 
 ## What's NOT done
 
@@ -376,12 +381,12 @@ Don't build these without an explicit prompt:
 
 ## Pre-launch checklist (before real users hit this)
 
-- [ ] Switch Supabase SMTP from built-in to Resend
+- [x] Switch Supabase SMTP from built-in to Resend (done Sprint 13 — configured in Supabase dashboard)
 - [ ] Verify Thunderview sending domain in Resend (SPF, DKIM, DMARC)
 - [ ] Customize magic link email template (subject, body, branding) — link format already fixed, but copy/styling still default
 - [x] Verified all Supabase auth email templates use the `/auth/confirm?token_hash=...&type=email` pattern (not `{{ .ConfirmationURL }}`)
-- [ ] Confirm From address is a Thunderview domain (no `noreply@mail.app.supabase.io`)
-- [ ] Confirm injected unsubscribe footer is gone
+- [x] Confirm From address is a Thunderview domain (`team@thunderviewceodinners.com` via Resend custom SMTP)
+- [x] Confirm injected unsubscribe footer is gone (custom SMTP eliminates it)
 - [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
 
 ## Known issues / gotchas
@@ -389,8 +394,8 @@ Don't build these without an explicit prompt:
 - **PKCE flow uses `/auth/confirm`, not `/auth/callback`.** The `@supabase/ssr` package defaults to PKCE. Supabase's magic link email template generates URLs with `token_hash` query param pointing to `/auth/confirm`. The `/auth/callback` route (code exchange) also exists as a fallback. Both routes create their own `createServerClient` inline with direct `cookieStore` access — do not use the shared `lib/supabase/server.ts` helper in auth routes, as cookies won't propagate on redirects.
 - **Next.js 16 uses `proxy.ts` instead of `middleware.ts`.** The file is `src/proxy.ts` with `export async function proxy(request)`. The `middleware` convention is deprecated.
 - **Vercel preview env vars partially missing.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are not set for the preview environment due to a Vercel CLI plugin bug. Add manually in Vercel dashboard if branch deploys are needed.
-- **Supabase built-in SMTP is rate-limited.** Magic link requests are capped at 1 per 60 seconds per email, with an hourly sending cap. Must switch to Resend before launch.
+- ~~**Supabase built-in SMTP is rate-limited.**~~ Resolved — switched to Resend custom SMTP. New rate limit: 30/hour (adjustable in Supabase dashboard → Authentication → Rate Limits).
 - **Supabase/PostgREST default row cap.** Supabase limits query results to 1,000 rows by default. This is silent — no error, just truncated results. Any query that might return more than 1,000 rows MUST paginate. This has caused bugs across multiple projects. Always account for it.
-- **Portal pages use admin client for data queries.** RLS policies on most tables (tickets, dinners, applications, members) only grant SELECT to admin/team. Portal pages authenticate the user via the session client (`createClient`), then use the admin client (`createAdminClient`) for all data reads and writes. This is the same pattern as the `/apply` form.
+- **Portal pages and proxy use admin client for data queries.** RLS policies on most tables (tickets, dinners, applications, members) only grant SELECT to admin/team. Portal pages authenticate the user via the session client (`createClient`), then use the admin client (`createAdminClient`) for all data reads and writes. The proxy also uses the service role client for member lookups (team check, community access check) — using the session client here caused all non-admin logins to fail because RLS blocked the query. Same pattern as the `/apply` form: authenticate with session, query with admin.
 - **Server action body size limit is 5MB** (set in `next.config.ts` under `experimental.serverActions.bodySizeLimit`). Default Next.js limit is 1MB. Raised because profile pic uploads send a PNG blob from the client-side crop canvas, which can exceed 1MB for larger source images. If this limit needs changing, it's in `next.config.ts`.
 - **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
