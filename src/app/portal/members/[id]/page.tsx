@@ -2,8 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { formatName, formatStageType } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
+import { H1, Eyebrow } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default async function MemberProfilePage({
   params,
@@ -56,125 +60,89 @@ export default async function MemberProfilePage({
   const roles = (member.attendee_stagetypes ?? []) as string[];
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
-      <Link
-        href="/portal/community"
-        className="mb-4 inline-block text-sm text-blue-600 hover:text-blue-800"
-      >
-        &larr; Back to community
+    <div className="max-w-[980px] mx-auto px-8 py-10">
+      <Link href="/portal/community" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
+        <ArrowLeft size={14} /> Community
       </Link>
 
-      <div className="rounded-lg border bg-white p-6">
-        <div className="mb-6 flex items-center gap-4">
-          <MemberAvatar member={member} size="lg" />
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">{name}</h2>
-            {member.company_name && (
-              <p className="text-gray-500">{member.company_name}</p>
-            )}
-          </div>
+      <div className="flex items-center gap-5 mt-3 mb-6">
+        <MemberAvatar member={member} size="lg" />
+        <div className="flex-1">
+          <H1 className="!m-0">{name}</H1>
+          {member.company_name && (
+            <p className="text-base text-fg2 mt-1">
+              CEO at{" "}
+              {member.company_website ? (
+                <a
+                  href={member.company_website.startsWith("http") ? member.company_website : `https://${member.company_website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-clay-600 underline decoration-line-200"
+                >
+                  {member.company_name}
+                </a>
+              ) : (
+                member.company_name
+              )}
+            </p>
+          )}
+          <p className="text-[13px] text-fg3 mt-1">
+            {roles.length > 0 ? roles.map(formatStageType).join(" \u00B7 ") : "Member"}
+          </p>
           {isSelf && (
-            <Link
-              href="/portal/profile"
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-            >
-              Edit Profile
+            <Link href="/portal/profile" className="no-underline mt-2.5 inline-block">
+              <Button variant="secondary" size="sm">Edit Profile</Button>
             </Link>
           )}
         </div>
-
-        {/* Profile details */}
-        <div className="space-y-4">
-          {member.company_website && (
-            <DetailField label="Website">
-              <a
-                href={
-                  member.company_website.startsWith("http")
-                    ? member.company_website
-                    : `https://${member.company_website}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800"
-              >
-                {member.company_website}
-              </a>
-            </DetailField>
-          )}
-
-          {member.linkedin_profile && (
-            <DetailField label="LinkedIn">
-              <a
-                href={
-                  member.linkedin_profile.startsWith("http")
-                    ? member.linkedin_profile
-                    : `https://${member.linkedin_profile}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800"
-              >
-                {member.linkedin_profile}
-              </a>
-            </DetailField>
-          )}
-
-          {roles.length > 0 && (
-            <DetailField label="Role">
-              {roles.map(formatStageType).join(", ")}
-            </DetailField>
-          )}
-
-          {primaryEmail && (
-            <DetailField label="Email">{primaryEmail}</DetailField>
-          )}
-
-          {member.contact_preference && (
-            <DetailField label="Preferred Contact">
-              {member.contact_preference === "linkedin"
-                ? "LinkedIn"
-                : member.contact_preference === "email"
-                  ? "Email"
-                  : member.contact_preference}
-            </DetailField>
-          )}
-        </div>
-
-        {/* Intro & Ask */}
-        {(member.current_intro || member.current_ask) && (
-          <div className="mt-6 space-y-4 border-t pt-6">
-            {member.current_intro && (
-              <DetailField label="Intro">
-                <p className="whitespace-pre-wrap text-gray-700">
-                  {member.current_intro}
-                </p>
-              </DetailField>
-            )}
-            {member.current_ask && (
-              <DetailField label="Ask">
-                <p className="whitespace-pre-wrap text-gray-700">
-                  {member.current_ask}
-                </p>
-              </DetailField>
-            )}
-          </div>
-        )}
       </div>
-    </div>
-  );
-}
 
-function DetailField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900">{children}</dd>
+      <Card>
+        {member.current_intro && (
+          <>
+            <Eyebrow>Intro</Eyebrow>
+            <p className="text-[15px] text-fg2 leading-[1.6] mt-1 mb-5 whitespace-pre-wrap">
+              {member.current_intro}
+            </p>
+          </>
+        )}
+
+        {member.current_ask && (
+          <>
+            <Eyebrow>Ask</Eyebrow>
+            <p className="text-[15px] text-fg2 leading-[1.6] mt-1 mb-5 whitespace-pre-wrap">
+              {member.current_ask}
+            </p>
+          </>
+        )}
+
+        <Eyebrow>Contact</Eyebrow>
+        <p className="text-[14.5px] mt-1">
+          {member.linkedin_profile && (
+            <a
+              href={member.linkedin_profile.startsWith("http") ? member.linkedin_profile : `https://${member.linkedin_profile}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-clay-600 underline decoration-line-200"
+            >
+              LinkedIn
+            </a>
+          )}
+          {member.linkedin_profile && member.company_website && (
+            <span className="text-fg4 mx-1.5">&middot;</span>
+          )}
+          {member.company_website && (
+            <a
+              href={member.company_website.startsWith("http") ? member.company_website : `https://${member.company_website}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-clay-600 underline decoration-line-200"
+            >
+              {member.company_website.replace(/^https?:\/\//, "")}
+            </a>
+          )}
+        </p>
+      </Card>
     </div>
   );
 }
