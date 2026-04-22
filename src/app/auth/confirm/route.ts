@@ -9,6 +9,7 @@ export async function GET(request: Request) {
 
   if (token_hash && type) {
     const cookieStore = await cookies();
+    const cookiesToApply: { name: string; value: string; options: Record<string, unknown> }[] = [];
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
+            cookiesToApply.push(...cookiesToSet);
           },
         },
       }
@@ -33,7 +35,11 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
-      return NextResponse.redirect(`${origin}/portal`);
+      const response = NextResponse.redirect(`${origin}/portal`);
+      cookiesToApply.forEach(({ name, value, options }) =>
+        response.cookies.set(name, value, options as Record<string, string>)
+      );
+      return response;
     }
   }
 
