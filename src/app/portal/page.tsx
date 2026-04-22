@@ -2,7 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
+import { H1, Body } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
 
 export default async function PortalPage() {
@@ -60,8 +63,6 @@ export default async function PortalPage() {
       const dinner = futureTicket.dinners as unknown as { date: string };
       bannerDinnerDate = dinner.date;
 
-      // Has intro or ask been updated since last dinner attended?
-      // Compare dates (lda is DATE, timestamps are TIMESTAMPTZ — convert to DATE for comparison)
       const lda = member.last_dinner_attended;
       const introDate = member.intro_updated_at ? toDateMT(member.intro_updated_at) : null;
       const askDate = member.ask_updated_at ? toDateMT(member.ask_updated_at) : null;
@@ -71,46 +72,43 @@ export default async function PortalPage() {
     }
   }
 
-  return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      <h2 className="mb-6 text-2xl font-bold text-gray-900">
-        {member?.first_name ? `Welcome, ${member.first_name}` : "Portal"}
-      </h2>
+  const navButtons = [
+    ...(isMember ? [{ href: "/portal/tickets", label: "Buy a dinner ticket" }] : []),
+    { href: "/portal/profile", label: "Update your profile" },
+    { href: "/portal/community", label: "View the community" },
+    { href: "/portal/recap", label: "Check last month\u2019s intros & asks" },
+  ];
 
-      <div className="grid gap-8 md:grid-cols-2">
+  return (
+    <div className="max-w-[980px] mx-auto px-8 py-10">
+      <H1 className="mb-1.5">
+        {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
+      </H1>
+      {bannerDinnerDate && (
+        <Body className="mb-8">
+          You&rsquo;re coming to the {formatDinnerDisplay(bannerDinnerDate)} dinner. Here&rsquo;s your corner of Thunderview.
+        </Body>
+      )}
+      {!bannerDinnerDate && <div className="mb-8" />}
+
+      <div className="grid gap-7 md:grid-cols-[1fr_1.2fr]">
         {/* Left column: navigation buttons */}
-        <div className="flex flex-col gap-3">
-          {isMember && (
+        <div>
+          {navButtons.map((btn) => (
             <Link
-              href="/portal/tickets"
-              className="rounded-md bg-gray-900 px-5 py-3 text-center text-sm font-medium text-white hover:bg-gray-800"
+              key={btn.href}
+              href={btn.href}
+              className="flex items-center justify-between px-[22px] py-[18px] bg-cream-100 border border-line-200 rounded-lg text-fg1 font-medium text-base no-underline mb-2.5 transition-all duration-150 hover:bg-cream-200 hover:translate-x-0.5"
             >
-              Buy A Dinner Ticket
+              {btn.label}
+              <ChevronRight size={16} className="text-fg3" />
             </Link>
-          )}
-          <Link
-            href="/portal/profile"
-            className="rounded-md bg-gray-900 px-5 py-3 text-center text-sm font-medium text-white hover:bg-gray-800"
-          >
-            Update Your Profile
-          </Link>
-          <Link
-            href="/portal/community"
-            className="rounded-md bg-gray-900 px-5 py-3 text-center text-sm font-medium text-white hover:bg-gray-800"
-          >
-            View The Community
-          </Link>
-          <Link
-            href="/portal/recap"
-            className="rounded-md bg-gray-900 px-5 py-3 text-center text-sm font-medium text-white hover:bg-gray-800"
-          >
-            Check Last Month&rsquo;s Intros &amp; Asks
-          </Link>
+          ))}
         </div>
 
         {/* Right column: inline edit form */}
         {isMember && (
-          <div className="rounded-lg border bg-white p-6">
+          <Card>
             <PortalForm
               initialIntro={member.current_intro}
               initialAsk={member.current_ask}
@@ -118,7 +116,7 @@ export default async function PortalPage() {
               bannerDinnerDate={bannerDinnerDate ? formatDinnerDisplay(bannerDinnerDate) : null}
               bannerIntroAskFresh={introAskFresh}
             />
-          </div>
+          </Card>
         )}
       </div>
     </div>

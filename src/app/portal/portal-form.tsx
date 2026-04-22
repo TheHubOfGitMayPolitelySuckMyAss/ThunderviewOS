@@ -2,6 +2,11 @@
 
 import { useState, useRef } from "react";
 import { savePortalProfile } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Eyebrow } from "@/components/ui/typography";
 
 const CONTACT_OPTIONS = ["linkedin", "email"];
 
@@ -50,7 +55,6 @@ export default function PortalForm({
       showToast("No changes to save", "success");
     } else {
       showToast("Saved!", "success");
-      // If intro or ask was just saved, banner switches to welcoming message
       if (bannerDinnerDate) setIntroAskFresh(true);
     }
   }
@@ -58,87 +62,83 @@ export default function PortalForm({
   return (
     <div className="space-y-4">
       {bannerDinnerDate && (
-        <div className="rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <p className="font-medium">
-            You&rsquo;ve got a ticket for {bannerDinnerDate}!
-          </p>
-          <p className="mt-1">
+        <div className="rounded-lg border border-tan-300 bg-cream-100 px-[22px] py-[18px] flex items-center gap-4 shadow-glow">
+          <span className="text-[28px]">🎟️</span>
+          <div className="flex-1 text-[14.5px] text-fg2 leading-[1.5]">
+            You&rsquo;re confirmed for <strong className="text-fg1">{bannerDinnerDate}</strong>.{" "}
             {introAskFresh
               ? "We can\u2019t wait to see you."
               : "Please update your Intro & Ask when you have a moment."}
-          </p>
+          </div>
         </div>
       )}
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="current_intro" className="block text-sm font-medium text-gray-700">
-          Intro
-        </label>
-        <textarea
-          id="current_intro"
-          name="current_intro"
-          rows={4}
-          value={intro}
-          onChange={(e) => setIntro(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:ring-1 focus:ring-gray-500 focus:outline-none"
-          placeholder="How would you introduce yourself to the group?"
-        />
-      </div>
 
-      <div>
-        <label htmlFor="current_ask" className="block text-sm font-medium text-gray-700">
-          Ask
-        </label>
-        <textarea
-          id="current_ask"
-          name="current_ask"
-          rows={4}
-          value={ask}
-          onChange={(e) => setAsk(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:ring-1 focus:ring-gray-500 focus:outline-none"
-          placeholder="What can the group help you with?"
-        />
-      </div>
+      <Eyebrow className="!mt-6">Your Intro & Ask</Eyebrow>
+      <p className="text-[13px] text-fg3 -mt-1 mb-4">
+        We send these around a week before each dinner so people know who to find you for.
+      </p>
 
-      <div>
-        <label htmlFor="contact_preference" className="block text-sm font-medium text-gray-700">
-          Preferred Contact
-        </label>
-        <select
-          id="contact_preference"
-          name="contact_preference"
-          value={contact}
-          onChange={(e) => setContact(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:ring-1 focus:ring-gray-500 focus:outline-none"
-        >
-          {CONTACT_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt.charAt(0).toUpperCase() + opt.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
-
-      {toast && (
-        <div
-          className={`rounded-md px-4 py-2 text-sm ${
-            toast.type === "success"
-              ? "bg-green-50 text-green-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {toast.message}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="current_intro">
+            Intro &mdash; how you&rsquo;d introduce yourself at the table
+          </Label>
+          <Textarea
+            id="current_intro"
+            name="current_intro"
+            rows={4}
+            value={intro}
+            onChange={(e) => setIntro(e.target.value)}
+            placeholder="How would you introduce yourself to the group?"
+          />
         </div>
-      )}
-    </form>
+
+        <div>
+          <Label htmlFor="current_ask">
+            Ask &mdash; one specific thing the room could help with
+          </Label>
+          <Textarea
+            id="current_ask"
+            name="current_ask"
+            rows={4}
+            value={ask}
+            onChange={(e) => setAsk(e.target.value)}
+            placeholder="What can the group help you with?"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="contact_preference">Preferred contact</Label>
+          <Select
+            id="contact_preference"
+            name="contact_preference"
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+          >
+            {CONTACT_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt.charAt(0).toUpperCase() + opt.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving\u2026" : "Save"}
+        </Button>
+
+        {toast && (
+          <div
+            className={`rounded-md px-4 py-2 text-sm ${
+              toast.type === "success"
+                ? "bg-[#E4E9D4] text-moss-600"
+                : "bg-[#F2D4CB] text-ember-600"
+            }`}
+          >
+            {toast.message}
+          </div>
+        )}
+      </form>
     </div>
   );
 }
