@@ -7,8 +7,14 @@ import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
 import { H1, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
+import PurchaseConfetti from "./purchase-confetti";
 
-export default async function PortalPage() {
+export default async function PortalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ purchased?: string }>;
+}) {
+  const { purchased } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -119,6 +125,8 @@ export default async function PortalPage() {
           </Card>
         )}
       </div>
+
+      {purchased === "true" && <PurchaseConfetti />}
     </div>
   );
 }

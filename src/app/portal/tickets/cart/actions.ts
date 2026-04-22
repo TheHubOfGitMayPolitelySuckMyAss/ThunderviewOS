@@ -98,7 +98,7 @@ export async function purchaseTicket(formData: FormData) {
       amount_paid: String(amountPaid),
     },
     customer_email: memberEmail!.email,
-    success_url: `${origin}/portal/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}/portal?purchased=true`,
     cancel_url: `${origin}/portal/tickets`,
   });
 
