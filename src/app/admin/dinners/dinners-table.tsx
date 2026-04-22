@@ -157,7 +157,7 @@ const DinnerRow = forwardRef<HTMLTableRowElement, { dinner: DinnerStat; isNext: 
           {dinner.paid}
         </td>
         <td className="w-20 px-2 py-3 text-center text-[14px] tabular-nums text-fg2">
-          {dinner.introAsk || "\u2014"}
+          {isNext ? dinner.introAsk : "\u2014"}
         </td>
         <td className="relative z-10 w-20 px-2 py-3 text-center text-[14px]">
           {isPending ? (
