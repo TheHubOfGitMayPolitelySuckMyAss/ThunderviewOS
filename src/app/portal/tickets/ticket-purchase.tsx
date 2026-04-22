@@ -66,33 +66,41 @@ export default function TicketPurchase({
       </div>
 
       {/* Buy buttons */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => handlePurchase(false)}
-          disabled={isPending}
-          className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <div className="font-semibold text-[15px] text-fg1 mb-1">Buy ticket</div>
-          <div className="text-[13px] text-fg3">Just you at the table.</div>
-          <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
-            {isPending ? "Processing…" : `$${ticketPrice}`}
-          </div>
-        </button>
-
-        {showGuestButton && (
+      {showGuestButton ? (
+        <div className="flex gap-3">
+          <button
+            onClick={() => handlePurchase(false)}
+            disabled={isPending}
+            className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="font-semibold text-[15px] text-fg1 mb-1">{ticketLabel}</div>
+            <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
+              {isPending ? "Processing…" : `$${ticketPrice}`}
+            </div>
+          </button>
           <button
             onClick={() => handlePurchase(true)}
             disabled={isPending}
             className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <div className="font-semibold text-[15px] text-fg1 mb-1">Buy ticket + guest</div>
-            <div className="text-[13px] text-fg3">Bring someone along.</div>
+            <div className="font-semibold text-[15px] text-fg1 mb-1">{ticketLabel} + Guest</div>
             <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
               {isPending ? "Processing…" : `$${ticketPrice + 40}`}
             </div>
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => handlePurchase(false)}
+          disabled={isPending}
+          className="w-full p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <div className="font-semibold text-[15px] text-fg1 mb-1">{ticketLabel}</div>
+          <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
+            {isPending ? "Processing…" : `$${ticketPrice}`}
+          </div>
+        </button>
+      )}
 
       <p className="text-[12.5px] text-fg3 leading-[1.5]">
         Ticket price covers the meal. You&rsquo;ll be redirected to Stripe to complete payment.
