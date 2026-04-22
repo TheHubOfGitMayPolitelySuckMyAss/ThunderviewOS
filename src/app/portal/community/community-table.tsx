@@ -89,7 +89,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
       <div className="mb-4">
         <Input
           type="text"
-          placeholder="Search name, company, role\u2026"
+          placeholder="Search name, company, role…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="!max-w-sm"
