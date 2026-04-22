@@ -74,11 +74,11 @@ export default async function HomePage() {
           {/* Hero photo */}
           <div className="relative aspect-video rounded-[16px] overflow-hidden shadow-lg">
             <Image
-              src="/brand/photos/dinner-02-audience-laughing.webp"
-              alt="CEOs laughing at a Thunderview dinner"
+              src="/brand/photos/dinner-03-two-guys-pointing.webp"
+              alt="Two CEOs at a Thunderview dinner"
               fill
               className="object-cover"
-              style={{ objectPosition: "center 40%" }}
+              style={{ objectPosition: "30% 40%" }}
               priority
             />
             <div className="absolute left-5 bottom-5 bg-[rgba(251,247,240,0.92)] backdrop-blur-[8px] rounded-pill px-4 py-2 text-[12.5px] text-fg2 font-medium">
