@@ -3,6 +3,7 @@ import { formatDinnerDisplay, formatName } from "@/lib/format";
 import { getTodayMT } from "@/lib/format";
 import Link from "next/link";
 import MemberAvatar from "@/components/member-avatar";
+import { H1, Eyebrow, Body } from "@/components/ui/typography";
 
 export default async function RecapPage() {
   const admin = createAdminClient();
@@ -19,11 +20,9 @@ export default async function RecapPage() {
 
   if (!dinner) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-8">
-        <h2 className="text-2xl font-bold text-gray-900">
-          Last Month&rsquo;s Intros &amp; Asks
-        </h2>
-        <p className="mt-4 text-gray-500">No dinners yet.</p>
+      <div className="max-w-[980px] mx-auto px-8 py-10">
+        <H1>Last Month&rsquo;s Intros &amp; Asks</H1>
+        <Body className="mt-4">No dinners yet.</Body>
       </div>
     );
   }
@@ -54,8 +53,7 @@ export default async function RecapPage() {
 
   const rows = (tickets ?? []) as unknown as AttendeeRow[];
 
-  // Deduplicate by member_id (qty=2 tickets are one row, but just in case),
-  // exclude kicked-out and no-community-access
+  // Deduplicate by member_id, exclude kicked-out and no-community-access
   const seen = new Set<string>();
   const attendees = rows
     .filter((r) => {
@@ -76,65 +74,56 @@ export default async function RecapPage() {
     });
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
-      <h2 className="text-2xl font-bold text-gray-900">
-        Thunderview Dinner &mdash; {formatDinnerDisplay(dinner.date)}
-      </h2>
-      <p className="mt-1 text-sm text-gray-500">
-        {attendees.length} attendee{attendees.length !== 1 ? "s" : ""}
-      </p>
+    <div className="max-w-[980px] mx-auto px-8 py-10">
+      {/* Centered header */}
+      <div className="text-center pb-5 border-b border-line-100 mb-7">
+        <Eyebrow className="mb-1.5">Thunderview Dinner</Eyebrow>
+        <p className="font-display font-medium text-[34px] italic text-clay-600">
+          {formatDinnerDisplay(dinner.date)}
+        </p>
+        <p className="text-fg3 text-[14px] mt-1.5">
+          {attendees.length} attendee{attendees.length !== 1 ? "s" : ""} &middot; here&rsquo;s who was there and what they&rsquo;re working on
+        </p>
+      </div>
 
-      <div className="mt-6 space-y-6">
+      {/* Two-column card grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {attendees.map((m) => (
-          <div key={m.id} className="flex gap-4 rounded-lg border bg-white p-5">
-            <MemberAvatar member={m} size="lg" />
-            <div className="flex-1">
-            <div className="flex items-baseline gap-2">
-              <Link
-                href={`/portal/members/${m.id}`}
-                className="text-lg font-semibold text-blue-600 hover:text-blue-800"
-              >
-                {formatName(m.first_name, m.last_name)}
-              </Link>
-              {m.company_name && (
-                <span className="text-sm text-gray-500">
-                  at {m.company_name}
-                </span>
-              )}
-            </div>
-
-            {(m.current_intro || m.current_ask) && (
-              <div className="mt-3 space-y-2">
-                {m.current_intro && (
-                  <div>
-                    <dt className="text-xs font-medium uppercase text-gray-500">
-                      Intro
-                    </dt>
-                    <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">
-                      {m.current_intro}
-                    </dd>
-                  </div>
-                )}
-                {m.current_ask && (
-                  <div>
-                    <dt className="text-xs font-medium uppercase text-gray-500">
-                      Ask
-                    </dt>
-                    <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">
-                      {m.current_ask}
-                    </dd>
-                  </div>
+          <div key={m.id} className="bg-cream-100 border border-line-100 rounded-lg p-[22px]">
+            <div className="flex items-center gap-3 mb-3.5">
+              <MemberAvatar member={m} size="md" />
+              <div>
+                <Link
+                  href={`/portal/members/${m.id}`}
+                  className="text-[15px] font-semibold text-fg1 no-underline hover:underline"
+                >
+                  {formatName(m.first_name, m.last_name)}
+                </Link>
+                {m.company_name && (
+                  <p className="text-[12.5px] text-fg3">{m.company_name}</p>
                 )}
               </div>
-            )}
             </div>
+
+            {m.current_intro && (
+              <>
+                <p className="font-semibold text-[11px] uppercase tracking-[0.12em] text-clay-600 mt-3 mb-1">Intro</p>
+                <p className="text-[13.5px] leading-[1.55] text-fg2 whitespace-pre-wrap">{m.current_intro}</p>
+              </>
+            )}
+            {m.current_ask && (
+              <>
+                <p className="font-semibold text-[11px] uppercase tracking-[0.12em] text-clay-600 mt-3 mb-1">Ask</p>
+                <p className="text-[13.5px] leading-[1.55] text-fg2 whitespace-pre-wrap">{m.current_ask}</p>
+              </>
+            )}
           </div>
         ))}
-
-        {attendees.length === 0 && (
-          <p className="text-gray-500">No attendees for this dinner.</p>
-        )}
       </div>
+
+      {attendees.length === 0 && (
+        <Body className="text-fg3 mt-4">No attendees for this dinner.</Body>
+      )}
     </div>
   );
 }
