@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { purchaseTicket } from "./cart/actions";
 import { allowsGuestTicket } from "@/lib/ticket-rules";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { FieldHelp } from "@/components/ui/field-help";
 
 type DinnerOption = {
   id: string;
@@ -41,71 +44,65 @@ export default function TicketPurchase({
   }
 
   return (
-    <div className="mt-8 space-y-6">
+    <div className="space-y-5">
       {/* Dinner dropdown */}
       <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Select Dinner
-        </label>
-        <select
+        <Label>Which dinner?</Label>
+        <Select
           value={selectedDinnerId}
           onChange={(e) => setSelectedDinnerId(e.target.value)}
-          className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {dinnerOptions.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.label}
+              {d.label} — ${ticketPrice}
             </option>
           ))}
-        </select>
+        </Select>
         {selectedDinner?.isPast && (
-          <p className="mt-1 text-xs text-amber-600">
+          <FieldHelp className="!text-mustard-500">
             Buying a ticket for a past dinner.
-          </p>
+          </FieldHelp>
         )}
       </div>
 
-      {/* Ticket info + buy buttons */}
-      <div className="rounded-lg border-2 border-gray-200 bg-white px-6 py-6 shadow-sm">
-        <p className="text-lg font-semibold text-gray-900">{ticketLabel}</p>
-        <p className="mt-1 text-2xl font-bold text-gray-900">${ticketPrice}</p>
-        {memberEmail && (
-          <p className="mt-1 text-xs text-gray-400">
-            Receipt to {memberEmail}
-          </p>
-        )}
+      {/* Buy buttons */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => handlePurchase(false)}
+          disabled={isPending}
+          className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <div className="font-semibold text-[15px] text-fg1 mb-1">Buy ticket</div>
+          <div className="text-[13px] text-fg3">Just you at the table.</div>
+          <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
+            {isPending ? "Processing…" : `$${ticketPrice}`}
+          </div>
+        </button>
 
-        <div className="mt-6">
-          {showGuestButton ? (
-            <div className="flex gap-3">
-              <button
-                onClick={() => handlePurchase(false)}
-                disabled={isPending}
-                className="flex-1 rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-              >
-                {isPending ? "Processing..." : `Buy Ticket — $${ticketPrice}`}
-              </button>
-              <button
-                onClick={() => handlePurchase(true)}
-                disabled={isPending}
-                className="flex-1 rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-              >
-                {isPending
-                  ? "Processing..."
-                  : `Buy Ticket + Guest — $${ticketPrice + 40}`}
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => handlePurchase(false)}
-              disabled={isPending}
-              className="w-full rounded-lg bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              {isPending ? "Processing..." : "Buy Ticket"}
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => showGuestButton && handlePurchase(true)}
+          disabled={isPending || !showGuestButton}
+          className={`flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left transition-all duration-[var(--tv-dur-fast)] ${
+            showGuestButton
+              ? "cursor-pointer hover:border-clay-500 hover:bg-cream-100"
+              : "opacity-55 cursor-not-allowed"
+          } disabled:opacity-55 disabled:cursor-not-allowed`}
+        >
+          <div className="font-semibold text-[15px] text-fg1 mb-1">Buy ticket + guest</div>
+          <div className="text-[13px] text-fg3">
+            {showGuestButton
+              ? "Bring someone along."
+              : "Guest spots not open for this dinner."}
+          </div>
+          <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
+            {showGuestButton ? `$${ticketPrice + 40}` : "\u2014"}
+          </div>
+        </button>
       </div>
+
+      <p className="text-[12.5px] text-fg3 leading-[1.5]">
+        Ticket price covers the meal. You&rsquo;ll be redirected to Stripe to complete payment.
+      </p>
     </div>
   );
 }

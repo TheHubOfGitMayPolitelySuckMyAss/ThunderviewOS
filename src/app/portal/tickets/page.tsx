@@ -2,8 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
+import { H1, Lede, Body } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
 import TicketPurchase from "./ticket-purchase";
 
 export default async function TicketSelectionPage() {
@@ -42,26 +45,18 @@ export default async function TicketSelectionPage() {
   // No stagetype set
   if (!member.attendee_stagetypes || member.attendee_stagetypes.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Buy Your Ticket</h1>
-          <p className="mt-4 text-gray-500">
-            Your profile isn&rsquo;t fully set up yet. Please contact{" "}
-            <a
-              href="mailto:eric@marcoullier.com"
-              className="text-blue-600 hover:text-blue-800"
-            >
-              eric@marcoullier.com
-            </a>{" "}
-            for help.
-          </p>
-          <Link
-            href="/portal"
-            className="mt-6 inline-block text-sm text-blue-600 hover:text-blue-800"
-          >
-            &larr; Back to portal
-          </Link>
-        </div>
+      <div className="max-w-[980px] mx-auto px-8 py-10">
+        <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
+          <ArrowLeft size={14} /> Portal home
+        </Link>
+        <H1 className="mt-2">Buy a dinner ticket.</H1>
+        <Body className="mt-4">
+          Your profile isn&rsquo;t fully set up yet. Please contact{" "}
+          <a href="mailto:eric@marcoullier.com" className="text-clay-600 underline decoration-line-200">
+            eric@marcoullier.com
+          </a>{" "}
+          for help.
+        </Body>
       </div>
     );
   }
@@ -123,26 +118,17 @@ export default async function TicketSelectionPage() {
 
   if (dinnerOptions.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Buy Your Ticket</h1>
-          <p className="mt-4 text-gray-500">
-            No upcoming dinners available. Please contact{" "}
-            <a
-              href="mailto:eric@marcoullier.com"
-              className="text-blue-600 hover:text-blue-800"
-            >
-              eric@marcoullier.com
-            </a>
-            .
-          </p>
-          <Link
-            href="/portal"
-            className="mt-6 inline-block text-sm text-blue-600 hover:text-blue-800"
-          >
-            &larr; Back to portal
-          </Link>
-        </div>
+      <div className="max-w-[980px] mx-auto px-8 py-10">
+        <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
+          <ArrowLeft size={14} /> Portal home
+        </Link>
+        <H1 className="mt-2">Buy a dinner ticket.</H1>
+        <Body className="mt-4">
+          No upcoming dinners available. Please contact{" "}
+          <a href="mailto:eric@marcoullier.com" className="text-clay-600 underline decoration-line-200">
+            eric@marcoullier.com
+          </a>.
+        </Body>
       </div>
     );
   }
@@ -157,13 +143,14 @@ export default async function TicketSelectionPage() {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Buy Your Ticket</h1>
-        <p className="mt-2 text-sm text-gray-500">
-          Mercury Cafe, Denver, 6p&ndash;9p
-        </p>
+    <div className="max-w-[980px] mx-auto px-8 py-10">
+      <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
+        <ArrowLeft size={14} /> Portal home
+      </Link>
+      <H1 className="mt-2">Buy a dinner ticket.</H1>
+      <Lede>Pick a date. We&rsquo;ll send details about a week before.</Lede>
 
+      <Card className="mt-6">
         <TicketPurchase
           dinnerOptions={dinnerOptions}
           defaultDinnerId={defaultDinnerId}
@@ -171,14 +158,7 @@ export default async function TicketSelectionPage() {
           ticketPrice={price}
           memberEmail={memberEmail!.email}
         />
-
-        <Link
-          href="/portal"
-          className="mt-6 inline-block text-sm text-blue-600 hover:text-blue-800"
-        >
-          &larr; Back to portal
-        </Link>
-      </div>
+      </Card>
     </div>
   );
 }
