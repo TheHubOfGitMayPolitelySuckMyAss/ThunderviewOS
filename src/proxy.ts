@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { createClient as createAdminSupabaseClient } from "@supabase/supabase-js";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -45,7 +46,11 @@ export async function proxy(request: NextRequest) {
     const isAdmin = email === "eric@marcoullier.com";
 
     if (!isAdmin) {
-      const { data: memberRow } = await supabase
+      const adminClient = createAdminSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: memberRow } = await adminClient
         .from("member_emails")
         .select("members!inner(is_team, kicked_out)")
         .eq("email", email!)
@@ -75,7 +80,11 @@ export async function proxy(request: NextRequest) {
     const isAdmin = email === "eric@marcoullier.com";
 
     if (!isAdmin) {
-      const { data: memberRow } = await supabase
+      const adminClient = createAdminSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: memberRow } = await adminClient
         .from("member_emails")
         .select("members!inner(has_community_access)")
         .eq("email", email!)
