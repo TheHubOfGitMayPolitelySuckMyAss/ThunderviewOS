@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { formatDinnerDisplay } from "@/lib/format";
+import { H1, Body } from "@/components/ui/typography";
+import { Button } from "@/components/ui/button";
 import ConfettiEffect from "@/app/apply/thanks/confetti";
 import Stripe from "stripe";
 
@@ -28,17 +30,14 @@ export default async function TicketSuccessPage({
     try {
       const session = await stripe.checkout.sessions.retrieve(session_id);
       if (session.metadata?.dinner_id) {
-        // Extract dinner date from line item name or metadata
         const amountPaid = session.metadata.amount_paid;
         if (amountPaid) {
           amountDisplay = `$${amountPaid}`;
         }
       }
-      // Get dinner date from the line item name
       if (session.amount_total) {
         amountDisplay = `$${session.amount_total / 100}`;
       }
-      // Fetch dinner date from Supabase using metadata
       if (session.metadata?.dinner_id) {
         const { createAdminClient } = await import("@/lib/supabase/admin");
         const admin = createAdminClient();
@@ -57,27 +56,22 @@ export default async function TicketSuccessPage({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
-      <div className="text-center">
-        <h1 className="mb-4 text-2xl font-bold text-gray-900">
-          Thanks, your ticket is confirmed!
-        </h1>
-        <p className="text-sm leading-relaxed text-gray-700">
-          See you at {dinnerDateDisplay} at the Mercury Cafe.
+    <div className="flex min-h-[60vh] items-center justify-center px-4">
+      <div className="max-w-[540px] mx-auto p-12 text-center bg-cream-100 rounded-xl shadow-glow">
+        <H1 className="mb-4">Ticket confirmed.</H1>
+        <Body>
+          You&rsquo;re on the list for {dinnerDateDisplay}.
           {amountDisplay && (
-            <span className="block mt-1 text-gray-500">
+            <span className="block mt-1 text-fg3">
               Amount paid: {amountDisplay}
             </span>
           )}
-        </p>
-        <p className="mt-3 text-sm text-gray-500">
-          We&rsquo;ll send a reminder a few days before with logistics.
-        </p>
-        <Link
-          href="/portal"
-          className="mt-6 inline-block rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          Back to portal
+        </Body>
+        <Body className="mt-3">
+          We&rsquo;ll send the full roster about a week before with logistics.
+        </Body>
+        <Link href="/portal" className="no-underline mt-6 inline-block">
+          <Button variant="secondary">Back To Portal</Button>
         </Link>
       </div>
       <ConfettiEffect />
