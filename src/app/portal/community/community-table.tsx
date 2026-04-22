@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { formatName, formatStageType } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
+import { Input } from "@/components/ui/input";
 
 type Member = {
   id: string;
@@ -73,68 +75,65 @@ export default function CommunityTable({ members }: { members: Member[] }) {
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const thClass =
-    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
-
-  function SortIndicator({ col }: { col: SortKey }) {
+  function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return null;
-    return (
-      <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>
+    return sortDir === "asc" ? (
+      <ArrowUp size={12} className="inline ml-1" />
+    ) : (
+      <ArrowDown size={12} className="inline ml-1" />
     );
   }
 
   return (
     <div>
       <div className="mb-4">
-        <input
+        <Input
           type="text"
-          placeholder="Search members..."
+          placeholder="Search name, company, role\u2026"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          className="!max-w-sm"
         />
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="sticky top-0 z-10 bg-gray-50">
+      <div className="rounded-xl border border-line-200 bg-cream-50 overflow-hidden">
+        <table className="w-full border-collapse">
+          <thead>
             <tr>
-              <th className={thClass} onClick={() => toggleSort("name")}>
-                Name
-                <SortIndicator col="name" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("company")}>
-                Company
-                <SortIndicator col="company" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("role")}>
-                Role
-                <SortIndicator col="role" />
-              </th>
+              {(["name", "company", "role"] as SortKey[]).map((col) => (
+                <th
+                  key={col}
+                  onClick={() => toggleSort(col)}
+                  className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-[18px] py-3 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10"
+                >
+                  {col === "name" ? "Name" : col === "company" ? "Company" : "Role"}
+                  <SortIcon col={col} />
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody>
             {sorted.map((member) => (
               <tr
                 key={member.id}
-                className="group relative cursor-pointer hover:bg-gray-50"
+                className="group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100"
               >
-                <td className="px-4 py-3 text-sm text-gray-900">
+                <td className="px-[18px] py-3.5 text-sm">
                   <Link
                     href={`/portal/members/${member.id}`}
-                    className="flex items-center gap-2 after:absolute after:inset-0"
+                    className="flex items-center gap-3 text-fg1 font-medium no-underline after:absolute after:inset-0"
                   >
                     <MemberAvatar member={member} size="sm" />
                     {formatName(member.first_name, member.last_name)}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {member.company_name || "-"}
+                <td className="px-[18px] py-3.5 text-[13px] text-fg2">
+                  {member.company_name || "\u2014"}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className="px-[18px] py-3.5 text-[13px] text-fg3">
                   {member.attendee_stagetypes.length > 0
                     ? member.attendee_stagetypes.map(formatStageType).join(", ")
-                    : "-"}
+                    : "\u2014"}
                 </td>
               </tr>
             ))}
@@ -142,7 +141,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
               <tr>
                 <td
                   colSpan={3}
-                  className="px-4 py-8 text-center text-sm text-gray-400"
+                  className="px-[18px] py-8 text-center text-sm text-fg4"
                 >
                   No members found.
                 </td>
@@ -152,9 +151,9 @@ export default function CommunityTable({ members }: { members: Member[] }) {
         </table>
       </div>
 
-      <p className="mt-2 text-xs text-gray-400">
+      <p className="mt-2 text-xs text-fg4">
         {sorted.length} member{sorted.length !== 1 ? "s" : ""}
-        {search ? ` matching "${search}"` : ""}
+        {search ? ` matching \u201C${search}\u201D` : ""}
       </p>
     </div>
   );

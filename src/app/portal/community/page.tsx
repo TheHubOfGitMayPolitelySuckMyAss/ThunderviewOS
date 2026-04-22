@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { H1, Lede } from "@/components/ui/typography";
 import CommunityTable from "./community-table";
 
 // PostgREST on Supabase caps responses at 1000 rows server-side.
@@ -33,8 +34,11 @@ export default async function CommunityPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      <h2 className="mb-6 text-2xl font-bold text-gray-900">Community</h2>
+    <div className="max-w-[980px] mx-auto px-8 py-10">
+      <H1 className="mb-1">Community</H1>
+      <Lede className="mb-6">
+        {members.length} members with community access.
+      </Lede>
       <CommunityTable members={members} />
     </div>
   );
