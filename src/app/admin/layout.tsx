@@ -52,7 +52,7 @@ export default async function AdminLayout({
   const initials = firstInitial + lastInitial;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col tv-surface">
       <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} profilePicUrl={member?.profile_pic_url ?? null} />
       <AdminShell>{children}</AdminShell>
     </div>

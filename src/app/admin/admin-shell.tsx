@@ -3,13 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navItems = [
-  { href: "/admin", label: "Dashboard", exact: true },
-  { href: "/admin/dinners", label: "Dinners" },
-  { href: "/admin/members", label: "Members" },
-  { href: "/admin/applications", label: "Applications" },
-  { href: "/admin/tickets", label: "Tickets" },
-  { href: "/admin/emails", label: "Emails" },
+const NAV_GROUPS = [
+  {
+    label: "Operations",
+    items: [
+      { href: "/admin", label: "Dashboard", exact: true },
+      { href: "/admin/dinners", label: "Dinners" },
+      { href: "/admin/tickets", label: "Tickets" },
+      { href: "/admin/applications", label: "Applications" },
+      { href: "/admin/members", label: "Members" },
+    ],
+  },
+  {
+    label: "Communication",
+    items: [
+      { href: "/admin/emails", label: "Emails" },
+    ],
+  },
 ];
 
 export default function AdminShell({
@@ -22,32 +32,39 @@ export default function AdminShell({
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
-      <aside className="flex w-56 flex-col bg-gray-900 text-white">
-        <nav className="flex-1 space-y-1 px-2 py-4">
-          {navItems.map((item) => {
-            const active = (item as { exact?: boolean }).exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`block rounded px-3 py-2 text-sm ${
-                  active
-                    ? "bg-gray-700 font-medium text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+      <aside className="flex w-[220px] flex-col bg-cream-100 border-r border-line-200">
+        <nav className="flex-1 px-3 py-5">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <div className="px-3 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-fg3">
+                {group.label}
+              </div>
+              {group.items.map((item) => {
+                const active = (item as { exact?: boolean }).exact
+                  ? pathname === item.href
+                  : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center justify-between rounded-md px-3 py-[9px] text-sm font-medium no-underline mb-0.5 ${
+                      active
+                        ? "bg-ink-900 text-cream-50"
+                        : "text-fg2 hover:bg-cream-200"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </aside>
 
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-cream-50 px-10 py-8">{children}</main>
       </div>
     </div>
   );
