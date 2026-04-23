@@ -78,10 +78,10 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-accent text-[13px] font-semibold text-cream-50 cursor-pointer overflow-hidden transition-colors duration-[120ms]"
+          className="flex h-[40px] w-[40px] items-center justify-center rounded-full bg-accent text-sm font-semibold text-cream-50 cursor-pointer overflow-hidden transition-colors duration-[120ms]"
         >
           {profilePicUrl ? (
-            <Image src={profilePicUrl} alt={initials} width={36} height={36} className="h-[36px] w-[36px] rounded-full object-cover" unoptimized />
+            <Image src={profilePicUrl} alt={initials} width={40} height={40} className="h-[40px] w-[40px] rounded-full object-cover" unoptimized />
           ) : (
             initials
           )}
