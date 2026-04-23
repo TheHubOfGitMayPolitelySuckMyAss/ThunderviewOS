@@ -59,7 +59,7 @@ export default async function ApplyPage() {
   }
 
   const schedule: { label: string; isOff: boolean }[] = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     let m = currentMonth + i;
     let y = currentYear;
     if (m > 12) {
