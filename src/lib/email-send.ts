@@ -187,18 +187,18 @@ export async function sendNewApplicationNotification(application: {
     const adminUrl = `${siteUrl}/admin/applications/${application.id}`;
 
     const subject = `New Application: ${application.firstName} ${application.lastName} (${application.companyName})`;
-    const body = [
-      `<a href="${adminUrl}">Review Application →</a>`,
+    const bodyText = [
+      `New application from ${application.firstName} ${application.lastName} at ${application.companyName}.`,
       ``,
-      `<strong>${application.firstName} ${application.lastName}</strong>`,
-      `${application.companyName}`,
       application.companyWebsite ? `Website: ${application.companyWebsite}` : null,
       application.linkedinProfile ? `LinkedIn: ${application.linkedinProfile}` : null,
       `Email: ${application.email}`,
       `Type: ${application.attendeeStagetype}`,
     ]
       .filter(Boolean)
-      .join("<br>");
+      .join("\n");
+
+    const ctaHtml = `<a href="${adminUrl}" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:16px 0 6px;">Review Application</a>`;
 
     // Admin is hard-coded (no is_admin column in DB)
     const recipients = ["eric@marcoullier.com"];
@@ -207,7 +207,7 @@ export async function sendNewApplicationNotification(application: {
       from: EMAIL_FROM,
       to: recipients,
       subject,
-      html: body,
+      html: bodyToHtml(bodyText, ctaHtml),
     });
   } catch (err) {
     console.error("[email] Failed to send new application notification:", err);
@@ -236,8 +236,8 @@ export async function sendMorningOfEmail(
         .replace(/\[dinner\.venue\]/g, venue)
         .replace(/\[dinner\.address\]/g, address);
 
-    const templateHtml = bodyToHtml(render(template.body));
-    const fullHtml = `${templateHtml}<br><br><hr><br><strong>Tonight's Attendees</strong><br><br>${attendeeHtml}`;
+    const appendedHtml = `<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight\u2019s Attendees</p>${attendeeHtml}`;
+    const fullHtml = bodyToHtml(render(template.body), appendedHtml);
 
     await resend.emails.send({
       from: EMAIL_FROM,
