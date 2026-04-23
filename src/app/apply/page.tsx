@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
 import PublicNav from "@/components/public-nav";
+import { Eyebrow } from "@/components/ui/typography";
 import ApplicationForm from "./application-form";
 
 function ordinalDay(day: number): string {
@@ -83,46 +84,65 @@ export default async function ApplyPage() {
   }
 
   return (
-    <div className="tv-surface tv-paper min-h-screen">
+    <div className="tv-surface min-h-screen">
       <PublicNav />
-      <div className="mx-auto max-w-[640px] tv-page-gutter pt-8 pb-9">
-        <h1 className="tv-h2 !text-[44px] mb-3">Apply to attend.</h1>
-        <p className="text-[17px] text-fg2 leading-[1.5] mb-7" style={{ textWrap: "pretty" }}>
-          Every dinner is vetted. This form is how we learn who you are. It takes two minutes,
-          it&rsquo;s not a quiz, and we&rsquo;ll be in touch within a week.
-        </p>
-
-        <div className="space-y-form-row text-[14px] text-fg2 leading-relaxed mb-7">
-          <p>
-            CEO tickets are $40 and VC tickets are $100.
-            If you can&rsquo;t afford the dinner ticket (it happens), send an email to{" "}
-            <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
-              eric@marcoullier.com
-            </a>{" "}
-            and we&rsquo;ll make it work.
-          </p>
-          <p>
-            All information provided will be held in strict confidence and is only used to ensure
-            we have a balanced and diverse group of dinner attendees. Historically underrepresented
-            founders get first access to tickets each month.
-          </p>
-          <p>
-            In case you can&rsquo;t make the {nextDinnerDate} dinner, our upcoming schedule
-            is listed below.
-          </p>
+      <div className="mx-auto max-w-[680px] tv-page-gutter pt-8 pb-9">
+        {/* Header */}
+        <div className="mb-6">
+          <Eyebrow className="mb-2.5">Apply to attend</Eyebrow>
+          <h1 className="font-display font-medium text-[44px] leading-[1.05] tracking-[-0.015em] mb-4" style={{ fontVariationSettings: '"opsz" 144' }}>
+            Sign Up to Attend a CEO Dinner
+          </h1>
+          <div className="text-[16px] leading-[1.55] text-fg2 space-y-4" style={{ textWrap: "pretty" }}>
+            <p>
+              If you are interested in attending a dinner, please fill out the
+              following form. When you are selected, we&rsquo;ll send you a URL
+              and invite code that you can use on this web site to purchase your
+              ticket. CEO tickets are $40 and VC tickets are $100.
+            </p>
+            <p>
+              If you can&rsquo;t afford the dinner ticket (it happens), send an
+              email to{" "}
+              <a
+                href="mailto:eric@marcoullier.com"
+                className="text-accent-hover underline decoration-border"
+              >
+                eric@marcoullier.com
+              </a>{" "}
+              and we&rsquo;ll make it work.
+            </p>
+            <p>
+              Please note that all information provided will be held in strict
+              confidence and is only used to ensure we have a balanced and diverse
+              group of dinner attendees. Historically underrepresented founders get
+              first access to tickets each month. We won&rsquo;t share, sell or
+              distribute your information to anyone else.
+            </p>
+            <p>
+              In case you can&rsquo;t make the {nextDinnerDate} dinner, our
+              upcoming schedule is listed below. All dinners will be held at the
+              Mercury Cafe in Denver and run from 6p to 9p. Please sign up for the
+              first dinner that works with your schedule.
+            </p>
+          </div>
         </div>
 
-        {/* Dinner schedule */}
-        <ul className="space-y-1 mb-7">
-          {schedule.map((s, i) => (
-            <li
-              key={i}
-              className={`text-sm ${s.isOff ? "italic text-fg4" : "text-fg2"}`}
-            >
-              {s.label}
-            </li>
-          ))}
-        </ul>
+        {/* Schedule panel */}
+        <div className="bg-bg-elevated border border-border-subtle rounded-lg px-6 py-5 mb-8">
+          <h3 className="font-sans font-semibold text-[11px] uppercase tracking-[0.12em] text-fg3 mb-3">
+            Upcoming schedule
+          </h3>
+          <ul className="list-none p-0 m-0 columns-2 max-sm:columns-1" style={{ columnGap: "32px" }}>
+            {schedule.map((s, i) => (
+              <li
+                key={i}
+                className={`text-[14px] py-1 break-inside-avoid ${s.isOff ? "italic text-fg4" : "text-fg1"}`}
+              >
+                {s.label}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <ApplicationForm />
       </div>

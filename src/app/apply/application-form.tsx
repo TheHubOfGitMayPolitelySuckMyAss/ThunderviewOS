@@ -93,7 +93,7 @@ export default function ApplicationForm() {
     <form onSubmit={handleSubmit} className="space-y-7">
       {/* PERSONAL INFORMATION */}
       <section>
-        <Eyebrow className="border-b border-border pb-2.5 mb-5">
+        <Eyebrow className="border-b border-border-subtle pb-2.5 mb-5">
           Personal Information
         </Eyebrow>
         <div className="space-y-form-row">
@@ -194,7 +194,7 @@ export default function ApplicationForm() {
 
       {/* COMPANY INFORMATION */}
       <section>
-        <Eyebrow className="border-b border-border pb-2.5 mb-5">
+        <Eyebrow className="border-b border-border-subtle pb-2.5 mb-5">
           Company Information
         </Eyebrow>
         <div className="space-y-form-row">
