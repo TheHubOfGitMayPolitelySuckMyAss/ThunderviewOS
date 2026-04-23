@@ -15,7 +15,11 @@ export const EMAIL_FROM = "Thunderview Team <team@thunderviewceodinners.com>";
  * body content area, and a warm footer.
  */
 export function bodyToHtml(body: string, appendHtml?: string): string {
-  const rendered = body.replace(/\n/g, "<br>");
+  // Line breaks → <br>, and add inline clay link color to bare <a> tags
+  // (email clients strip <style> blocks, so links must be inline-styled)
+  const rendered = body
+    .replace(/\n/g, "<br>")
+    .replace(/<a(?![^>]*style=)([^>]*>)/g, '<a style="color:#9A7A5E;"$1');
   const extra = appendHtml ? `\n${appendHtml}` : "";
 
   return `<!DOCTYPE html>
@@ -66,7 +70,7 @@ Thunderview CEO Dinners &middot; Denver, CO
  * raw HTML including button markup.
  */
 export function emailCtaButton(label: string, href: string): string {
-  return `<a href="${href}" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:8px 0 6px;">${label}</a>`;
+  return `<a href="${href}" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:16px 0 6px;">${label}</a>`;
 }
 
 /**
