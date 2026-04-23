@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
-import { H1, Body } from "@/components/ui/typography";
+import { H1 } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
 import PurchaseConfetti from "./purchase-confetti";
@@ -87,17 +88,36 @@ export default async function PortalPage({
 
   return (
     <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
-      <H1 className="mb-1.5">
+      <H1 className="mb-6">
         {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
       </H1>
-      <Body className="mb-6">
-        {bannerDinnerDate
-          ? <>You&rsquo;re coming to the {formatDinnerDisplay(bannerDinnerDate)} dinner. Here&rsquo;s your corner of Thunderview.</>
-          : <>Here&rsquo;s your corner of Thunderview.</>}
-      </Body>
 
-      <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
-        {/* Left column: navigation buttons */}
+      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
+        {/* Left column: intro/ask form or dinner photo */}
+        {isMember && bannerDinnerDate ? (
+          <Card>
+            <PortalForm
+              initialIntro={member.current_intro}
+              initialAsk={member.current_ask}
+              initialContact={member.contact_preference}
+              bannerDinnerDate={formatDinnerDisplay(bannerDinnerDate)}
+              bannerIntroAskFresh={introAskFresh}
+            />
+          </Card>
+        ) : (
+          <div className="rounded-lg overflow-hidden">
+            <Image
+              src="/brand/photos/dinner-10-laughing-pair.webp"
+              alt="Thunderview CEO Dinner"
+              width={640}
+              height={427}
+              className="w-full h-full object-cover rounded-lg"
+              priority
+            />
+          </div>
+        )}
+
+        {/* Right column: navigation buttons */}
         <div>
           {navButtons.map((btn) => (
             <Link
@@ -110,19 +130,6 @@ export default async function PortalPage({
             </Link>
           ))}
         </div>
-
-        {/* Right column: inline edit form */}
-        {isMember && (
-          <Card>
-            <PortalForm
-              initialIntro={member.current_intro}
-              initialAsk={member.current_ask}
-              initialContact={member.contact_preference}
-              bannerDinnerDate={bannerDinnerDate ? formatDinnerDisplay(bannerDinnerDate) : null}
-              bannerIntroAskFresh={introAskFresh}
-            />
-          </Card>
-        )}
       </div>
 
       {purchased === "true" && <PurchaseConfetti />}

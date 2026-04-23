@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { saveProfile } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ type ProfileFormProps = {
 };
 
 export default function ProfileForm({ member }: ProfileFormProps) {
+  const router = useRouter();
   const [firstName, setFirstName] = useState(member.firstName);
   const [lastName, setLastName] = useState(member.lastName);
   const [companyName, setCompanyName] = useState(member.companyName ?? "");
@@ -142,6 +144,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     setSelectedFile(null);
     setPicPreview(null);
     setRemovePic(false);
+    router.refresh();
   }
 
   function handleCropCancel() {
@@ -179,6 +182,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     showToast("Photo removed!", "success");
     setProfilePicUrl(null);
     setRemovePic(false);
+    router.refresh();
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
