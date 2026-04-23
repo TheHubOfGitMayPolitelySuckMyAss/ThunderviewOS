@@ -85,7 +85,7 @@ export default async function PortalPage({
       </H1>
 
       {isMember && bannerDinnerDate && (
-        <div className="rounded-lg border border-tan-300 bg-bg-elevated px-5 py-3.5 flex items-center gap-3 mb-6">
+        <div className="rounded-lg border border-accent-soft bg-bg-elevated px-5 py-3.5 flex items-center gap-3 mb-6">
           <Check size={18} className="text-accent flex-shrink-0" />
           <span className="text-[14.5px] text-fg2 leading-[1.5]">
             You&rsquo;re confirmed for <strong className="text-fg1">{formatDinnerDisplay(bannerDinnerDate)}</strong>.
