@@ -73,7 +73,7 @@ export default function PortalForm({
         </div>
       )}
 
-      <Eyebrow className="!mt-6">Your Intro & Ask</Eyebrow>
+      <Eyebrow className="!mt-5">Your Intro & Ask</Eyebrow>
       <p className="text-[13px] text-fg3 -mt-1 mb-4">
         We send these around a week before each dinner so people know who to find you for.
       </p>

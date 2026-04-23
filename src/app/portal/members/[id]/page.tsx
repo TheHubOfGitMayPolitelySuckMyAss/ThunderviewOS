@@ -65,7 +65,7 @@ export default async function MemberProfilePage({
         <ArrowLeft size={14} /> Community
       </Link>
 
-      <div className="flex items-center gap-5 mt-3 mb-6">
+      <div className="flex items-center gap-5 mt-3 mb-5">
         <MemberAvatar member={member} size="lg" />
         <div className="flex-1">
           <H1 className="!m-0">{name}</H1>

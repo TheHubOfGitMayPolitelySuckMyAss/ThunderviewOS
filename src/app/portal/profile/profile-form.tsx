@@ -372,7 +372,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
             </div>
           </Field>
 
-          <Eyebrow className="mt-8 mb-4">Intro & Ask</Eyebrow>
+          <Eyebrow className="mt-7 pt-5 border-t border-border-subtle mb-4">Intro & Ask</Eyebrow>
 
           <Field label="Intro">
             <Textarea
