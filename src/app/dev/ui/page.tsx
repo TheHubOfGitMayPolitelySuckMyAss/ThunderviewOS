@@ -54,7 +54,7 @@ export default function DevUIPage() {
 
   return (
     <div className="tv-surface min-h-screen">
-      <div className="max-w-[1040px] mx-auto px-8 py-12">
+      <div className="tv-container-marketing tv-page-gutter py-12">
         <H1 className="mb-2">UI Primitives</H1>
         <Lede className="mb-10">Dev-only showcase. Every primitive in every relevant state.</Lede>
 

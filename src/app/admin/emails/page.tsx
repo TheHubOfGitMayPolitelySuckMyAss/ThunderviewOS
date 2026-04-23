@@ -47,7 +47,7 @@ const transactionalEmails = [
 
 export default function EmailsPage() {
   return (
-    <div className="max-w-[1280px]">
+    <div className="tv-container-admin">
       <h1 className="tv-h2 !text-[36px] mb-6">Emails</h1>
 
       {/* Marketing */}

@@ -37,7 +37,7 @@ export default async function MembersPage() {
     .order("date", { ascending: true });
 
   return (
-    <div className="max-w-[1280px]">
+    <div className="tv-container-admin">
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="tv-h2 !text-[36px]">Members</h1>
       </div>

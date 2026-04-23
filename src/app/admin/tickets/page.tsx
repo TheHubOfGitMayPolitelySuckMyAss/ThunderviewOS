@@ -65,7 +65,7 @@ export default async function TicketsPage() {
   });
 
   return (
-    <div className="max-w-[1440px]">
+    <div className="tv-container-admin">
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="tv-h2 !text-[36px]">Tickets</h1>
         <span className="text-fg3 text-[14px]">{rows.length} total</span>

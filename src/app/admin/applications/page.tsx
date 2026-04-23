@@ -31,7 +31,7 @@ export default async function ApplicationsPage() {
   const pendingCount = applications.filter((a) => a.status === "pending").length;
 
   return (
-    <div className="max-w-[1280px]">
+    <div className="tv-container-admin">
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="tv-h2 !text-[36px]">Applications</h1>
         <span className="text-fg3 text-[14px]">{applications.length} total &middot; {pendingCount} pending</span>

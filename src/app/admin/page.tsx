@@ -71,7 +71,7 @@ export default async function DashboardPage() {
     .order("marketing_opted_out_at", { ascending: false });
 
   return (
-    <div className="max-w-[1280px]">
+    <div className="tv-container-admin">
       <div className="flex items-baseline justify-between mb-6">
         <H1 className="!text-[36px]">Dashboard</H1>
         {nextDinner && (

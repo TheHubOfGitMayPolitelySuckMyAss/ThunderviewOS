@@ -86,7 +86,7 @@ export default async function PortalPage({
   ];
 
   return (
-    <div className="max-w-[980px] mx-auto px-8 py-10">
+    <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
       <H1 className="mb-1.5">
         {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
       </H1>

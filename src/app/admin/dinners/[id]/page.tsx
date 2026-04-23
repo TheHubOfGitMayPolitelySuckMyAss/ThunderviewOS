@@ -178,7 +178,7 @@ export default async function DinnerDetailPage({
   });
 
   return (
-    <div className="max-w-[1280px] space-y-6">
+    <div className="tv-container-admin space-y-6">
       {/* Dinner header */}
       <div>
         <Link href="/admin/dinners" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">

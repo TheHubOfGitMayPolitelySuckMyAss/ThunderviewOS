@@ -27,7 +27,7 @@ export default async function HomePage() {
 
       {/* ---- Hero ---- */}
       <section className="tv-paper">
-        <div className="max-w-[1120px] mx-auto px-6 md:px-12 pt-16 md:pt-[72px] pb-10">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter pt-16 md:pt-[72px] pb-10">
           <div className="max-w-[820px] mb-12">
             <Eyebrow className="!text-clay-600 mb-5">Monthly CEO Dinners · Denver, Colorado</Eyebrow>
             <H1 className="mb-7 max-w-[900px]">
@@ -82,7 +82,7 @@ export default async function HomePage() {
 
       {/* ---- Three reasons ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto px-6 md:px-12 py-[72px]">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px]">
           <H2 className="mb-10 max-w-[680px]">
             {/* TODO(eric): confirm copy */}
             Why CEOs keep coming back.
@@ -118,7 +118,7 @@ export default async function HomePage() {
 
       {/* ---- Quote ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto px-6 md:px-12 py-[72px]">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px]">
           <div className="bg-bg-elevated rounded-xl p-14 md:px-16 text-center shadow-glow border border-transparent">
             <p className="font-display italic font-normal text-[32px] leading-[1.3] text-fg1 max-w-[780px] mx-auto mb-6" style={{ textWrap: "balance" }}>
               {/* TODO(eric): confirm copy — real quote from a member */}
@@ -134,7 +134,7 @@ export default async function HomePage() {
 
       {/* ---- Photo gallery ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto px-6 md:px-12 py-[72px]">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px]">
           <H2 className="mb-10">Scenes from the last three years.</H2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
@@ -161,7 +161,7 @@ export default async function HomePage() {
 
       {/* ---- Bottom CTA ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto px-6 md:px-12 py-[72px] text-center">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px] text-center">
           {/* TODO(eric): confirm copy — pull next dinner date from DB? */}
           <H2 className="mx-auto mb-7">Next dinner: first Thursday of the month.</H2>
           {isAuthenticated ? (

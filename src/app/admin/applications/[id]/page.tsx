@@ -20,7 +20,7 @@ export default async function ApplicationDetailPage({
   if (!application) notFound();
 
   return (
-    <div className="max-w-[1280px]">
+    <div className="tv-container-admin">
       <Link
         href="/admin/applications"
         className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
