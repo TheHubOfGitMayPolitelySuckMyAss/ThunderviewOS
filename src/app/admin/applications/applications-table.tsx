@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
+import { Pill } from "@/components/ui/pill";
+import { Input } from "@/components/ui/input";
 
 type Application = {
   id: string;
@@ -16,7 +19,7 @@ type Application = {
   status: string;
 };
 
-const filters = ["All", "Pending", "Approved", "Rejected"] as const;
+const filters = ["Pending", "Approved", "Rejected", "All"] as const;
 
 type SortKey = "name" | "email" | "company" | "stage" | "dinner" | "status" | "submitted";
 type SortDir = "asc" | "desc";
@@ -33,12 +36,22 @@ function getSortValue(app: Application, key: SortKey): string {
   }
 }
 
+function StatusPill({ status }: { status: string }) {
+  const variant = {
+    pending: "warn" as const,
+    approved: "success" as const,
+    rejected: "danger" as const,
+  }[status] ?? "neutral" as const;
+  return <Pill variant={variant} dot>{status.charAt(0).toUpperCase() + status.slice(1)}</Pill>;
+}
+
 export default function ApplicationsTable({
   applications,
 }: {
   applications: Application[];
 }) {
-  const [filter, setFilter] = useState<string>("All");
+  const [filter, setFilter] = useState<string>("Pending");
+  const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("submitted");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -51,12 +64,21 @@ export default function ApplicationsTable({
     }
   }
 
-  const filtered =
+  const byFilter =
     filter === "All"
       ? applications
-      : applications.filter(
-          (a) => a.status === filter.toLowerCase()
+      : applications.filter((a) => a.status === filter.toLowerCase());
+
+  const filtered = search
+    ? byFilter.filter((a) => {
+        const s = search.toLowerCase();
+        return (
+          formatName(a.first_name, a.last_name).toLowerCase().includes(s) ||
+          a.email.toLowerCase().includes(s) ||
+          a.company_name.toLowerCase().includes(s)
         );
+      })
+    : byFilter;
 
   const sorted = [...filtered].sort((a, b) => {
     const av = getSortValue(a, sortKey);
@@ -65,94 +87,96 @@ export default function ApplicationsTable({
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const thClass =
-    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
-
-  function SortIndicator({ col }: { col: SortKey }) {
+  function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return null;
-    return <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
+    return sortDir === "asc" ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
   }
+
+  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
 
   return (
     <div>
-      {/* Filter tabs */}
-      <div className="mb-4 flex gap-2">
-        {filters.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-md px-3 py-1 text-sm font-medium ${
-              filter === f
-                ? "bg-gray-900 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      {/* Search + filter tabs */}
+      <div className="flex items-center gap-3 mb-4">
+        <Input
+          type="text"
+          placeholder="Search name, company, email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="!max-w-[360px]"
+        />
+        <div className="flex gap-1 bg-cream-100 p-1 rounded-md border border-line-200">
+          {filters.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-md text-[13px] font-medium cursor-pointer ${
+                filter === f
+                  ? "bg-ink-900 text-cream-50"
+                  : "bg-transparent text-fg2 hover:bg-cream-200"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="sticky top-0 z-10 bg-gray-50">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-line-200 bg-cream-50">
+        <table className="w-full border-collapse">
+          <thead>
             <tr>
-              <th className={thClass} onClick={() => toggleSort("name")}>
-                Name<SortIndicator col="name" />
+              <th className={thClass} onClick={() => toggleSort("submitted")}>
+                Received<SortIcon col="submitted" />
               </th>
-              <th className={thClass} onClick={() => toggleSort("email")}>
-                Email<SortIndicator col="email" />
+              <th className={thClass} onClick={() => toggleSort("name")}>
+                Name<SortIcon col="name" />
               </th>
               <th className={thClass} onClick={() => toggleSort("company")}>
-                Company<SortIndicator col="company" />
+                Company<SortIcon col="company" />
               </th>
               <th className={thClass} onClick={() => toggleSort("stage")}>
-                Stage/Type<SortIndicator col="stage" />
+                Stage<SortIcon col="stage" />
               </th>
               <th className={thClass} onClick={() => toggleSort("status")}>
-                Status<SortIndicator col="status" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("submitted")}>
-                Submitted<SortIndicator col="submitted" />
+                Status<SortIcon col="status" />
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {sorted.map((app) => (
-              <tr
-                key={app.id}
-                className="group relative cursor-pointer hover:bg-gray-50"
-              >
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  <Link
-                    href={`/admin/applications/${app.id}`}
-                    className="after:absolute after:inset-0"
-                  >
-                    {formatName(app.first_name, app.last_name)}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {app.email}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {app.company_name}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {formatStageType(app.attendee_stagetype)}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <StatusBadge status={app.status} />
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {formatDate(app.submitted_on)}
-                </td>
-              </tr>
-            ))}
+          <tbody>
+            {sorted.map((app) => {
+              const isRejected = app.status === "rejected";
+              return (
+                <tr
+                  key={app.id}
+                  className="group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100"
+                >
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {formatDate(app.submitted_on, { month: "short", day: "numeric", year: "numeric" })}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] font-medium ${isRejected ? "text-fg4 line-through" : "text-fg1"}`}>
+                    <Link
+                      href={`/admin/applications/${app.id}`}
+                      className={`no-underline after:absolute after:inset-0 ${isRejected ? "text-fg4" : "text-fg1"}`}
+                    >
+                      {formatName(app.first_name, app.last_name)}
+                    </Link>
+                  </td>
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {app.company_name}
+                  </td>
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {formatStageType(app.attendee_stagetype)}
+                  </td>
+                  <td className="px-3.5 py-3 text-sm">
+                    <StatusPill status={app.status} />
+                  </td>
+                </tr>
+              );
+            })}
             {sorted.length === 0 && (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-6 text-center text-sm text-gray-400"
-                >
+                <td colSpan={5} className="px-3.5 py-6 text-center text-sm text-fg4">
                   No applications found.
                 </td>
               </tr>
@@ -161,20 +185,5 @@ export default function ApplicationsTable({
         </table>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    approved: "bg-green-100 text-green-800",
-    rejected: "bg-red-100 text-red-800",
-  };
-  return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] || "bg-gray-100 text-gray-800"}`}
-    >
-      {status}
-    </span>
   );
 }
