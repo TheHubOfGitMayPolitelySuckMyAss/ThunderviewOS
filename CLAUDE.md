@@ -24,9 +24,11 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 - **Tailwind CSS 4** (via `@tailwindcss/postcss`)
 - **Supabase**: `@supabase/supabase-js` ^2.103.2, `@supabase/ssr` ^0.10.2
 - **Stripe**: `stripe` ^22.0.2 (Checkout Sessions + refunds, sandbox mode)
-- **Resend** ^6.11.0 (installed, not yet wired)
+- **Resend** ^6.11.0 (all transactional emails wired)
+- **lucide-react** (all icons — no emoji, no unicode arrows)
 - **Hosting**: Vercel (production: https://thunderview-os.vercel.app)
 - **Database**: Supabase project `volrbqcolrqarmquaqvy` (us-west-2)
+- **Design system**: `design-system/` directory at repo root. `README.md` is the visual spec (positioning, content rules, visual foundations, layout invariants, iconography). `colors_and_type.css` is the token source. `ui_kits/` has HTML prototypes (marketing, portal, admin, emails). See "Design system" section below.
 
 ## Key architectural decisions
 
@@ -82,15 +84,32 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 src/
 ├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect (Next.js 16 "proxy", replaces middleware.ts)
 ├── components/
-│   ├── top-nav.tsx                     # Global top nav: logo → /portal, center links (Tickets/Community/Recap), avatar dropdown (Profile/Admin/Sign Out)
-│   └── member-avatar.tsx              # Reusable avatar: shows profile pic if set, initials circle if not. Props: member (first_name, last_name, profile_pic_url), size (sm/md/lg)
+│   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links, avatar dropdown. Uses .tv-nav (64px height)
+│   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team/Gallery), Apply + Sign In (or Portal when authenticated). Server component with auth check
+│   ├── member-avatar.tsx              # Reusable avatar: shows profile pic if set, clay-500 initials circle if not. Props: member (first_name, last_name, profile_pic_url), size (sm/md/lg)
+│   └── ui/                            # Design system primitives (compose these, don't inline)
+│       ├── index.ts                   # Barrel export
+│       ├── button.tsx                 # Primary/secondary/ghost, sm/md/lg, asChild prop for wrapping Links
+│       ├── card.tsx                   # Default/elevated/feature (shadow-glow)/photo variants
+│       ├── pill.tsx                   # Stage/neutral/accent/success/warn/danger with optional dot
+│       ├── avatar.tsx                 # Re-export of member-avatar.tsx
+│       ├── input.tsx                  # Warm focus ring, error state, inset active shadow
+│       ├── textarea.tsx               # Same treatment as input
+│       ├── select.tsx                 # Custom chevron, same treatment
+│       ├── label.tsx                  # 13px medium, optional required asterisk
+│       ├── field-help.tsx             # Hint text, error variant
+│       └── typography.tsx             # Eyebrow, H1–H4, Lede, Body, Small — thin wrappers around .tv-* classes
 ├── lib/supabase/
 │   ├── client.ts                       # Browser client (createBrowserClient)
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
 │   └── admin.ts                        # Service role client (bypasses RLS)
 ├── app/
-│   ├── page.tsx                        # Public marketing placeholder (Thunderview CEO Dinners)
-│   ├── layout.tsx                      # Root layout (Geist fonts, Tailwind)
+│   ├── page.tsx                        # Marketing home: hero + stats + three-reason grid + quote + gallery + CTA. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
+│   ├── layout.tsx                      # Root layout (Inter + Fraunces + JetBrains Mono via next/font/google, Tailwind)
+│   ├── about/page.tsx                  # Placeholder (public-nav + H1)
+│   ├── faq/page.tsx                    # Placeholder (public-nav + H1)
+│   ├── team/page.tsx                   # Placeholder (public-nav + H1)
+│   ├── gallery/page.tsx                # Placeholder (public-nav + H1)
 │   ├── login/page.tsx                  # Magic link sign-in form (client component)
 │   ├── apply/
 │   │   ├── page.tsx                    # Public application form (server wrapper: fetches dinners + schedule)
@@ -105,7 +124,8 @@ src/
 │   ├── portal/
 │   │   ├── layout.tsx                  # Portal layout: auth check, TopNav, wraps all /portal/* pages
 │   │   ├── page.tsx                    # Two-column portal home: nav buttons (left) + inline Intro/Ask/Contact form (right)
-│   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas, Contact dropdown, Save with toast
+│   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas, Contact dropdown, Save with toast. Ticket banner with glow shadow
+│   │   ├── purchase-confetti.tsx       # Client component: fires confetti on ?purchased=true, cleans up param
 │   │   ├── actions.ts                  # Server action: savePortalProfile (updates intro/ask/contact, sets timestamps only on change)
 │   │   ├── sign-out-button.tsx         # Client component: sign-out button (unused — sign-out now in TopNav dropdown)
 │   │   ├── profile/
@@ -122,11 +142,10 @@ src/
 │   │       ├── page.tsx                # Ticket selection: dinner dropdown + buy buttons (server component)
 │   │       ├── ticket-purchase.tsx     # Client component: dinner dropdown, guest-aware buy buttons, calls purchaseTicket action
 │   │       ├── guest/page.tsx          # Legacy guest upsell page (orphaned — no longer navigated to)
-│   │       ├── cart/
-│   │       │   ├── page.tsx            # Legacy cart page (orphaned — no longer navigated to)
-│   │       │   ├── actions.ts          # Server action: purchaseTicket (creates Stripe Checkout Session, redirects to Stripe)
-│   │       │   └── purchase-button.tsx # Legacy purchase button (orphaned — no longer navigated to)
-│   │       └── success/page.tsx        # Post-purchase confirmation: fetches Stripe session for details, confetti
+│   │       └── cart/
+│   │           ├── page.tsx            # Legacy cart page (orphaned — no longer navigated to)
+│   │           ├── actions.ts          # Server action: purchaseTicket (creates Stripe Checkout Session, redirects to Stripe). Success URL → /portal?purchased=true
+│   │           └── purchase-button.tsx # Legacy purchase button (orphaned — no longer navigated to)
 │   ├── api/cron/generate-dinner/
 │   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
 │   ├── api/cron/post-dinner/
@@ -137,6 +156,9 @@ src/
 │   │   └── route.ts                    # Vercel Cron: morning of dinner (7am MT), sends morning-of email to all fulfilled attendees
 │   ├── api/webhooks/stripe/
 │   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
+│   ├── dev/
+│   │   ├── ui/page.tsx                # Dev-only UI primitive showcase (every component in every state)
+│   │   └── emails/[slug]/page.tsx     # Dev-only email template preview with sample data (approval, re-application, rejection, fulfillment, morning-of, admin-notification)
 │   └── admin/
 │       ├── layout.tsx                  # Auth check + role detection + TopNav (server component)
 │       ├── admin-shell.tsx             # Sidebar nav only (client component; header moved to TopNav)
@@ -193,11 +215,17 @@ src/
 │       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management
 ├── lib/
-│   ├── email.ts                        # Shared email constants (EMAIL_FROM) and helpers (bodyToHtml)
-│   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of)
+│   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
+│   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification). All use bodyToHtml() for branded shell
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
 │   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
 │   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
+public/
+├── brand/
+│   ├── photos/                         # 12 candid dinner photos (webp) — used on marketing home + recap
+│   └── logo/
+│       ├── wordmark.svg               # SVG wordmark (needs CSS classes to render text — use text logo in nav instead)
+│       └── monogram.svg               # SVG monogram mark
 supabase/
 ├── migrations/
 │   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
@@ -251,9 +279,9 @@ These are configured in the Supabase dashboard, not in the codebase:
 
 - **Site URL:** `https://thunderview-os.vercel.app`
 - **Redirect URLs allowlist:** `https://thunderview-os.vercel.app/**` and `http://localhost:3000/**`
-- **SMTP:** Currently using Supabase's built-in dev SMTP (rate-limited, has injected unsubscribe footer). Pre-launch must-do: switch to Resend custom SMTP.
+- **SMTP:** Resend custom SMTP (`team@thunderviewceodinners.com`). Switched from built-in SMTP in Sprint 13. Rate limit: 30/hour (adjustable in Supabase dashboard).
 - **Email templates:** Customized via Management API. See "Email template requirements" below.
-- **Magic link rate limits:** Default — 1 request per 60 seconds per email, hourly cap on built-in SMTP.
+- **Magic link rate limits:** Default — 1 request per 60 seconds per email.
 
 ### Email template requirements
 
@@ -355,6 +383,29 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
   - **Switched Supabase auth SMTP to Resend custom SMTP.** Configured in Supabase dashboard (not code). Eliminates the 4/hour rate limit and the injected unsubscribe footer. Sender: `team@thunderviewceodinners.com`.
   - Login input text color fixed (was near-invisible on white background).
 
+## What's done (Design system — Sprints 14–15)
+
+- **Design system installed** (`design-system/` at repo root): tokens, fonts, UI kit prototypes, brand assets. Source of truth for all visual decisions. See `design-system/README.md` for positioning, content rules, visual foundations, layout invariants, iconography, and component rules.
+- **Fonts swapped**: Geist/Geist_Mono replaced with Inter (body/UI), Fraunces (display, variable opsz axis), JetBrains Mono (code) via `next/font/google` in `src/app/layout.tsx`.
+- **Token architecture**: Design tokens use `--tv-` prefix in `:root` to avoid circular references with Tailwind 4's `@theme inline` (which writes to the same CSS custom property namespace). All tokens exposed to Tailwind via `@theme inline` in `src/app/globals.css`. Design system source (`design-system/colors_and_type.css`) uses unprefixed names — the `--tv-` prefix is an app-layer concern only.
+- **No dark mode.** The `prefers-color-scheme: dark` media block was removed. Thunderview is explicitly cream-on-cream, never dark.
+- **UI primitives** in `src/components/ui/`: Button (with `asChild` for wrapping Links), Card, Pill, Input, Textarea, Select, Label, FieldHelp, typography wrappers (Eyebrow, H1–H4, Lede, Body, Small). All pages compose these — no inline buttons, cards, or form inputs.
+- **Brand assets** copied to `public/brand/`: 12 dinner photos (webp), wordmark SVG, monogram SVG.
+- **Marketing home page** (`/`): full branded page with hero photo, stats, three-reason grid, editorial quote, photo gallery, bottom CTA. Conditional auth: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket". Public nav with About/FAQ/Team/Gallery links (placeholder pages scaffolded).
+- **All portal pages restyled**: top-nav, layout, home, profile, community directory, member view, recap, tickets. Cream backgrounds, Fraunces headings, warm borders, design system primitives throughout.
+- **All admin pages restyled**: sidebar (cream-100, grouped nav), dashboard, dinners list + detail, applications list + detail, members list + detail + add-member modal, tickets list, emails index + template editors + morning-of editor. Warm tables, Pill status badges, Lucide sort arrows, Button primitives on modals.
+- **Transactional email HTML shell** (`bodyToHtml()` in `src/lib/email.ts`): Resend-safe table-based layout, cream #FBF7F0 background, 600px max-width, clay-500 top border, Fraunces headings with Georgia fallback, Inter body with system sans fallback, warm footer. All CSS inline. Optional `appendHtml` parameter for morning-of attendee section. `EMAIL_FROM` = "Thunderview Team <team@thunderviewceodinners.com>".
+- **`sendNewApplicationNotification`** now uses the branded email shell (was raw HTML).
+- **Ticket success page removed**: Stripe success URL now redirects to `/portal?purchased=true`. Confetti fires once via `purchase-confetti.tsx`, query param cleaned up silently via `router.replace`.
+- **Guest ticket button hidden** when dinner doesn't allow guests (was shown disabled at 55% opacity).
+- **Intro/Ask column** on dinners list scoped to next upcoming dinner only (was showing for all dinners — pre-existing bug fixed).
+- **Layout invariant tokens** added: nav height (64px), page gutters (24/48px), container widths (marketing 1040, app 1280, admin 1440), vertical rhythm (section-gap 64px, stack-gap 24px, tight-gap 12px), form spacing, table spacing, modal widths, nav internals. All navs now exactly 64px. All pages use `tv-page-gutter` or `tv-container-*`.
+- **Semantic alias conformance sweep**: all raw-scale Tailwind classes (`bg-cream-50`, `border-line-200`, `text-clay-600`, etc.) replaced with semantic aliases (`bg-bg`, `border-border`, `text-accent-hover`). Remaining raw-scale refs are intentional (active nav state, Pill internals).
+- **Broken motion refs fixed**: all `var(--tv-dur-fast)` / `var(--tv-ease-out)` references replaced with literal values — Tailwind arbitrary values can't resolve CSS vars for non-standard properties through `@theme inline`.
+- **Dev routes**: `/dev/ui` (primitive showcase), `/dev/emails/[slug]` (email template preview with sample data). Not linked from any page.
+- **NEEDS DESIGN REVIEW**: admin member detail (`member-detail.tsx`) has no matching UI kit screen — styled using system conventions. Portal uses `max-w-[980px]` not the `--container-app` (1280px) token — deliberate per kit layout, consider adding `--container-portal`.
+- **NEEDS DECISION**: receipt email — using Stripe's built-in receipt. Kit has a design but no sender/template/trigger built. Fulfillment hero photo skipped in email shell — would need per-template image support.
+
 ## What's NOT done
 
 Don't build these without an explicit prompt:
@@ -376,8 +427,13 @@ Don't build these without an explicit prompt:
 
 - ~~Transactional emails via Resend~~ Done — all five templates wired to events
 - ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets`
+- ~~Design system~~ Done — tokens, fonts, primitives, full page restyling, email shell, layout invariants
 - Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
 - Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
+- Restyle remaining unstyled pages: `/login`, `/apply` (application form still uses old gray styles)
+- Add `--container-portal: 980px` token (portal pages use 980px, not the 1280px `--container-app` token)
+- Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in
+- Fulfillment email hero photo: per-template image support if wanted
 
 ## Pre-launch checklist (before real users hit this)
 
@@ -398,4 +454,9 @@ Don't build these without an explicit prompt:
 - **Supabase/PostgREST default row cap.** Supabase limits query results to 1,000 rows by default. This is silent — no error, just truncated results. Any query that might return more than 1,000 rows MUST paginate. This has caused bugs across multiple projects. Always account for it.
 - **Portal pages and proxy use admin client for data queries.** RLS policies on most tables (tickets, dinners, applications, members) only grant SELECT to admin/team. Portal pages authenticate the user via the session client (`createClient`), then use the admin client (`createAdminClient`) for all data reads and writes. The proxy also uses the service role client for member lookups (team check, community access check) — using the session client here caused all non-admin logins to fail because RLS blocked the query. Same pattern as the `/apply` form: authenticate with session, query with admin.
 - **Server action body size limit is 5MB** (set in `next.config.ts` under `experimental.serverActions.bodySizeLimit`). Default Next.js limit is 1MB. Raised because profile pic uploads send a PNG blob from the client-side crop canvas, which can exceed 1MB for larger source images. If this limit needs changing, it's in `next.config.ts`.
+- **CSS token `--tv-` prefix is required in `globals.css`.** Tailwind 4's `@theme inline` writes to the same CSS custom property namespace as `:root`. Without the prefix, `--font-sans: var(--font-sans)` is circular. The design system source (`design-system/colors_and_type.css`) uses unprefixed names; `globals.css` adds the `--tv-` prefix; `@theme inline` references `var(--tv-*)`. If you add a new token, follow this pattern.
+- **Motion values must be literals in Tailwind classes.** `duration-[var(--tv-dur-fast)]` doesn't resolve — Tailwind arbitrary values for non-standard properties can't reach `:root` vars through `@theme inline`. Use literal values: `duration-[120ms]`, `duration-[220ms]`, `duration-[420ms]`.
+- **Semantic alias rule.** App code uses `bg-bg`, `text-fg1`, `border-border` — NOT raw scale names like `bg-cream-50`, `text-ink-900`, `border-line-200`. The raw scale stays in `:root` as underlying definitions. Same for `text-accent-hover` (not `text-clay-600`), `bg-accent` (not `bg-clay-500`). Exceptions: `bg-ink-900`/`text-cream-50` for active nav/filter state (no semantic alias for this pattern), Pill component internals.
+- **Button `asChild` pattern.** Any `<Link>` that looks like a button must use `<Button asChild><Link href="...">Label</Link></Button>`. No anchor-styled-as-button with hand-tuned padding/colors. The Button component merges its classes onto the child element.
+- **`bodyToHtml()` wraps in a full HTML document.** It's no longer just `\n` → `<br>`. Every caller gets a branded shell. The `appendHtml` parameter lets you inject pre-rendered HTML inside the shell (used by morning-of for attendee list). Don't concatenate HTML after calling `bodyToHtml()` — it would land outside the `</html>` tag.
 - **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
