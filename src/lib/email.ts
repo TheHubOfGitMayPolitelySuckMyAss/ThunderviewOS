@@ -1,4 +1,4 @@
-export const EMAIL_FROM = "Eric Marcoullier <team@thunderviewceodinners.com>";
+export const EMAIL_FROM = "Thunderview Team <team@thunderviewceodinners.com>";
 
 /**
  * Wraps plain-text email body (with [variable] substitutions already applied)
