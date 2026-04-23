@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { ArrowRight, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
 import {
@@ -10,12 +11,12 @@ import {
   linkApplicationToMember,
   searchMembers,
 } from "./actions";
-
-const statusColors: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  approved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
-};
+import { Pill } from "@/components/ui/pill";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const REJECTION_REASONS = ["Service Provider", "services business", "Other"];
 
@@ -41,6 +42,15 @@ type ApplicationData = {
   reviewed_at: string | null;
 };
 
+function StatusPill({ status }: { status: string }) {
+  const variant = {
+    pending: "warn" as const,
+    approved: "success" as const,
+    rejected: "danger" as const,
+  }[status] ?? "neutral" as const;
+  return <Pill variant={variant} dot>{status.charAt(0).toUpperCase() + status.slice(1)}</Pill>;
+}
+
 export default function ApplicationDetail({
   application,
 }: {
@@ -57,13 +67,11 @@ export default function ApplicationDetail({
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Re-sync when server refreshes
   useEffect(() => {
     setApp(application);
   }, [application]);
 
   const fullName = formatName(app.first_name, app.last_name);
-  const heading = `${fullName} at ${app.company_name}`;
   const isActiveCEO =
     app.attendee_stagetype === "Active CEO (Bootstrapping or VC-Backed)";
 
@@ -80,7 +88,7 @@ export default function ApplicationDetail({
       }
       if (result.success) {
         if (result.isExisting) {
-          setToast(`${fullName} is already a member — application linked.`);
+          setToast(`${fullName} is already a member \u2014 application linked.`);
           setTimeout(() => setToast(null), 4000);
         }
         router.refresh();
@@ -90,31 +98,30 @@ export default function ApplicationDetail({
 
   function handleLinked(memberName: string) {
     setShowLinkModal(false);
-    setToast(`${memberName} linked — application approved.`);
+    setToast(`${memberName} linked \u2014 application approved.`);
     setTimeout(() => setToast(null), 4000);
     router.refresh();
   }
 
   const showApprove = app.status === "pending" || app.status === "rejected";
   const showReject = app.status === "pending";
-  const showLink =
-    app.status === "pending" && !app.member_id;
+  const showLink = app.status === "pending" && !app.member_id;
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow">
+    <div>
       {/* Toast */}
       {toast && (
-        <div className="mb-4 rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <div className="mb-4 rounded-md bg-[#E4E9D4] px-4 py-3 text-sm text-moss-600">
           {toast}
         </div>
       )}
 
       {/* Kicked-out warning */}
       {kickedOutWarning && (
-        <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="mb-4 rounded-md bg-[#F2D4CB] px-4 py-3 text-sm text-ember-600">
           <Link
             href={`/admin/members/${kickedOutWarning.memberId}`}
-            className="font-medium underline"
+            className="font-medium underline text-ember-600"
           >
             {kickedOutWarning.name}
           </Link>{" "}
@@ -123,122 +130,82 @@ export default function ApplicationDetail({
         </div>
       )}
 
-      {/* Heading + status pill + member link + action buttons */}
+      {/* Heading */}
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-lg font-semibold text-gray-900">{heading}</h3>
-          <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[app.status] || "bg-gray-100 text-gray-800"}`}
-          >
-            {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
-          </span>
+          <h1 className="tv-h2 !text-[36px]">
+            {fullName}{" "}
+            <span className="font-sans font-normal text-[22px] text-fg3">at {app.company_name}</span>
+          </h1>
+          <StatusPill status={app.status} />
           {app.member_id && (
             <Link
               href={`/admin/members/${app.member_id}`}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="text-sm text-clay-600 no-underline hover:underline inline-flex items-center gap-1"
             >
-              View member &rarr;
+              View member <ArrowRight size={14} />
             </Link>
-          )}
-        </div>
-
-        {/* Action buttons */}
-        <div className="mt-3 flex gap-3">
-          {showApprove && (
-            <button
-              onClick={handleApprove}
-              disabled={isPending || !!kickedOutWarning}
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-            >
-              {isPending ? "Approving..." : "Approve"}
-            </button>
-          )}
-          {showLink && (
-            <button
-              onClick={() => setShowLinkModal(true)}
-              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Link to existing member
-            </button>
-          )}
-          {showReject && (
-            <button
-              onClick={() => setShowRejectModal(true)}
-              className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-            >
-              Reject
-            </button>
           )}
         </div>
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        {/* Column One */}
-        <div className="space-y-4">
-          <DetailField label="Type">
-            {formatStageType(app.attendee_stagetype)}
-          </DetailField>
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_340px]">
+        {/* Column One — application data */}
+        <div>
+          <div className="tv-eyebrow border-b border-line-100 pb-2 mb-3">Application</div>
+          <div className="space-y-0">
+            <DetailRow label="Received" value={`${formatDate(app.submitted_on, { month: "long", day: "numeric", year: "numeric" })}`} />
+            <DetailRow label="Email" value={app.email} link={`mailto:${app.email}`} />
+            <DetailRow label="LinkedIn" value={app.linkedin_profile} link={app.linkedin_profile} />
+            <DetailRow label="Website" value={app.company_website} link={app.company_website?.startsWith("http") ? app.company_website : `https://${app.company_website}`} />
+            <DetailRow label="Stage / Type" value={formatStageType(app.attendee_stagetype)} />
+            {isActiveCEO && (
+              <DetailRow label="Is startup CEO" value={app.i_am_my_startups_ceo || "N/A"} />
+            )}
+          </div>
 
-          <DetailField label="Email">{app.email}</DetailField>
-
-          <DetailField label="LinkedIn">
-            <a
-              href={app.linkedin_profile}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800"
-            >
-              {app.linkedin_profile}
-            </a>
-          </DetailField>
-
-          <DetailField label="Website">
-            <a
-              href={
-                app.company_website.startsWith("http")
-                  ? app.company_website
-                  : `https://${app.company_website}`
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800"
-            >
-              {app.company_website}
-            </a>
-          </DetailField>
-
-          <DetailField label="Gender">{app.gender}</DetailField>
-
-          <DetailField label="Race/Ethnicity">{app.race}</DetailField>
-
-          <DetailField label="Orientation">{app.orientation}</DetailField>
-
-          {isActiveCEO && (
-            <>
-              <DetailField label="I Am My Startup's CEO">
-                {app.i_am_my_startups_ceo || "N/A"}
-              </DetailField>
-              <DetailField label="My Startup Is NOT A Services Business">
-                {app.my_startup_is_not_a_services_business || "N/A"}
-              </DetailField>
-            </>
-          )}
+          <div className="tv-eyebrow border-b border-line-100 pb-2 mb-3 mt-6">Demographics</div>
+          <div className="space-y-0">
+            <DetailRow label="Gender" value={app.gender} />
+            <DetailRow label="Race" value={app.race} />
+            <DetailRow label="Orientation" value={app.orientation} />
+          </div>
         </div>
 
-        {/* Column Two */}
-        <div className="space-y-4">
-          <DetailField label="Applied">
-            {formatDate(app.submitted_on)}
-          </DetailField>
-
-          <DetailField label="Status">{app.status}</DetailField>
-
-          {app.status === "rejected" && (
-            <DetailField label="Rejection Reason">
-              {app.rejection_reason || "No reason given"}
-            </DetailField>
-          )}
+        {/* Column Two — actions */}
+        <div>
+          <Card>
+            <div className="tv-eyebrow mb-3">Actions</div>
+            <div className="flex flex-col gap-2">
+              {showApprove && (
+                <Button
+                  onClick={handleApprove}
+                  disabled={isPending || !!kickedOutWarning}
+                  className="w-full justify-center"
+                >
+                  {isPending ? "Approving\u2026" : "Approve Application"}
+                </Button>
+              )}
+              {showLink && (
+                <Button variant="secondary" onClick={() => setShowLinkModal(true)} className="w-full justify-center">
+                  Link To Existing Member
+                </Button>
+              )}
+              {showReject && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRejectModal(true)}
+                  className="w-full justify-center !text-ember-600 !border-ember-600/30 hover:!bg-ember-600/[0.08]"
+                >
+                  Reject…
+                </Button>
+              )}
+            </div>
+            <p className="text-[12.5px] text-fg3 mt-4 leading-[1.5]">
+              Approving creates a member record, grants community access, and sends the approval email template.
+            </p>
+          </Card>
         </div>
       </div>
 
@@ -267,6 +234,25 @@ export default function ApplicationDetail({
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Detail Row ──
+
+function DetailRow({ label, value, link }: { label: string; value: string; link?: string }) {
+  return (
+    <div className="grid grid-cols-[140px_1fr] gap-4 py-2.5 border-b border-line-100">
+      <span className="text-[13px] text-fg3">{label}</span>
+      <span className="text-[14px] text-fg1">
+        {link ? (
+          <a href={link} target="_blank" rel="noopener noreferrer" className="text-clay-600 underline decoration-line-200">
+            {value}
+          </a>
+        ) : (
+          value
+        )}
+      </span>
     </div>
   );
 }
@@ -300,59 +286,40 @@ function RejectModal({
     });
   }
 
-  const inputClass =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          Reject {name}
-        </h3>
+      <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+        <h3 className="tv-h4 mb-4">Reject {name}</h3>
 
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Rejection Reason
-            </label>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className={inputClass}
-            >
+            <Label>Rejection Reason</Label>
+            <Select value={reason} onChange={(e) => setReason(e.target.value)}>
               {REJECTION_REASONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
+                <option key={r} value={r}>{r}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {reason === "Other" && (
-            <input
-              type="text"
+            <Input
               placeholder="Enter reason..."
               value={customReason}
               onChange={(e) => setCustomReason(e.target.value)}
-              className={inputClass}
             />
           )}
         </div>
 
         <div className="mt-4 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
-          >
-            Cancel
-          </button>
-          <button
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
+            className="!bg-ember-600 hover:!bg-ember-600/90"
             onClick={handleReject}
             disabled={isPending || (reason === "Other" && !customReason.trim())}
-            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
-            {isPending ? "Rejecting..." : "Reject"}
-          </button>
+            {isPending ? "Rejecting\u2026" : "Reject"}
+          </Button>
         </div>
       </div>
     </div>
@@ -415,61 +382,47 @@ function LinkMemberModal({
     });
   }
 
-  const inputClass =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <div className="mx-4 w-full max-w-md rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Link to Existing Member
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            &times;
+          <h3 className="tv-h4">Link To Existing Member</h3>
+          <button onClick={onClose} className="text-fg4 cursor-pointer hover:text-fg2">
+            <X size={18} />
           </button>
         </div>
 
-        <input
-          type="text"
+        <Input
           placeholder="Search members by name..."
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             setSelected(null);
           }}
-          className={inputClass}
         />
 
         {searching && (
-          <p className="mt-2 text-xs text-gray-400">Searching...</p>
+          <p className="mt-2 text-xs text-fg4">Searching...</p>
         )}
 
         {results.length > 0 && (
-          <div className="mt-2 max-h-60 overflow-auto rounded-md border border-gray-200">
+          <div className="mt-2 max-h-60 overflow-auto rounded-md border border-line-200">
             {results.map((m) => (
               <button
                 key={m.id}
                 onClick={() => setSelected(m.id)}
-                className={`flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-gray-50 ${
-                  selected === m.id ? "bg-blue-50" : ""
+                className={`flex w-full items-start gap-3 px-3 py-2 text-left cursor-pointer hover:bg-cream-100 ${
+                  selected === m.id ? "bg-cream-200" : ""
                 }`}
               >
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {m.name}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {m.company_name || "-"} &middot; {m.primary_email}
+                  <div className="text-sm font-medium text-fg1">{m.name}</div>
+                  <div className="text-xs text-fg3">
+                    {m.company_name || "\u2014"} &middot; {m.primary_email}
                   </div>
                 </div>
                 {selected === m.id && (
-                  <span className="ml-auto text-xs text-blue-600">
-                    Selected
-                  </span>
+                  <span className="ml-auto text-xs text-clay-600">Selected</span>
                 )}
               </button>
             ))}
@@ -477,48 +430,22 @@ function LinkMemberModal({
         )}
 
         {search.length >= 2 && !searching && results.length === 0 && (
-          <p className="mt-2 text-xs text-gray-400">No members found.</p>
+          <p className="mt-2 text-xs text-fg4">No members found.</p>
         )}
 
         {error && (
-          <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="mt-2 rounded-md bg-[#F2D4CB] px-3 py-2 text-sm text-ember-600">
             {error}
           </p>
         )}
 
         <div className="mt-4 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!selected || isPending}
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-          >
-            {isPending ? "Linking..." : "Link & Approve"}
-          </button>
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={handleConfirm} disabled={!selected || isPending}>
+            {isPending ? "Linking\u2026" : "Link & Approve"}
+          </Button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── DetailField ──
-
-function DetailField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900">{children}</dd>
     </div>
   );
 }

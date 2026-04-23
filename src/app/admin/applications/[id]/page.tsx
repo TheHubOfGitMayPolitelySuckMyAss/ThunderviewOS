@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ApplicationDetail from "./application-detail";
@@ -19,12 +20,12 @@ export default async function ApplicationDetailPage({
   if (!application) notFound();
 
   return (
-    <div>
+    <div className="max-w-[1280px]">
       <Link
         href="/admin/applications"
-        className="mb-4 inline-block text-sm text-blue-600 hover:text-blue-800"
+        className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
       >
-        &larr; Back to applications
+        <ArrowLeft size={14} /> Applications
       </Link>
 
       <ApplicationDetail application={application} />
