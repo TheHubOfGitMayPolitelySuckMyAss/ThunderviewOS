@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import { Pill } from "@/components/ui/pill";
+import { Input } from "@/components/ui/input";
 
 type TicketRow = {
   id: string;
@@ -21,44 +24,31 @@ type TicketRow = {
   fulfillmentStatus: string;
 };
 
-type SortKey =
-  | "purchased"
-  | "member"
-  | "dinner"
-  | "qty"
-  | "amount"
-  | "type"
-  | "source"
-  | "status";
+type SortKey = "purchased" | "member" | "dinner" | "qty" | "amount" | "type" | "source" | "status";
 type SortDir = "asc" | "desc";
 
 function getSortValue(t: TicketRow, key: SortKey): string | number {
   switch (key) {
-    case "purchased":
-      return t.purchasedAt;
-    case "member":
-      return t.memberName.toLowerCase();
-    case "dinner":
-      return t.dinnerDate;
-    case "qty":
-      return t.quantity;
-    case "amount":
-      return t.amountPaid;
-    case "type":
-      return t.ticketType;
-    case "source":
-      return t.paymentSource;
-    case "status":
-      return t.fulfillmentStatus;
+    case "purchased": return t.purchasedAt;
+    case "member": return t.memberName.toLowerCase();
+    case "dinner": return t.dinnerDate;
+    case "qty": return t.quantity;
+    case "amount": return t.amountPaid;
+    case "type": return t.ticketType;
+    case "source": return t.paymentSource;
+    case "status": return t.fulfillmentStatus;
   }
 }
 
-const statusColors: Record<string, string> = {
-  purchased: "bg-yellow-100 text-yellow-800",
-  fulfilled: "bg-green-100 text-green-800",
-  refunded: "bg-red-100 text-red-800",
-  credited: "bg-yellow-100 text-yellow-800",
-};
+function StatusPill({ status }: { status: string }) {
+  const variant = {
+    purchased: "neutral" as const,
+    fulfilled: "success" as const,
+    refunded: "danger" as const,
+    credited: "warn" as const,
+  }[status] ?? "neutral" as const;
+  return <Pill variant={variant} dot>{status.charAt(0).toUpperCase() + status.slice(1)}</Pill>;
+}
 
 export default function TicketsTable({ tickets }: { tickets: TicketRow[] }) {
   const [search, setSearch] = useState("");
@@ -92,115 +82,75 @@ export default function TicketsTable({ tickets }: { tickets: TicketRow[] }) {
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const thClass =
-    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
-
-  function SortIndicator({ col }: { col: SortKey }) {
+  function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return null;
-    return (
-      <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>
-    );
+    return sortDir === "asc" ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
   }
+
+  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
 
   return (
     <div>
       <div className="mb-4">
-        <input
+        <Input
           type="text"
-          placeholder="Search by member name..."
+          placeholder="Search member…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="!max-w-[360px]"
         />
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="sticky top-0 z-10 bg-gray-50">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-line-200 bg-cream-50">
+        <table className="w-full border-collapse">
+          <thead>
             <tr>
-              <th className={thClass} onClick={() => toggleSort("purchased")}>
-                Purchased
-                <SortIndicator col="purchased" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("member")}>
-                Member
-                <SortIndicator col="member" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("dinner")}>
-                Dinner
-                <SortIndicator col="dinner" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("qty")}>
-                Qty
-                <SortIndicator col="qty" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("amount")}>
-                Amount
-                <SortIndicator col="amount" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("type")}>
-                Type
-                <SortIndicator col="type" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("source")}>
-                Source
-                <SortIndicator col="source" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("status")}>
-                Status
-                <SortIndicator col="status" />
-              </th>
+              <th className={thClass} onClick={() => toggleSort("purchased")}>Purchased<SortIcon col="purchased" /></th>
+              <th className={thClass} onClick={() => toggleSort("member")}>Member<SortIcon col="member" /></th>
+              <th className={thClass} onClick={() => toggleSort("dinner")}>Dinner<SortIcon col="dinner" /></th>
+              <th className={thClass} onClick={() => toggleSort("qty")}>Qty<SortIcon col="qty" /></th>
+              <th className={thClass} onClick={() => toggleSort("amount")}>Amount<SortIcon col="amount" /></th>
+              <th className={thClass} onClick={() => toggleSort("source")}>Source<SortIcon col="source" /></th>
+              <th className={thClass} onClick={() => toggleSort("status")}>Status<SortIcon col="status" /></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {sorted.map((t) => (
-              <tr
-                key={t.id}
-                className="group relative cursor-pointer hover:bg-gray-50"
-              >
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  <Link
-                    href={`/admin/dinners/${t.dinnerId}`}
-                    className="after:absolute after:inset-0"
-                  >
-                    {formatDate(t.purchasedAt)}
-                  </Link>
-                </td>
-                <td
-                  className={`px-4 py-3 text-sm ${t.kickedOut ? "text-gray-400 line-through" : "text-gray-900"}`}
+          <tbody>
+            {sorted.map((t) => {
+              const kicked = t.kickedOut;
+              return (
+                <tr
+                  key={t.id}
+                  className={`group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100 ${kicked ? "line-through" : ""}`}
                 >
-                  {t.memberName}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {t.dinnerDisplay}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {t.quantity}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  ${t.amountPaid.toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {t.ticketType}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {t.paymentSource}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[t.fulfillmentStatus] || "bg-gray-100 text-gray-800"}`}
-                  >
-                    {t.fulfillmentStatus}
-                  </span>
-                </td>
-              </tr>
-            ))}
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    <Link href={`/admin/dinners/${t.dinnerId}`} className={`no-underline after:absolute after:inset-0 ${kicked ? "text-fg4" : "text-fg2"}`}>
+                      {formatDate(t.purchasedAt)}
+                    </Link>
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] font-medium ${kicked ? "text-fg4" : "text-fg1"}`}>
+                    {t.memberName}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    {t.dinnerDisplay}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] tabular-nums ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    {t.quantity}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] tabular-nums ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    ${t.amountPaid.toFixed(2)}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    {t.paymentSource}
+                  </td>
+                  <td className="px-3.5 py-3 text-sm">
+                    <StatusPill status={t.fulfillmentStatus} />
+                  </td>
+                </tr>
+              );
+            })}
             {sorted.length === 0 && (
               <tr>
-                <td
-                  colSpan={8}
-                  className="px-4 py-6 text-center text-sm text-gray-400"
-                >
+                <td colSpan={7} className="px-3.5 py-6 text-center text-sm text-fg4">
                   No tickets found.
                 </td>
               </tr>

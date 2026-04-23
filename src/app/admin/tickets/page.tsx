@@ -65,8 +65,11 @@ export default async function TicketsPage() {
   });
 
   return (
-    <div>
-      <h2 className="mb-4 text-xl font-bold text-gray-900">Tickets</h2>
+    <div className="max-w-[1440px]">
+      <div className="flex items-baseline justify-between mb-6">
+        <h1 className="tv-h2 !text-[36px]">Tickets</h1>
+        <span className="text-fg3 text-[14px]">{rows.length} total</span>
+      </div>
       <TicketsTable tickets={rows} />
     </div>
   );
