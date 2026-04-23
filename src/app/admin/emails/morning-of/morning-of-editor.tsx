@@ -69,18 +69,18 @@ export default function MorningOfEditor({
 
       {/* Attendee preview section */}
       <div className="mt-10 max-w-2xl">
-        <h3 className="mb-1 text-lg font-semibold text-gray-800">
+        <h3 className="mb-1 text-lg font-semibold text-fg1">
           Attendee Intros &amp; Asks{" "}
-          <span className="text-sm font-normal text-gray-500">(auto-generated)</span>
+          <span className="text-sm font-normal text-fg3">(auto-generated)</span>
         </h3>
         {dinnerDisplay && (
-          <p className="mb-4 text-sm text-gray-500">
+          <p className="mb-4 text-sm text-fg3">
             Next dinner: {dinnerDisplay} &middot; {attendees.length} fulfilled attendee{attendees.length !== 1 ? "s" : ""}
           </p>
         )}
 
         {attendees.length === 0 ? (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-sm text-fg3 italic">
             No fulfilled attendees for the next upcoming dinner yet.
           </p>
         ) : (
@@ -88,19 +88,19 @@ export default function MorningOfEditor({
             {attendees.map((a) => {
               const link = getNameLink(a);
               return (
-                <div key={a.id} className="rounded-lg border bg-white p-4">
+                <div key={a.id} className="rounded-lg border border-line-200 bg-cream-50 p-4">
                   <div className="flex items-baseline gap-2">
                     {link ? (
                       <a
                         href={link.href}
                         target={link.href.startsWith("mailto:") ? undefined : "_blank"}
                         rel="noopener noreferrer"
-                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                        className="font-semibold text-clay-600 no-underline hover:underline hover:underline"
                       >
                         {link.label}
                       </a>
                     ) : (
-                      <span className="font-semibold text-gray-900">
+                      <span className="font-semibold text-fg1">
                         {formatName(a.first_name, a.last_name)}
                       </span>
                     )}
@@ -110,17 +110,17 @@ export default function MorningOfEditor({
                           href={a.company_website.startsWith("http") ? a.company_website : `https://${a.company_website}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-500 hover:text-blue-700 hover:underline"
+                          className="text-sm text-clay-600 hover:underline"
                         >
                           at {a.company_name}
                         </a>
                       ) : (
-                        <span className="text-sm text-gray-500">at {a.company_name}</span>
+                        <span className="text-sm text-fg3">at {a.company_name}</span>
                       )
                     )}
                   </div>
                   {(a.current_intro || a.showAsk) && (
-                    <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">
+                    <div className="mt-2 text-sm text-fg2 whitespace-pre-wrap">
                       {a.current_intro}
                       {a.current_intro && a.showAsk && a.current_ask && <><br /><br /></>}
                       {a.showAsk && a.current_ask}

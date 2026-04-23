@@ -32,12 +32,12 @@ export default async function RejectionTemplatePage() {
     <div>
       <Link
         href="/admin/emails"
-        className="mb-4 inline-block text-sm text-blue-600 hover:text-blue-800"
+        className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
       >
-        &larr; Back to emails
+        &larr; Emails
       </Link>
 
-      <h2 className="mb-6 text-xl font-bold text-gray-900">
+      <h2 className="tv-h2 !text-[36px] mb-6">
         Rejection Email Template
       </h2>
 

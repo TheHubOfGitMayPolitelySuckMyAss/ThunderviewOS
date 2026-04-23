@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Eyebrow } from "@/components/ui/typography";
 
 const marketingEmails = [
   {
@@ -18,13 +19,13 @@ const transactionalEmails = [
     href: "/admin/emails/approval",
     label: "Approval",
     description:
-      "New member approved — \"you're in, buy a ticket\"",
+      "New member approved \u2014 \"you\u2019re in, buy a ticket\"",
   },
   {
     href: "/admin/emails/re-application",
     label: "Re-application",
     description:
-      "Application linked to existing member — \"you're already in, just buy a ticket next time\"",
+      "Application linked to existing member \u2014 \"you\u2019re already in, just buy a ticket next time\"",
   },
   {
     href: "/admin/emails/rejection",
@@ -34,38 +35,36 @@ const transactionalEmails = [
   {
     href: "/admin/emails/fulfillment",
     label: "Fulfillment",
-    description: "Ticket transitions to fulfilled — dinner details email",
+    description: "Ticket transitions to fulfilled \u2014 dinner details email",
   },
   {
     href: "/admin/emails/morning-of",
     label: "Morning Of",
     description:
-      "Morning-of-dinner email — intros & asks for tonight's attendees only",
+      "Morning-of-dinner email \u2014 intros & asks for tonight\u2019s attendees only",
   },
 ];
 
 export default function EmailsPage() {
   return (
-    <div>
-      <h2 className="mb-6 text-xl font-bold text-gray-900">Emails</h2>
+    <div className="max-w-[1280px]">
+      <h1 className="tv-h2 !text-[36px] mb-6">Emails</h1>
 
       {/* Marketing */}
       <section className="mb-10">
-        <h3 className="mb-3 text-lg font-semibold text-gray-800">Marketing</h3>
+        <Eyebrow className="mb-3 pb-2.5 border-b border-line-100">Marketing</Eyebrow>
         <div className="space-y-4">
           {marketingEmails.map((email) => (
             <div key={email.href}>
               <Link
                 href={email.href}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                className="text-sm font-medium text-clay-600 no-underline hover:underline"
               >
                 {email.label}
               </Link>
-              <p className="mt-0.5 text-sm text-gray-500">
+              <p className="mt-0.5 text-sm text-fg3">
                 {email.description}
               </p>
-              {/* Space reserved for per-month customized email list */}
-              <div className="mt-2" />
             </div>
           ))}
         </div>
@@ -73,19 +72,17 @@ export default function EmailsPage() {
 
       {/* Transactional */}
       <section>
-        <h3 className="mb-3 text-lg font-semibold text-gray-800">
-          Transactional
-        </h3>
+        <Eyebrow className="mb-3 pb-2.5 border-b border-line-100">Transactional</Eyebrow>
         <div className="space-y-4">
           {transactionalEmails.map((email) => (
             <div key={email.href}>
               <Link
                 href={email.href}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                className="text-sm font-medium text-clay-600 no-underline hover:underline"
               >
                 {email.label}
               </Link>
-              <p className="mt-0.5 text-sm text-gray-500">
+              <p className="mt-0.5 text-sm text-fg3">
                 {email.description}
               </p>
             </div>

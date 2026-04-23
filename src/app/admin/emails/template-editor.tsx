@@ -2,6 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { formatTimestamp } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface TemplateEditorProps {
   slug: string;
@@ -79,64 +83,58 @@ export default function TemplateEditor({
     <div className="max-w-2xl">
       {/* Subject */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Subject
-        </label>
-        <input
+        <Label>Subject</Label>
+        <Input
           type="text"
           value={subject}
           onChange={(e) => handleSubjectChange(e.target.value)}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
         />
       </div>
 
       {/* Body */}
       <div className="mb-2">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Body
-        </label>
-        <textarea
+        <Label>Body</Label>
+        <Textarea
           value={body}
           onChange={(e) => handleBodyChange(e.target.value)}
           rows={16}
-          className="w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+          className="!font-mono !text-sm"
         />
       </div>
 
       {/* Available variables */}
-      <p className="mb-6 text-xs text-gray-500">
+      <p className="mb-6 text-xs text-fg3">
         Available variables:{" "}
         {availableVariables.map((v, i) => (
           <span key={v}>
             {i > 0 && ", "}
-            <code className="rounded bg-gray-100 px-1 py-0.5">{v}</code>
+            <code className="rounded bg-cream-100 px-1 py-0.5 text-fg2">{v}</code>
           </span>
         ))}
       </p>
 
       {/* Buttons */}
       <div className="flex items-center gap-3">
-        <button
+        <Button
+          variant="secondary"
           onClick={handleSendTest}
           disabled={!hasEdited || testSent || isSending}
-          className="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {isSending ? "Sending..." : "Send Test Email"}
-        </button>
-        <button
+          {isSending ? "Sending\u2026" : "Send Test Email"}
+        </Button>
+        <Button
           onClick={handleSave}
           disabled={!testSent || isSaving}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {isSaving ? "Saving..." : "Save Changes"}
-        </button>
+          {isSaving ? "Saving\u2026" : "Save Changes"}
+        </Button>
       </div>
 
       {/* Status message */}
       {message && (
         <p
           className={`mt-3 text-sm ${
-            message.type === "success" ? "text-green-600" : "text-red-600"
+            message.type === "success" ? "text-moss-600" : "text-ember-600"
           }`}
         >
           {message.text}
@@ -145,7 +143,7 @@ export default function TemplateEditor({
 
       {/* Last updated */}
       {updatedAt && updatedByName && (
-        <p className="mt-4 text-xs text-gray-500">
+        <p className="mt-4 text-xs text-fg3">
           Last updated by {updatedByName} on {formatTimestamp(updatedAt)}
         </p>
       )}
