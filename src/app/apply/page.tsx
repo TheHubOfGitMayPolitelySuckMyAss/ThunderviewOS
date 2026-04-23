@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
+import PublicNav from "@/components/public-nav";
 import ApplicationForm from "./application-form";
 
 function ordinalDay(day: number): string {
@@ -82,58 +83,46 @@ export default async function ApplyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto max-w-2xl px-4 py-7">
-        <h1 className="mb-6 text-2xl font-bold text-gray-900">
-          Sign Up to Attend a CEO Dinner
-        </h1>
+    <div className="tv-surface tv-paper min-h-screen">
+      <PublicNav />
+      <div className="mx-auto max-w-[640px] tv-page-gutter pt-8 pb-9">
+        <h1 className="tv-h2 !text-[44px] mb-3">Apply to attend.</h1>
+        <p className="text-[17px] text-fg2 leading-[1.5] mb-7" style={{ textWrap: "pretty" }}>
+          Every dinner is vetted. This form is how we learn who you are. It takes two minutes,
+          it&rsquo;s not a quiz, and we&rsquo;ll be in touch within a week.
+        </p>
 
-        <div className="mb-8 space-y-4 text-sm leading-relaxed text-gray-700">
+        <div className="space-y-form-row text-[14px] text-fg2 leading-relaxed mb-7">
           <p>
-            If you are interested in attending a dinner, please fill out the
-            following form. When you are selected, we&rsquo;ll send you a URL
-            and invite code that you can use on this web site to purchase your
-            ticket. CEO tickets are $40 and VC tickets are $100.
-          </p>
-          <p>
-            If you can&rsquo;t afford the dinner ticket (it happens), send an
-            email to{" "}
-            <a
-              href="mailto:eric@marcoullier.com"
-              className="text-blue-600 hover:text-blue-800"
-            >
+            CEO tickets are $40 and VC tickets are $100.
+            If you can&rsquo;t afford the dinner ticket (it happens), send an email to{" "}
+            <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
               eric@marcoullier.com
             </a>{" "}
             and we&rsquo;ll make it work.
           </p>
           <p>
-            Please note that all information provided will be held in strict
-            confidence and is only used to ensure we have a balanced and diverse
-            group of dinner attendees. Historically underrepresented founders get
-            first access to tickets each month. We won&rsquo;t share, sell or
-            distribute your information to anyone else.
+            All information provided will be held in strict confidence and is only used to ensure
+            we have a balanced and diverse group of dinner attendees. Historically underrepresented
+            founders get first access to tickets each month.
           </p>
           <p>
-            In case you can&rsquo;t make the {nextDinnerDate} dinner, our
-            upcoming schedule is listed below. All dinners will be held at the
-            Mercury Cafe in Denver and run from 6p to 9p. Please sign up for the
-            first dinner that works with your schedule.
+            In case you can&rsquo;t make the {nextDinnerDate} dinner, our upcoming schedule
+            is listed below.
           </p>
         </div>
 
         {/* Dinner schedule */}
-        <div className="mb-7">
-          <ul className="space-y-1">
-            {schedule.map((s, i) => (
-              <li
-                key={i}
-                className={`text-sm ${s.isOff ? "italic text-gray-400" : "text-gray-700"}`}
-              >
-                {s.label}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul className="space-y-1 mb-7">
+          {schedule.map((s, i) => (
+            <li
+              key={i}
+              className={`text-sm ${s.isOff ? "italic text-fg4" : "text-fg2"}`}
+            >
+              {s.label}
+            </li>
+          ))}
+        </ul>
 
         <ApplicationForm />
       </div>

@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitApplication } from "./actions";
 import Field from "@/components/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/typography";
 
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -85,34 +89,29 @@ export default function ApplicationForm() {
     });
   }
 
-  const inputClass =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-
   return (
     <form onSubmit={handleSubmit} className="space-y-7">
       {/* PERSONAL INFORMATION */}
       <section>
-        <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">
+        <Eyebrow className="border-b border-border pb-2.5 mb-5">
           Personal Information
-        </h2>
+        </Eyebrow>
         <div className="space-y-form-row">
           <Field label="Name" required>
             <div className="grid grid-cols-2 gap-3">
-              <input
+              <Input
                 type="text"
                 required
                 placeholder="First Name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className={inputClass}
               />
-              <input
+              <Input
                 type="text"
                 required
                 placeholder="Last Name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className={inputClass}
               />
             </div>
           </Field>
@@ -122,32 +121,29 @@ export default function ApplicationForm() {
             required
             help="Please click the button below to get our pre-dinner email with attendee introductions!"
           >
-            <input
+            <Input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
             />
           </Field>
 
           <Field label="LinkedIn Profile" required>
-            <input
+            <Input
               type="text"
               required
-              placeholder="http://"
+              placeholder="https://"
               value={linkedinProfile}
               onChange={(e) => setLinkedinProfile(e.target.value)}
-              className={inputClass}
             />
           </Field>
 
           <Field label="Gender" required>
-            <select
+            <Select
               required
               value={gender}
               onChange={(e) => setGender(e.target.value)}
-              className={inputClass}
             >
               <option value="" disabled>
                 Select an option
@@ -157,15 +153,14 @@ export default function ApplicationForm() {
                   {opt}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           <Field label="Race" required>
-            <select
+            <Select
               required
               value={race}
               onChange={(e) => setRace(e.target.value)}
-              className={inputClass}
             >
               <option value="" disabled>
                 Select an option
@@ -175,15 +170,14 @@ export default function ApplicationForm() {
                   {opt}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           <Field label="Orientation" required>
-            <select
+            <Select
               required
               value={orientation}
               onChange={(e) => setOrientation(e.target.value)}
-              className={inputClass}
             >
               <option value="" disabled>
                 Select an option
@@ -193,44 +187,41 @@ export default function ApplicationForm() {
                   {opt}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
       </section>
 
       {/* COMPANY INFORMATION */}
       <section>
-        <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">
+        <Eyebrow className="border-b border-border pb-2.5 mb-5">
           Company Information
-        </h2>
+        </Eyebrow>
         <div className="space-y-form-row">
           <Field label="Company Name" required>
-            <input
+            <Input
               type="text"
               required
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              className={inputClass}
             />
           </Field>
 
           <Field label="Company Website" required>
-            <input
+            <Input
               type="text"
               required
-              placeholder="http://"
+              placeholder="https://"
               value={companyWebsite}
               onChange={(e) => setCompanyWebsite(e.target.value)}
-              className={inputClass}
             />
           </Field>
 
           <Field label="Attendee Stage/Type" required>
-            <select
+            <Select
               required
               value={attendeeStagetype}
               onChange={(e) => setAttendeeStagetype(e.target.value)}
-              className={inputClass}
             >
               <option value="" disabled>
                 Select an option
@@ -240,7 +231,7 @@ export default function ApplicationForm() {
                   {opt}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           {isActiveCEO && (
@@ -250,18 +241,17 @@ export default function ApplicationForm() {
                 required
                 help="Thunderview CEO Dinners are specifically organized for company CEOs. Sadly, this means no CTOs, CPOs, Presidents, co-founders or spouses (work or otherwise)."
               >
-                <select
+                <Select
                   required
                   value={iAmCeo}
                   onChange={(e) => setIAmCeo(e.target.value)}
-                  className={inputClass}
                 >
                   <option value="" disabled>
                     Select an option
                   </option>
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
-                </select>
+                </Select>
               </Field>
 
               <Field
@@ -269,18 +259,17 @@ export default function ApplicationForm() {
                 required
                 help="Our dinners are focused on product and software companies. We do not allow the following types of companies to attend: accountancies, dev shops, recruiters, consultants, fractional executives and coaches."
               >
-                <select
+                <Select
                   required
                   value={isNotServices}
                   onChange={(e) => setIsNotServices(e.target.value)}
-                  className={inputClass}
                 >
                   <option value="" disabled>
                     Select an option
                   </option>
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
-                </select>
+                </Select>
               </Field>
             </>
           )}
@@ -288,18 +277,14 @@ export default function ApplicationForm() {
       </section>
 
       {error && (
-        <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="rounded-md bg-[rgba(192,68,42,0.1)] px-4 py-3 text-sm text-danger">
           {error}
-        </div>
+        </p>
       )}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full rounded-md bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-      >
-        {isPending ? "Submitting..." : "Submit"}
-      </button>
+      <Button type="submit" disabled={isPending} className="w-full" size="lg">
+        {isPending ? "Submitting\u2026" : "Submit"}
+      </Button>
     </form>
   );
 }

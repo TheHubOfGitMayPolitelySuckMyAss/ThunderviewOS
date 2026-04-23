@@ -2,7 +2,10 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
+import Link from "next/link";
 import Field from "@/components/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -33,48 +36,50 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm space-y-6 rounded-lg bg-white p-8 shadow">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Thunderview OS</h1>
-          <p className="mt-1 text-sm text-gray-500">Sign in with your email</p>
-        </div>
+    <div className="tv-surface min-h-screen">
+      {/* Minimal nav — logo only per kit */}
+      <nav className="tv-nav sticky top-0 z-10 bg-[rgba(251,247,240,0.86)] backdrop-blur-[10px]">
+        <Link href="/" className="tv-nav-logo no-underline">
+          Thunderview
+        </Link>
+        <div />
+        <div />
+      </nav>
 
-        {sent ? (
-          <div className="rounded-md bg-green-50 p-4">
-            <p className="text-sm text-green-800">
+      <div className="flex items-center justify-center px-gutter-sm py-7" style={{ minHeight: "calc(100vh - var(--tv-nav-height))" }}>
+        <div className="w-full max-w-[420px] bg-bg-elevated border border-border rounded-lg p-8 shadow-sm">
+          <h1 className="tv-h3 !text-[32px] mb-2">Sign in.</h1>
+          <p className="text-[14px] text-fg3 mb-7">We&rsquo;ll email you a magic link.</p>
+
+          {sent ? (
+            <p className="rounded-md bg-[rgba(91,106,59,0.12)] text-success px-4 py-3.5 text-[14px] leading-[1.5]">
               Check your email for a magic link to sign in.
             </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Email" required>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="you@example.com"
-              />
-            </Field>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-form-row">
+              <Field label="Email" required>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </Field>
 
-            {error && (
-              <div className="rounded-md bg-red-50 p-3">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
+              {error && (
+                <p className="rounded-md bg-[rgba(192,68,42,0.1)] px-3 py-2 text-sm text-danger">
+                  {error}
+                </p>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? "Sending..." : "Send Magic Link"}
-            </button>
-          </form>
-        )}
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Sending\u2026" : "Send Magic Link"}
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
