@@ -69,8 +69,8 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 ## Auth flow
 
 1. User enters email at `/login`
-2. Client calls `supabase.auth.signInWithOtp` with `emailRedirectTo` set to `${NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`
-3. Supabase sends magic link email (PKCE flow)
+2. Client calls `supabase.auth.signInWithOtp` with `shouldCreateUser: false` and `emailRedirectTo` set to `${NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`
+3. Supabase sends magic link email (PKCE flow). If the email is not in `auth.users`, the call succeeds silently but no email is sent (prevents orphan auth rows for unknown emails)
 4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
 5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
 6. Both `/auth/confirm` and `/auth/callback` always redirect to `/portal` after successful auth, regardless of role. Portal page checks role and shows admin button for admin/team.
@@ -253,7 +253,9 @@ supabase/
 │   ├── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
 │   ├── 20260420700000_email_templates.sql               # email_templates table + RLS + approval template seed
 │   ├── 20260420800000_dinner_venue_address.sql          # Add address column, update venue default to 'ID345', backfill future dinners
-│   └── 20260420900000_post_dinner_cron_and_trigger_fix.sql  # Remove last_dinner_attended from fulfillment trigger; now set by post-dinner cron
+│   ├── 20260420900000_post_dinner_cron_and_trigger_fix.sql  # Remove last_dinner_attended from fulfillment trigger; now set by post-dinner cron
+│   ├── 20260421000000_morning_of_sent_at.sql                # dinners.morning_of_sent_at column for morning-of cron idempotency
+│   └── 20260421100000_fix_has_community_access_on_approval.sql  # Backfill has_community_access = true for 161 existing members
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -405,6 +407,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Layout invariant tokens** added: nav height (64px), page gutters (24/48px), container widths (marketing 1040, app 1280, admin 1440), vertical rhythm (section-gap 64px, stack-gap 24px, tight-gap 12px), form spacing, table spacing, modal widths, nav internals. All navs now exactly 64px. All pages use `tv-page-gutter` or `tv-container-*`.
 - **Semantic alias conformance sweep**: all raw-scale Tailwind classes (`bg-cream-50`, `border-line-200`, `text-clay-600`, etc.) replaced with semantic aliases (`bg-bg`, `border-border`, `text-accent-hover`). Remaining raw-scale refs are intentional (active nav state, Pill internals).
 - **Broken motion refs fixed**: all `var(--tv-dur-fast)` / `var(--tv-ease-out)` references replaced with literal values — Tailwind arbitrary values can't resolve CSS vars for non-standard properties through `@theme inline`.
+- **Mobile responsive** across all three tiers: marketing pages, portal pages, and admin pages. Two-column layouts stack on mobile, tables scroll horizontally, nav collapses appropriately. Responsive breakpoints applied during the page restyling work in these sprints and polished in Sprint 16.
 - **Dev routes**: `/dev/ui` (primitive showcase), `/dev/emails/[slug]` (email template preview with sample data). Not linked from any page.
 - **NEEDS DESIGN REVIEW**: Portal uses `max-w-[980px]` not the `--container-app` (1280px) token — deliberate per kit layout, consider adding `--container-portal`.
 - **NEEDS DECISION**: receipt email — using Stripe's built-in receipt. Kit has a design but no sender/template/trigger built. Fulfillment hero photo skipped in email shell — would need per-template image support.
@@ -446,6 +449,7 @@ Don't build these without an explicit prompt:
 - LinkedIn URL matching for automatic duplicate detection across applications and members
 - Side-by-side comparison when re-application has different data than existing member record (name, company, website changes)
 - Automatic member field updates from re-application data
+- Custom receipt email — kit design exists in `design-system/ui_kits/` but won't be built. Using Stripe's built-in receipt instead
 
 ## Upcoming work
 
@@ -457,15 +461,15 @@ Don't build these without an explicit prompt:
 - ~~Restyle remaining unstyled pages: `/login`, `/apply`~~ Done (Sprint 16)
 - Add `--container-portal: 980px` token (portal pages use 980px, not the 1280px `--container-app` token)
 - Add `size="portal"` to PageHeader (tv-h1 + 32px gap) and migrate portal pages to use it
-- Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in
+- ~~Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in~~ Decided — keeping Stripe's built-in receipt
 - Fulfillment email hero photo: per-template image support if wanted
 - Page-by-page detail polish pass (next session)
 
 ## Pre-launch checklist (before real users hit this)
 
 - [x] Switch Supabase SMTP from built-in to Resend (done Sprint 13 — configured in Supabase dashboard)
-- [ ] Verify Thunderview sending domain in Resend (SPF, DKIM, DMARC)
-- [ ] Customize magic link email template (subject, body, branding) — link format already fixed, but copy/styling still default
+- [x] Verify Thunderview sending domain in Resend (SPF, DKIM, DMARC) — `thunderviewceodinners.com` verified. DKIM TXT + SPF MX/TXT on the `send` subdomain in Squarespace DNS; no conflict with Google Workspace MX/SPF on root domain. DMARC at `_dmarc` with `v=DMARC1; p=none` (monitoring mode)
+- [x] Customize magic link email template (subject, body, branding) — branded HTML shell matching `bodyToHtml()`, subject "Sign in to Thunderview", template in `tmp/magic-link-template.html`. Apply via Supabase dashboard > Authentication > Email Templates > Magic Link
 - [x] Verified all Supabase auth email templates use the `/auth/confirm?token_hash=...&type=email` pattern (not `{{ .ConfirmationURL }}`)
 - [x] Confirm From address is a Thunderview domain (`team@thunderviewceodinners.com` via Resend custom SMTP)
 - [x] Confirm injected unsubscribe footer is gone (custom SMTP eliminates it)
@@ -485,4 +489,5 @@ Don't build these without an explicit prompt:
 - **Semantic alias rule.** App code uses `bg-bg`, `text-fg1`, `border-border` — NOT raw scale names like `bg-cream-50`, `text-ink-900`, `border-line-200`. The raw scale stays in `:root` as underlying definitions. Same for `text-accent-hover` (not `text-clay-600`), `bg-accent` (not `bg-clay-500`). Exceptions: `bg-ink-900`/`text-cream-50` for active nav/filter state (no semantic alias for this pattern), Pill component internals.
 - **Button `asChild` pattern.** Any `<Link>` that looks like a button must use `<Button asChild><Link href="...">Label</Link></Button>`. No anchor-styled-as-button with hand-tuned padding/colors. The Button component merges its classes onto the child element.
 - **`bodyToHtml()` wraps in a full HTML document.** It's no longer just `\n` → `<br>`. Every caller gets a branded shell. The `appendHtml` parameter lets you inject pre-rendered HTML inside the shell (used by morning-of for attendee list). Don't concatenate HTML after calling `bodyToHtml()` — it would land outside the `</html>` tag.
+- **Stripe sandbox does not auto-send receipts.** Even with `receipt_email` set on the Checkout Session and the dashboard toggle enabled, sandbox mode silently skips receipt emails. Integration is correct — auto-send will be validated at Phase 8 live cutover. Do not debug further.
 - **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
