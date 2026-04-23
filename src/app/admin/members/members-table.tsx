@@ -3,8 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import AddMemberModal from "./add-member-modal";
 
 type MemberEmail = {
@@ -96,30 +99,24 @@ export default function MembersTable({
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const thClass =
-    "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 cursor-pointer select-none hover:text-gray-700";
-
-  function SortIndicator({ col }: { col: SortKey }) {
+  function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return null;
-    return <span className="ml-1">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
+    return sortDir === "asc" ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
   }
+
+  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
 
   return (
     <div>
       <div className="mb-4 flex items-center gap-4">
-        <input
+        <Input
           type="text"
-          placeholder="Search by name or email..."
+          placeholder="Search name, company, email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="!max-w-[360px]"
         />
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="whitespace-nowrap rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          Add Member
-        </button>
+        <Button onClick={() => setShowAddModal(true)}>+ Add Member</Button>
       </div>
 
       {showAddModal && (
@@ -136,86 +133,61 @@ export default function MembersTable({
 
       {addedName && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 rounded-lg bg-white px-8 py-6 text-center shadow-xl">
-            <p className="text-lg font-semibold text-gray-900">
-              {addedName} added!
-            </p>
-            <button
-              onClick={() => setAddedName(null)}
-              className="mt-4 rounded-md bg-gray-900 px-6 py-2 text-sm font-medium text-white hover:bg-gray-800"
-            >
+          <div className="mx-4 rounded-lg bg-cream-50 border border-line-200 px-8 py-6 text-center shadow-lg">
+            <p className="tv-h4">{addedName} added!</p>
+            <Button variant="secondary" className="mt-4" onClick={() => setAddedName(null)}>
               Onwards!
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="sticky top-0 z-10 bg-gray-50">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-line-200 bg-cream-50">
+        <table className="w-full border-collapse">
+          <thead>
             <tr>
-              <th className={thClass} onClick={() => toggleSort("name")}>
-                Name<SortIndicator col="name" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("email")}>
-                Email<SortIndicator col="email" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("company")}>
-                Company<SortIndicator col="company" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("stage")}>
-                Stage/Type<SortIndicator col="stage" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("lastDinner")}>
-                Last Dinner<SortIndicator col="lastDinner" />
-              </th>
-              <th className={thClass} onClick={() => toggleSort("marketing")}>
-                Marketing<SortIndicator col="marketing" />
-              </th>
+              <th className={thClass} onClick={() => toggleSort("name")}>Name<SortIcon col="name" /></th>
+              <th className={thClass} onClick={() => toggleSort("company")}>Company<SortIcon col="company" /></th>
+              <th className={thClass} onClick={() => toggleSort("stage")}>Stage<SortIcon col="stage" /></th>
+              <th className={thClass} onClick={() => toggleSort("lastDinner")}>Last Dinner<SortIcon col="lastDinner" /></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {sorted.map((member) => (
-              <tr
-                key={member.id}
-                className={`group relative cursor-pointer hover:bg-gray-50 ${member.kicked_out ? "line-through text-gray-400" : ""}`}
-              >
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-900"}`}>
-                  <Link
-                    href={`/admin/members/${member.id}`}
-                    className="flex items-center gap-2 after:absolute after:inset-0"
-                  >
-                    <MemberAvatar member={member} size="sm" />
-                    {formatName(member.first_name, member.last_name)}
-                  </Link>
-                </td>
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
-                  {getPrimaryEmail(member)}
-                </td>
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
-                  {member.company_name || "-"}
-                </td>
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
-                  {member.attendee_stagetypes.length > 0
-                    ? member.attendee_stagetypes.map(formatStageType).join(", ")
-                    : "-"}
-                </td>
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
-                  {member.last_dinner_attended
-                    ? formatDate(member.last_dinner_attended)
-                    : "-"}
-                </td>
-                <td className={`px-4 py-3 text-sm ${member.kicked_out ? "text-gray-400" : "text-gray-500"}`}>
-                  {member.marketing_opted_in ? "Yes" : "No"}
-                </td>
-              </tr>
-            ))}
+          <tbody>
+            {sorted.map((member) => {
+              const kicked = member.kicked_out;
+              return (
+                <tr
+                  key={member.id}
+                  className={`group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100 ${kicked ? "line-through" : ""}`}
+                >
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg1"} font-medium`}>
+                    <Link
+                      href={`/admin/members/${member.id}`}
+                      className={`flex items-center gap-2 no-underline after:absolute after:inset-0 ${kicked ? "text-fg4" : "text-fg1"}`}
+                    >
+                      <MemberAvatar member={member} size="sm" />
+                      {formatName(member.first_name, member.last_name)}
+                    </Link>
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    {member.company_name || "\u2014"}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    {member.attendee_stagetypes.length > 0
+                      ? member.attendee_stagetypes.map(formatStageType).join(", ")
+                      : "\u2014"}
+                  </td>
+                  <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg2"}`}>
+                    {member.last_dinner_attended
+                      ? formatDate(member.last_dinner_attended)
+                      : "\u2014"}
+                  </td>
+                </tr>
+              );
+            })}
             {sorted.length === 0 && (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-6 text-center text-sm text-gray-400"
-                >
+                <td colSpan={4} className="px-3.5 py-6 text-center text-sm text-fg4">
                   No members found.
                 </td>
               </tr>

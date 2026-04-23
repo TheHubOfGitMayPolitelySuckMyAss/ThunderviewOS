@@ -2,9 +2,15 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { X } from "lucide-react";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
 import { checkEmail, addMember } from "./actions";
 import type { EmailCheckResult } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/ui/field-help";
 
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -13,13 +19,7 @@ const STAGE_OPTIONS = [
   "Guest (Speaker/Press/Etc)",
 ];
 
-const GENDER_OPTIONS = [
-  "Prefer not to say",
-  "Male",
-  "Female",
-  "Other",
-];
-
+const GENDER_OPTIONS = ["Prefer not to say", "Male", "Female", "Other"];
 const RACE_OPTIONS = [
   "Prefer not to say",
   "American Indian or Alaska Native",
@@ -30,12 +30,7 @@ const RACE_OPTIONS = [
   "Native Hawaiian or Other Pacific Islander",
   "White",
 ];
-
-const ORIENTATION_OPTIONS = [
-  "Prefer not to say",
-  "Straight",
-  "LGBTQ+",
-];
+const ORIENTATION_OPTIONS = ["Prefer not to say", "Straight", "LGBTQ+"];
 
 type Dinner = { id: string; date: string };
 
@@ -58,16 +53,13 @@ export default function AddMemberModal({
   const [gender, setGender] = useState("Prefer not to say");
   const [race, setRace] = useState("Prefer not to say");
   const [orientation, setOrientation] = useState("Prefer not to say");
-  const [preferredDinnerDate, setPreferredDinnerDate] = useState(
-    dinners[0]?.date ?? ""
-  );
+  const [preferredDinnerDate, setPreferredDinnerDate] = useState(dinners[0]?.date ?? "");
 
   const [emailCheck, setEmailCheck] = useState<EmailCheckResult | null>(null);
   const [emailChecking, setEmailChecking] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  // Debounced email validation
   const validateEmail = useCallback((val: string) => {
     if (!val || !val.includes("@")) {
       setEmailCheck(null);
@@ -85,8 +77,7 @@ export default function AddMemberModal({
     return () => clearTimeout(timer);
   }, [email, validateEmail]);
 
-  const emailBlocked =
-    !!emailCheck?.existingMember || !!emailCheck?.pendingApp;
+  const emailBlocked = !!emailCheck?.existingMember || !!emailCheck?.pendingApp;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,17 +86,9 @@ export default function AddMemberModal({
 
     startTransition(async () => {
       const result = await addMember({
-        firstName,
-        lastName,
-        email,
-        companyName,
-        companyWebsite,
-        linkedinProfile,
-        attendeeStagetype,
-        preferredDinnerDate,
-        gender,
-        race,
-        orientation,
+        firstName, lastName, email, companyName, companyWebsite,
+        linkedinProfile, attendeeStagetype, preferredDinnerDate,
+        gender, race, orientation,
       });
 
       if (result.success) {
@@ -116,234 +99,117 @@ export default function AddMemberModal({
     });
   }
 
-  const inputClass =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-  const labelClass = "block text-sm font-medium text-gray-700";
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+      <div className="mx-4 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Add Member</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            &times;
+          <h3 className="tv-h4">Add Member</h3>
+          <button onClick={onClose} className="text-fg4 cursor-pointer hover:text-fg2">
+            <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className={inputClass}
-              />
+              <Label required>First Name</Label>
+              <Input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </div>
             <div>
-              <label className={labelClass}>
-                Last Name
-              </label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className={inputClass}
-              />
+              <Label>Last Name</Label>
+              <Input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <label className={labelClass}>
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
-            />
-            {emailChecking && (
-              <p className="mt-1 text-xs text-gray-400">Checking...</p>
-            )}
+            <Label required>Email</Label>
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} error={!!emailCheck?.existingMember} />
+            {emailChecking && <FieldHelp>Checking...</FieldHelp>}
             {emailCheck?.existingMember && (
-              <p className="mt-1 text-xs text-red-600">
+              <FieldHelp error>
                 This email belongs to an existing member:{" "}
-                <Link
-                  href={`/admin/members/${emailCheck.existingMember.id}`}
-                  className="underline"
-                >
+                <Link href={`/admin/members/${emailCheck.existingMember.id}`} className="underline text-ember-600">
                   {emailCheck.existingMember.name}
                 </Link>
-              </p>
+              </FieldHelp>
             )}
             {emailCheck?.pendingApp && (
-              <p className="mt-1 text-xs text-yellow-700">
+              <FieldHelp className="!text-mustard-500">
                 This person has a pending application.{" "}
-                <Link
-                  href={`/admin/applications/${emailCheck.pendingApp.id}`}
-                  className="underline"
-                >
+                <Link href={`/admin/applications/${emailCheck.pendingApp.id}`} className="underline">
                   View application
                 </Link>
-              </p>
+              </FieldHelp>
             )}
             {emailCheck?.rejectedApp && !emailCheck.pendingApp && (
-              <p className="mt-1 text-xs text-yellow-700">
+              <FieldHelp className="!text-mustard-500">
                 This person was previously rejected.{" "}
-                <Link
-                  href={`/admin/applications/${emailCheck.rejectedApp.id}`}
-                  className="underline"
-                >
+                <Link href={`/admin/applications/${emailCheck.rejectedApp.id}`} className="underline">
                   View application
                 </Link>
-              </p>
+              </FieldHelp>
             )}
           </div>
 
           <div>
-            <label className={labelClass}>
-              Company <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className={inputClass}
-            />
+            <Label required>Company</Label>
+            <Input type="text" required value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
           </div>
 
           <div>
-            <label className={labelClass}>Website</label>
-            <input
-              type="text"
-              value={companyWebsite}
-              onChange={(e) => setCompanyWebsite(e.target.value)}
-              className={inputClass}
-            />
+            <Label>Website</Label>
+            <Input type="text" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} />
           </div>
 
           <div>
-            <label className={labelClass}>LinkedIn</label>
-            <input
-              type="text"
-              value={linkedinProfile}
-              onChange={(e) => setLinkedinProfile(e.target.value)}
-              className={inputClass}
-            />
+            <Label>LinkedIn</Label>
+            <Input type="text" value={linkedinProfile} onChange={(e) => setLinkedinProfile(e.target.value)} />
           </div>
 
           <div>
-            <label className={labelClass}>
-              Type <span className="text-red-500">*</span>
-            </label>
-            <select
-              required
-              value={attendeeStagetype}
-              onChange={(e) => setAttendeeStagetype(e.target.value)}
-              className={inputClass}
-            >
-              {STAGE_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {formatStageType(opt)}
-                </option>
-              ))}
-            </select>
+            <Label required>Type</Label>
+            <Select required value={attendeeStagetype} onChange={(e) => setAttendeeStagetype(e.target.value)}>
+              {STAGE_OPTIONS.map((opt) => <option key={opt} value={opt}>{formatStageType(opt)}</option>)}
+            </Select>
           </div>
 
           <div>
-            <label className={labelClass}>Gender</label>
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              className={inputClass}
-            >
-              {GENDER_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <Label>Gender</Label>
+            <Select value={gender} onChange={(e) => setGender(e.target.value)}>
+              {GENDER_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            </Select>
           </div>
 
           <div>
-            <label className={labelClass}>Race/Ethnicity</label>
-            <select
-              value={race}
-              onChange={(e) => setRace(e.target.value)}
-              className={inputClass}
-            >
-              {RACE_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <Label>Race/Ethnicity</Label>
+            <Select value={race} onChange={(e) => setRace(e.target.value)}>
+              {RACE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            </Select>
           </div>
 
           <div>
-            <label className={labelClass}>Orientation</label>
-            <select
-              value={orientation}
-              onChange={(e) => setOrientation(e.target.value)}
-              className={inputClass}
-            >
-              {ORIENTATION_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <Label>Orientation</Label>
+            <Select value={orientation} onChange={(e) => setOrientation(e.target.value)}>
+              {ORIENTATION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            </Select>
           </div>
 
           <div>
-            <label className={labelClass}>
-              Preferred Dinner Date <span className="text-red-500">*</span>
-            </label>
-            <select
-              required
-              value={preferredDinnerDate}
-              onChange={(e) => setPreferredDinnerDate(e.target.value)}
-              className={inputClass}
-            >
-              {dinners.map((d) => (
-                <option key={d.id} value={d.date}>
-                  {formatDate(d.date)}
-                </option>
-              ))}
-            </select>
+            <Label required>Preferred Dinner Date</Label>
+            <Select required value={preferredDinnerDate} onChange={(e) => setPreferredDinnerDate(e.target.value)}>
+              {dinners.map((d) => <option key={d.id} value={d.date}>{formatDate(d.date)}</option>)}
+            </Select>
           </div>
 
           {error && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </p>
+            <p className="rounded-md bg-[#F2D4CB] px-3 py-2 text-sm text-ember-600">{error}</p>
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isPending || emailBlocked || emailChecking}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              {isPending ? "Adding..." : "Add Member"}
-            </button>
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={isPending || emailBlocked || emailChecking}>
+              {isPending ? "Adding\u2026" : "Add Member"}
+            </Button>
           </div>
         </form>
       </div>
