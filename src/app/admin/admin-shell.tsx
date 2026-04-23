@@ -64,7 +64,7 @@ export default function AdminShell({
 
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto bg-bg tv-page-gutter py-8">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-bg tv-page-gutter py-7">{children}</main>
       </div>
     </div>
   );

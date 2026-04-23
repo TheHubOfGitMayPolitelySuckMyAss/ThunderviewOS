@@ -48,7 +48,7 @@ const transactionalEmails = [
 
 export default function EmailsPage() {
   return (
-    <div className="tv-container-admin">
+    <div className="max-w-[720px]">
       <PageHeader title="Emails" size="compact" />
 
       {/* Marketing */}

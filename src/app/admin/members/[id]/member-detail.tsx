@@ -96,7 +96,7 @@ export default function MemberDetail({
         <Heading member={m} />
       </div>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-7">
         {/* Column One */}
         <div className="space-y-4">
           <EditableField

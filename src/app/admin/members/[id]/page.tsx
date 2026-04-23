@@ -112,7 +112,7 @@ export default async function MemberDetailPage({
   };
 
   return (
-    <div className="tv-container-admin">
+    <div className="max-w-[1040px] mx-auto">
       <Link
         href="/admin/members"
         className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
