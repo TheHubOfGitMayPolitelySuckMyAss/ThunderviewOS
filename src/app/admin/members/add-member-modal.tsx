@@ -9,8 +9,8 @@ import type { EmailCheckResult } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { FieldHelp } from "@/components/ui/field-help";
+import Field from "@/components/field";
 
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -111,22 +111,19 @@ export default function AddMemberModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label required>First Name</Label>
+            <Field label="First Name" required>
               <Input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            </div>
-            <div>
-              <Label>Last Name</Label>
+            </Field>
+            <Field label="Last Name">
               <Input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </div>
+            </Field>
           </div>
 
-          <div>
-            <Label required>Email</Label>
+          <Field label="Email" required>
             <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} error={!!emailCheck?.existingMember} />
-            {emailChecking && <FieldHelp>Checking...</FieldHelp>}
+            {emailChecking && <FieldHelp className="!mt-0">Checking...</FieldHelp>}
             {emailCheck?.existingMember && (
-              <FieldHelp error>
+              <FieldHelp error className="!mt-0">
                 This email belongs to an existing member:{" "}
                 <Link href={`/admin/members/${emailCheck.existingMember.id}`} className="underline text-ember-600">
                   {emailCheck.existingMember.name}
@@ -134,7 +131,7 @@ export default function AddMemberModal({
               </FieldHelp>
             )}
             {emailCheck?.pendingApp && (
-              <FieldHelp className="!text-mustard-500">
+              <FieldHelp className="!text-mustard-500 !mt-0">
                 This person has a pending application.{" "}
                 <Link href={`/admin/applications/${emailCheck.pendingApp.id}`} className="underline">
                   View application
@@ -142,64 +139,56 @@ export default function AddMemberModal({
               </FieldHelp>
             )}
             {emailCheck?.rejectedApp && !emailCheck.pendingApp && (
-              <FieldHelp className="!text-mustard-500">
+              <FieldHelp className="!text-mustard-500 !mt-0">
                 This person was previously rejected.{" "}
                 <Link href={`/admin/applications/${emailCheck.rejectedApp.id}`} className="underline">
                   View application
                 </Link>
               </FieldHelp>
             )}
-          </div>
+          </Field>
 
-          <div>
-            <Label required>Company</Label>
+          <Field label="Company" required>
             <Input type="text" required value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
-          </div>
+          </Field>
 
-          <div>
-            <Label>Website</Label>
+          <Field label="Website">
             <Input type="text" value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} />
-          </div>
+          </Field>
 
-          <div>
-            <Label>LinkedIn</Label>
+          <Field label="LinkedIn">
             <Input type="text" value={linkedinProfile} onChange={(e) => setLinkedinProfile(e.target.value)} />
-          </div>
+          </Field>
 
-          <div>
-            <Label required>Type</Label>
+          <Field label="Type" required>
             <Select required value={attendeeStagetype} onChange={(e) => setAttendeeStagetype(e.target.value)}>
               {STAGE_OPTIONS.map((opt) => <option key={opt} value={opt}>{formatStageType(opt)}</option>)}
             </Select>
-          </div>
+          </Field>
 
-          <div>
-            <Label>Gender</Label>
+          <Field label="Gender">
             <Select value={gender} onChange={(e) => setGender(e.target.value)}>
               {GENDER_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
             </Select>
-          </div>
+          </Field>
 
-          <div>
-            <Label>Race/Ethnicity</Label>
+          <Field label="Race/Ethnicity">
             <Select value={race} onChange={(e) => setRace(e.target.value)}>
               {RACE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
             </Select>
-          </div>
+          </Field>
 
-          <div>
-            <Label>Orientation</Label>
+          <Field label="Orientation">
             <Select value={orientation} onChange={(e) => setOrientation(e.target.value)}>
               {ORIENTATION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
             </Select>
-          </div>
+          </Field>
 
-          <div>
-            <Label required>Preferred Dinner Date</Label>
+          <Field label="Preferred Dinner Date" required>
             <Select required value={preferredDinnerDate} onChange={(e) => setPreferredDinnerDate(e.target.value)}>
               {dinners.map((d) => <option key={d.id} value={d.date}>{formatDate(d.date)}</option>)}
             </Select>
-          </div>
+          </Field>
 
           {error && (
             <p className="rounded-md bg-[#F2D4CB] px-3 py-2 text-sm text-ember-600">{error}</p>

@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Eyebrow, H1 } from "@/components/ui/typography";
+import Field from "@/components/field";
 import { Card } from "@/components/ui/card";
 
 const CropModal = dynamic(() => import("./crop-modal"), { ssr: false });
@@ -286,8 +287,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
         <Card>
           <Eyebrow className="mb-4">Profile details</Eyebrow>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <Label htmlFor="first_name">First name</Label>
+            <Field label="First name" required>
               <Input
                 id="first_name"
                 name="first_name"
@@ -295,20 +295,18 @@ export default function ProfileForm({ member }: ProfileFormProps) {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
               />
-            </div>
-            <div>
-              <Label htmlFor="last_name">Last name</Label>
+            </Field>
+            <Field label="Last name">
               <Input
                 id="last_name"
                 name="last_name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="mt-4">
-            <Label htmlFor="primary_email">Primary email</Label>
+          <Field label="Primary email" className="mt-form-row">
             <Input
               type="email"
               id="primary_email"
@@ -316,20 +314,18 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               value={primaryEmail}
               onChange={(e) => setPrimaryEmail(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <Label htmlFor="company_name">Company name</Label>
+          <Field label="Company name" className="mt-form-row">
             <Input
               id="company_name"
               name="company_name"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <Label htmlFor="company_website">Company website</Label>
+          <Field label="Company website" className="mt-form-row">
             <Input
               id="company_website"
               name="company_website"
@@ -337,10 +333,9 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               value={companyWebsite}
               onChange={(e) => setCompanyWebsite(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <Label htmlFor="linkedin_profile">LinkedIn</Label>
+          <Field label="LinkedIn" className="mt-form-row">
             <Input
               id="linkedin_profile"
               name="linkedin_profile"
@@ -348,16 +343,15 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               value={linkedinProfile}
               onChange={(e) => setLinkedinProfile(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <Label>Attendee type</Label>
+          <Field label="Attendee type" className="mt-form-row">
             <input
               type="hidden"
               name="attendee_stagetypes"
               value={stagetypes.join(",")}
             />
-            <div className="flex flex-wrap gap-3.5 text-[14px] text-fg2 mt-1">
+            <div className="flex flex-wrap gap-3.5 text-[14px] text-fg2">
               {STAGE_OPTIONS.map((option) => {
                 const checked = stagetypes.includes(option);
                 return (
@@ -376,12 +370,11 @@ export default function ProfileForm({ member }: ProfileFormProps) {
                 );
               })}
             </div>
-          </div>
+          </Field>
 
           <Eyebrow className="mt-8 mb-4">Intro & Ask</Eyebrow>
 
-          <div>
-            <Label htmlFor="current_intro">Intro</Label>
+          <Field label="Intro">
             <Textarea
               id="current_intro"
               name="current_intro"
@@ -390,10 +383,9 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               onChange={(e) => setIntro(e.target.value)}
               placeholder="How would you introduce yourself to the group?"
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <Label htmlFor="current_ask">Ask</Label>
+          <Field label="Ask" className="mt-form-row">
             <Textarea
               id="current_ask"
               name="current_ask"
@@ -402,10 +394,9 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               onChange={(e) => setAsk(e.target.value)}
               placeholder="What can the group help you with?"
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <Label htmlFor="contact_preference">Preferred contact</Label>
+          <Field label="Preferred contact" className="mt-form-row">
             <Select
               id="contact_preference"
               name="contact_preference"
@@ -418,7 +409,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
                 </option>
               ))}
             </Select>
-          </div>
+          </Field>
 
           <div className="mt-6">
             <Button type="submit" disabled={saving}>

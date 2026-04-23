@@ -5,8 +5,8 @@ import { savePortalProfile } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Eyebrow } from "@/components/ui/typography";
+import Field from "@/components/field";
 
 const CONTACT_OPTIONS = ["linkedin", "email"];
 
@@ -78,11 +78,8 @@ export default function PortalForm({
         We send these around a week before each dinner so people know who to find you for.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="current_intro">
-            Intro &mdash; how you&rsquo;d introduce yourself at the table
-          </Label>
+      <form onSubmit={handleSubmit} className="space-y-form-row">
+        <Field label="Intro \u2014 how you'd introduce yourself at the table">
           <Textarea
             id="current_intro"
             name="current_intro"
@@ -91,12 +88,9 @@ export default function PortalForm({
             onChange={(e) => setIntro(e.target.value)}
             placeholder="How would you introduce yourself to the group?"
           />
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="current_ask">
-            Ask &mdash; one specific thing the room could help with
-          </Label>
+        <Field label="Ask \u2014 one specific thing the room could help with">
           <Textarea
             id="current_ask"
             name="current_ask"
@@ -105,10 +99,9 @@ export default function PortalForm({
             onChange={(e) => setAsk(e.target.value)}
             placeholder="What can the group help you with?"
           />
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="contact_preference">Preferred contact</Label>
+        <Field label="Preferred contact">
           <Select
             id="contact_preference"
             name="contact_preference"
@@ -121,7 +114,7 @@ export default function PortalForm({
               </option>
             ))}
           </Select>
-        </div>
+        </Field>
 
         <Button type="submit" disabled={saving}>
           {saving ? "Saving\u2026" : "Save"}

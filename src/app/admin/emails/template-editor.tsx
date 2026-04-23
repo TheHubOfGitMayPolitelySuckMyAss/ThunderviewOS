@@ -5,7 +5,7 @@ import { formatTimestamp } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import Field from "@/components/field";
 
 interface TemplateEditorProps {
   slug: string;
@@ -82,25 +82,23 @@ export default function TemplateEditor({
   return (
     <div className="max-w-2xl">
       {/* Subject */}
-      <div className="mb-4">
-        <Label>Subject</Label>
+      <Field label="Subject" className="mb-4">
         <Input
           type="text"
           value={subject}
           onChange={(e) => handleSubjectChange(e.target.value)}
         />
-      </div>
+      </Field>
 
       {/* Body */}
-      <div className="mb-2">
-        <Label>Body</Label>
+      <Field label="Body" className="mb-2">
         <Textarea
           value={body}
           onChange={(e) => handleBodyChange(e.target.value)}
           rows={16}
           className="!font-mono !text-sm"
         />
-      </div>
+      </Field>
 
       {/* Available variables */}
       <p className="mb-6 text-xs text-fg3">

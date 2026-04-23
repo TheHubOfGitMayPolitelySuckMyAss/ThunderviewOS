@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { purchaseTicket } from "./cart/actions";
 import { allowsGuestTicket } from "@/lib/ticket-rules";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FieldHelp } from "@/components/ui/field-help";
+import Field from "@/components/field";
 
 type DinnerOption = {
   id: string;
@@ -46,8 +46,7 @@ export default function TicketPurchase({
   return (
     <div className="space-y-5">
       {/* Dinner dropdown */}
-      <div>
-        <Label>Which dinner?</Label>
+      <Field label="Which dinner?">
         <Select
           value={selectedDinnerId}
           onChange={(e) => setSelectedDinnerId(e.target.value)}
@@ -59,11 +58,11 @@ export default function TicketPurchase({
           ))}
         </Select>
         {selectedDinner?.isPast && (
-          <FieldHelp className="!text-mustard-500">
+          <FieldHelp className="!text-mustard-500 !mt-0">
             Buying a ticket for a past dinner.
           </FieldHelp>
         )}
-      </div>
+      </Field>
 
       {/* Buy buttons */}
       {showGuestButton ? (

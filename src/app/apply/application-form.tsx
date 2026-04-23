@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitApplication } from "./actions";
+import Field from "@/components/field";
 
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -86,8 +87,6 @@ export default function ApplicationForm() {
 
   const inputClass =
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-  const labelClass = "block text-sm font-medium text-gray-700";
-  const requiredStar = <span className="text-red-500"> *</span>;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-7">
@@ -96,10 +95,9 @@ export default function ApplicationForm() {
         <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">
           Personal Information
         </h2>
-        <div className="space-y-4">
-          <div>
-            <label className={labelClass}>Name{requiredStar}</label>
-            <div className="mt-1 grid grid-cols-2 gap-3">
+        <div className="space-y-form-row">
+          <Field label="Name" required>
+            <div className="grid grid-cols-2 gap-3">
               <input
                 type="text"
                 required
@@ -117,14 +115,13 @@ export default function ApplicationForm() {
                 className={inputClass}
               />
             </div>
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>Email{requiredStar}</label>
-            <p className="mb-1 text-xs text-gray-500">
-              Please click the button below to get our pre-dinner email with
-              attendee introductions!
-            </p>
+          <Field
+            label="Email"
+            required
+            help="Please click the button below to get our pre-dinner email with attendee introductions!"
+          >
             <input
               type="email"
               required
@@ -132,12 +129,9 @@ export default function ApplicationForm() {
               onChange={(e) => setEmail(e.target.value)}
               className={inputClass}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>
-              LinkedIn Profile{requiredStar}
-            </label>
+          <Field label="LinkedIn Profile" required>
             <input
               type="text"
               required
@@ -146,10 +140,9 @@ export default function ApplicationForm() {
               onChange={(e) => setLinkedinProfile(e.target.value)}
               className={inputClass}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>Gender{requiredStar}</label>
+          <Field label="Gender" required>
             <select
               required
               value={gender}
@@ -165,10 +158,9 @@ export default function ApplicationForm() {
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>Race{requiredStar}</label>
+          <Field label="Race" required>
             <select
               required
               value={race}
@@ -184,10 +176,9 @@ export default function ApplicationForm() {
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>Orientation{requiredStar}</label>
+          <Field label="Orientation" required>
             <select
               required
               value={orientation}
@@ -203,7 +194,7 @@ export default function ApplicationForm() {
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
         </div>
       </section>
 
@@ -212,9 +203,8 @@ export default function ApplicationForm() {
         <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">
           Company Information
         </h2>
-        <div className="space-y-4">
-          <div>
-            <label className={labelClass}>Company Name{requiredStar}</label>
+        <div className="space-y-form-row">
+          <Field label="Company Name" required>
             <input
               type="text"
               required
@@ -222,12 +212,9 @@ export default function ApplicationForm() {
               onChange={(e) => setCompanyName(e.target.value)}
               className={inputClass}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>
-              Company Website{requiredStar}
-            </label>
+          <Field label="Company Website" required>
             <input
               type="text"
               required
@@ -236,12 +223,9 @@ export default function ApplicationForm() {
               onChange={(e) => setCompanyWebsite(e.target.value)}
               className={inputClass}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className={labelClass}>
-              Attendee Stage/Type{requiredStar}
-            </label>
+          <Field label="Attendee Stage/Type" required>
             <select
               required
               value={attendeeStagetype}
@@ -257,19 +241,15 @@ export default function ApplicationForm() {
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
 
           {isActiveCEO && (
             <>
-              <div>
-                <label className={labelClass}>
-                  I Am My Startup&rsquo;s CEO{requiredStar}
-                </label>
-                <p className="mb-1 text-xs text-gray-500">
-                  Thunderview CEO Dinners are specifically organized for company
-                  CEOs. Sadly, this means no CTOs, CPOs, Presidents, co-founders
-                  or spouses (work or otherwise).
-                </p>
+              <Field
+                label="I Am My Startup's CEO"
+                required
+                help="Thunderview CEO Dinners are specifically organized for company CEOs. Sadly, this means no CTOs, CPOs, Presidents, co-founders or spouses (work or otherwise)."
+              >
                 <select
                   required
                   value={iAmCeo}
@@ -282,18 +262,13 @@ export default function ApplicationForm() {
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
-              </div>
+              </Field>
 
-              <div>
-                <label className={labelClass}>
-                  My Startup Is NOT A Services Business{requiredStar}
-                </label>
-                <p className="mb-1 text-xs text-gray-500">
-                  Our dinners are focused on product and software companies. We
-                  do not allow the following types of companies to attend:
-                  accountancies, dev shops, recruiters, consultants, fractional
-                  executives and coaches.
-                </p>
+              <Field
+                label="My Startup Is NOT A Services Business"
+                required
+                help="Our dinners are focused on product and software companies. We do not allow the following types of companies to attend: accountancies, dev shops, recruiters, consultants, fractional executives and coaches."
+              >
                 <select
                   required
                   value={isNotServices}
@@ -306,7 +281,7 @@ export default function ApplicationForm() {
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
-              </div>
+              </Field>
             </>
           )}
         </div>

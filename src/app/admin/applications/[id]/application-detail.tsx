@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import Field from "@/components/field";
 
 const REJECTION_REASONS = ["Service Provider", "services business", "Other"];
 
@@ -292,14 +292,13 @@ function RejectModal({
         <h3 className="tv-h4 mb-4">Reject {name}</h3>
 
         <div className="space-y-3">
-          <div>
-            <Label>Rejection Reason</Label>
+          <Field label="Rejection Reason">
             <Select value={reason} onChange={(e) => setReason(e.target.value)}>
               {REJECTION_REASONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </Select>
-          </div>
+          </Field>
 
           {reason === "Other" && (
             <Input
