@@ -5,6 +5,20 @@
    Fraunces (display) via Google Fonts — see links below or the
    @import. Ships warm-neutral cream/tan tokens and semantic
    type styles (h1..h4, p, small, label, mono).
+
+   TOKEN NAMING — matches production (src/app/globals.css).
+   Production defines every token twice:
+     1. Raw vars with a `--tv-` prefix (e.g. `--tv-bg`, `--tv-accent`,
+        `--tv-dur-fast`). These are the source of truth in CSS.
+        The prefix exists so Tailwind 4's `@theme inline` block can
+        re-expose them without collision.
+     2. Tailwind utility classes (`bg-bg`, `text-fg1`, `rounded-lg`,
+        `shadow-glow`, `duration-[120ms]`) that consume the prefixed
+        vars. This is what component JSX actually uses.
+   This file mirrors (1) — it declares both the unprefixed aliases
+   (`--bg`, `--fg1`, `--dur-fast`, …) and the prefixed `--tv-*`
+   originals. Either name is valid in design mocks. In production
+   app code, prefer the `--tv-*` form or the Tailwind utility.
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -108,38 +122,157 @@
   --dur-med:  220ms;
   --dur-slow: 420ms;
 
-  /* ---- Layout: nav + page chrome ---- */
+  /* ================================================================
+     LAYOUT INVARIANTS — non-negotiable measurements.
+     If a new design needs to deviate, update the token here — never
+     hand-tune a component. Goal: any page added six months from now
+     matches existing pages without a designer re-specifying spacing.
+     ================================================================ */
+
+  /* ---- Nav + page chrome ---- */
   --nav-height: 64px;
-  --page-gutter-sm: 24px;
-  --page-gutter-lg: 48px;
+  --page-gutter-sm: 24px;   /* mobile */
+  --page-gutter-lg: 48px;   /* desktop */
   --container-marketing: 1040px;
-  --container-app: 1280px;
-  --container-admin: 1440px;
+  --container-app:       1280px;
+  --container-admin:     1440px;
 
-  /* ---- Layout: vertical rhythm ---- */
-  --section-gap: var(--space-8);      /* 64px — between major page sections */
-  --stack-gap: var(--space-5);        /* 24px — default stack within a section */
-  --tight-gap: var(--space-3);        /* 12px — tight groups, related items */
+  /* ---- Vertical rhythm ---- */
+  --section-gap: var(--space-8);   /* 64px — between major page sections */
+  --stack-gap:   var(--space-5);   /* 24px — default stack within a section */
+  --tight-gap:   var(--space-3);   /* 12px — related items, page-header internals */
 
-  /* ---- Layout: forms ---- */
-  --form-row-gap: var(--space-4);     /* 16px between fields in a form */
-  --label-input-gap: var(--space-2);  /* 8px between label and input */
-  --button-group-gap: var(--space-3); /* 12px between buttons in a group */
+  /* ---- Forms ---- */
+  --form-row-gap:     var(--space-4);   /* 16px between fields */
+  --label-input-gap:  var(--space-2);   /*  8px between label and input */
+  --button-group-gap: var(--space-3);   /* 12px between buttons in a group */
 
-  /* ---- Layout: tables ---- */
-  --table-row-height: 52px;
-  --table-header-height: 44px;
-  --table-cell-padding-x: var(--space-4);
+  /* ---- Tables ---- */
+  --table-row-height:      52px;
+  --table-header-height:   44px;
+  --table-cell-padding-x:  var(--space-4);
 
-  /* ---- Layout: modals ---- */
+  /* ---- Modals ---- */
   --modal-width-sm: 420px;
   --modal-width-md: 560px;
   --modal-width-lg: 720px;
 
-  /* ---- Layout: nav internals ---- */
-  --nav-logo-size: 20px;              /* Fraunces 500, tight tracking */
-  --nav-link-gap: var(--space-6);     /* 24px between nav links */
-  --nav-logo-to-links-gap: var(--space-7); /* 48px between logo and link group */
+  /* ---- Nav internals ---- */
+  --nav-logo-size:          20px;            /* Fraunces 500, -0.01em tracking */
+  --nav-link-gap:           var(--space-6);  /* 24px between nav links */
+  --nav-logo-to-links-gap:  var(--space-7);  /* 48px logo → link group */
+
+  /* ================================================================
+     Prefixed `--tv-*` aliases — mirror production (globals.css).
+     Every unprefixed token above is re-exposed here under `--tv-*`
+     so mocks can reference either form. In production app code,
+     prefer the prefixed form; the raw Tailwind utility (bg-bg,
+     text-fg1, etc.) is the canonical consumer.
+     ================================================================ */
+
+  --tv-cream-50:  var(--cream-50);
+  --tv-cream-100: var(--cream-100);
+  --tv-cream-200: var(--cream-200);
+  --tv-tan-300:   var(--tan-300);
+  --tv-tan-400:   var(--tan-400);
+  --tv-clay-500:  var(--clay-500);
+  --tv-clay-600:  var(--clay-600);
+  --tv-ink-900:   var(--ink-900);
+  --tv-ink-700:   var(--ink-700);
+  --tv-ink-500:   var(--ink-500);
+  --tv-ink-300:   var(--ink-300);
+  --tv-line-200:  var(--line-200);
+  --tv-line-100:  var(--line-100);
+  --tv-ember-600:   var(--ember-600);
+  --tv-mustard-500: var(--mustard-500);
+  --tv-moss-600:    var(--moss-600);
+  --tv-plum-700:    var(--plum-700);
+
+  --tv-bg:          var(--bg);
+  --tv-bg-elevated: var(--bg-elevated);
+  --tv-bg-tinted:   var(--bg-tinted);
+  --tv-bg-accent:   var(--bg-accent);
+  --tv-fg1: var(--fg1);
+  --tv-fg2: var(--fg2);
+  --tv-fg3: var(--fg3);
+  --tv-fg4: var(--fg4);
+  --tv-border:        var(--border);
+  --tv-border-subtle: var(--border-subtle);
+  --tv-accent:       var(--accent);
+  --tv-accent-hover: var(--accent-hover);
+  --tv-accent-soft:  var(--accent-soft);
+  --tv-success: var(--success);
+  --tv-warning: var(--warning);
+  --tv-danger:  var(--danger);
+
+  --tv-font-sans:    var(--font-sans);
+  --tv-font-display: var(--font-display);
+  --tv-font-mono:    var(--font-mono);
+
+  --tv-text-xs:   var(--text-xs);
+  --tv-text-sm:   var(--text-sm);
+  --tv-text-base: var(--text-base);
+  --tv-text-md:   var(--text-md);
+  --tv-text-lg:   var(--text-lg);
+  --tv-text-xl:   var(--text-xl);
+  --tv-text-2xl:  var(--text-2xl);
+  --tv-text-3xl:  var(--text-3xl);
+  --tv-text-4xl:  var(--text-4xl);
+
+  --tv-radius-sm:   var(--radius-sm);
+  --tv-radius-md:   var(--radius-md);
+  --tv-radius-lg:   var(--radius-lg);
+  --tv-radius-xl:   var(--radius-xl);
+  --tv-radius-pill: var(--radius-pill);
+
+  --tv-shadow-xs:   var(--shadow-xs);
+  --tv-shadow-sm:   var(--shadow-sm);
+  --tv-shadow-md:   var(--shadow-md);
+  --tv-shadow-lg:   var(--shadow-lg);
+  --tv-shadow-glow: var(--shadow-glow);
+
+  --tv-space-1: var(--space-1);
+  --tv-space-2: var(--space-2);
+  --tv-space-3: var(--space-3);
+  --tv-space-4: var(--space-4);
+  --tv-space-5: var(--space-5);
+  --tv-space-6: var(--space-6);
+  --tv-space-7: var(--space-7);
+  --tv-space-8: var(--space-8);
+  --tv-space-9: var(--space-9);
+
+  --tv-ease-out:    var(--ease-out);
+  --tv-ease-in-out: var(--ease-in-out);
+  --tv-dur-fast: var(--dur-fast);
+  --tv-dur-med:  var(--dur-med);
+  --tv-dur-slow: var(--dur-slow);
+
+  --tv-nav-height:          var(--nav-height);
+  --tv-page-gutter-sm:      var(--page-gutter-sm);
+  --tv-page-gutter-lg:      var(--page-gutter-lg);
+  --tv-container-marketing: var(--container-marketing);
+  --tv-container-app:       var(--container-app);
+  --tv-container-admin:     var(--container-admin);
+
+  --tv-section-gap: var(--section-gap);
+  --tv-stack-gap:   var(--stack-gap);
+  --tv-tight-gap:   var(--tight-gap);
+
+  --tv-form-row-gap:     var(--form-row-gap);
+  --tv-label-input-gap:  var(--label-input-gap);
+  --tv-button-group-gap: var(--button-group-gap);
+
+  --tv-table-row-height:     var(--table-row-height);
+  --tv-table-header-height:  var(--table-header-height);
+  --tv-table-cell-padding-x: var(--table-cell-padding-x);
+
+  --tv-modal-width-sm: var(--modal-width-sm);
+  --tv-modal-width-md: var(--modal-width-md);
+  --tv-modal-width-lg: var(--modal-width-lg);
+
+  --tv-nav-logo-size:         var(--nav-logo-size);
+  --tv-nav-link-gap:          var(--nav-link-gap);
+  --tv-nav-logo-to-links-gap: var(--nav-logo-to-links-gap);
 }
 
 /* ================================================================
@@ -268,7 +401,8 @@
 }
 
 /* ================================================================
-   Layout utility classes
+   Layout utility classes — enforce the LAYOUT INVARIANTS above.
+   Prefer these over hand-rolled padding/margin values.
    ================================================================ */
 
 .tv-nav {
@@ -277,7 +411,9 @@
   padding-right: var(--page-gutter-sm);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg);
 }
 
 @media (min-width: 768px) {
@@ -303,6 +439,7 @@
   padding-left: var(--page-gutter-sm);
   padding-right: var(--page-gutter-sm);
 }
+
 @media (min-width: 768px) {
   .tv-page-gutter {
     padding-left: var(--page-gutter-lg);
@@ -312,4 +449,4 @@
 
 /* Page header block — eyebrow + h1 + lede, consistent rhythm */
 .tv-page-header > * + * { margin-top: var(--tight-gap); }
-.tv-page-header + * { margin-top: var(--section-gap); }
+.tv-page-header + *     { margin-top: var(--section-gap); }
