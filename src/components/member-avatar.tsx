@@ -1,9 +1,9 @@
 import Image from "next/image";
 
 const SIZES = {
-  sm: { container: "h-7 w-7", text: "text-[10px]", px: 28 },
-  md: { container: "h-10 w-10", text: "text-xs", px: 40 },
-  lg: { container: "h-[120px] w-[120px]", text: "text-3xl", px: 120 },
+  sm: { container: "h-[28px] w-[28px]", text: "text-[10px]", px: 28 },
+  md: { container: "h-[40px] w-[40px]", text: "text-xs",     px: 40 },
+  lg: { container: "h-[120px] w-[120px]", text: "text-3xl",  px: 120 },
 } as const;
 
 type MemberAvatarProps = {

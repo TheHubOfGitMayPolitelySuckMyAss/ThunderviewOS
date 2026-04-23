@@ -214,27 +214,22 @@
   --shadow-lg: var(--tv-shadow-lg);
   --shadow-glow: var(--tv-shadow-glow);
 
-  /* Spacing */
-  --spacing-1: var(--tv-space-1);
-  --spacing-2: var(--tv-space-2);
-  --spacing-3: var(--tv-space-3);
-  --spacing-4: var(--tv-space-4);
-  --spacing-5: var(--tv-space-5);
-  --spacing-6: var(--tv-space-6);
-  --spacing-7: var(--tv-space-7);
-  --spacing-8: var(--tv-space-8);
-  --spacing-9: var(--tv-space-9);
-
-  /* Layout */
-  --spacing-nav: var(--tv-nav-height);
-  --spacing-gutter-sm: var(--tv-page-gutter-sm);
-  --spacing-gutter-lg: var(--tv-page-gutter-lg);
-  --spacing-section-gap: var(--tv-section-gap);
-  --spacing-stack-gap: var(--tv-stack-gap);
-  --spacing-tight-gap: var(--tv-tight-gap);
-  --spacing-form-row: var(--tv-form-row-gap);
-  --spacing-label-input: var(--tv-label-input-gap);
-  --spacing-button-group: var(--tv-button-group-gap);
+  /* Spacing — semantic aliases only.
+     Do NOT add --spacing-1 through --spacing-9 here. Tailwind 4 computes
+     numeric utilities (h-9, p-4, gap-6) as calc(var(--spacing) * N).
+     Defining --spacing-N overrides that per-step, silently remapping every
+     numeric sizing class to our non-linear scale (e.g. h-9 → 96px instead
+     of 36px). Raw --tv-space-* vars remain available for var() usage and
+     arbitrary values like gap-[var(--tv-space-5)]. */
+  --spacing-tight:        var(--tv-tight-gap);
+  --spacing-stack:        var(--tv-stack-gap);
+  --spacing-section:      var(--tv-section-gap);
+  --spacing-form-row:     var(--tv-form-row-gap);
+  --spacing-label-input:  var(--tv-label-input-gap);
+  --spacing-button-grp:   var(--tv-button-group-gap);
+  --spacing-gutter-sm:    var(--tv-page-gutter-sm);
+  --spacing-gutter-lg:    var(--tv-page-gutter-lg);
+  --spacing-nav:          var(--tv-nav-height);
   --spacing-table-cell-x: var(--tv-table-cell-padding-x);
 }
 

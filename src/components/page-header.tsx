@@ -16,7 +16,7 @@ export default function PageHeader({
   size = "default",
 }: PageHeaderProps) {
   const compact = size === "compact";
-  const gap = compact ? "mb-stack-gap" : "mb-section-gap";
+  const gap = compact ? "mb-stack" : "mb-section";
 
   const heading = compact ? (
     <h1 className="tv-h3">{title}</h1>
@@ -48,7 +48,7 @@ export default function PageHeader({
         {heading}
         {ledeEl}
       </div>
-      <div className="flex items-center gap-button-group flex-shrink-0">
+      <div className="flex items-center gap-button-grp flex-shrink-0">
         {actions}
       </div>
     </div>

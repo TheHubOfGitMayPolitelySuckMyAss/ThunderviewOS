@@ -19,6 +19,18 @@
    (`--bg`, `--fg1`, `--dur-fast`, …) and the prefixed `--tv-*`
    originals. Either name is valid in design mocks. In production
    app code, prefer the `--tv-*` form or the Tailwind utility.
+
+   SPACING HAZARD — Tailwind 4's --spacing-* namespace.
+   Do not re-export --tv-space-1 through --tv-space-9 under
+   --spacing-N keys in @theme inline. Tailwind 4 computes numeric
+   utilities (h-9, p-4, gap-6) as calc(var(--spacing) * N). Defining
+   --spacing-9 overrides that step to our scale (96px), so h-9
+   silently becomes 96px instead of 36px. Only semantic aliases
+   (--spacing-stack, --spacing-section, --spacing-tight, --spacing-form-row,
+   --spacing-label-input, --spacing-button-grp, --spacing-gutter-sm/lg,
+   --spacing-nav) may live in @theme inline. The raw --tv-space-* vars
+   stay available for var() usage and arbitrary values like
+   gap-[var(--tv-space-5)].
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&display=swap');
