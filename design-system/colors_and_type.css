@@ -1,0 +1,315 @@
+/* ================================================================
+   Thunderview Design System — Colors & Type
+   ----------------------------------------------------------------
+   Load before any Thunderview UI. Uses Inter (body + UI) and
+   Fraunces (display) via Google Fonts — see links below or the
+   @import. Ships warm-neutral cream/tan tokens and semantic
+   type styles (h1..h4, p, small, label, mono).
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ---- Core warm neutrals (the whole system sits on these) ---- */
+  --cream-50:  #FBF7F0;   /* page background, lightest */
+  --cream-100: #F5EEE1;   /* card surface, elevated on cream-50 */
+  --cream-200: #EADFC8;   /* subtle divider / tinted surface */
+  --tan-300:   #D9C4A0;   /* warm accent surface, tag bg, hover */
+  --tan-400:   #B8A387;   /* muted CTA, secondary accent — greyed */
+  --clay-500:  #9A7A5E;   /* brand warm-grey — primary accent (was #B5835A) */
+  --clay-600:  #76563D;   /* brand warm-grey, darker (hover) */
+
+  /* ---- Warm grays (text + UI chrome) ---- */
+  --ink-900: #2B241C;   /* near-black warm; primary text (fg1) */
+  --ink-700: #4A3F34;   /* secondary text (fg2) */
+  --ink-500: #75695B;   /* tertiary / meta (fg3) */
+  --ink-300: #A89E8F;   /* disabled / placeholder (fg4) */
+  --line-200: #E2D7C1;  /* default border */
+  --line-100: #EDE3D1;  /* subtle border / hairline */
+
+  /* ---- Accents (used sparingly, pulled from dinner photography) */
+  --ember-600:  #C0442A;   /* bright warm red — rare accent / alerts */
+  --mustard-500:#D8A13E;   /* warm gold — highlight / star */
+  --moss-600:   #5B6A3B;   /* deep olive — success / calm accent */
+  --plum-700:   #6B3A3A;   /* dim red-brown — rare quote accent */
+
+  /* ---- Semantic colors ---- */
+  --bg:           var(--cream-50);
+  --bg-elevated:  var(--cream-100);
+  --bg-tinted:    var(--cream-200);
+  --bg-accent:    var(--tan-300);
+
+  --fg1: var(--ink-900);   /* primary text */
+  --fg2: var(--ink-700);   /* secondary text */
+  --fg3: var(--ink-500);   /* meta / captions */
+  --fg4: var(--ink-300);   /* disabled / placeholder */
+
+  --border:        var(--line-200);
+  --border-subtle: var(--line-100);
+
+  --accent:       var(--clay-500);  /* primary action color */
+  --accent-hover: var(--clay-600);
+  --accent-soft:  var(--tan-300);
+
+  --success: var(--moss-600);
+  --warning: var(--mustard-500);
+  --danger:  var(--ember-600);
+
+  /* ---- Fonts ---- */
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', 'Inter', ui-serif, Georgia, serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* ---- Type scale (semantic) ---- */
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-md:   18px;
+  --text-lg:   22px;
+  --text-xl:   28px;
+  --text-2xl:  36px;
+  --text-3xl:  48px;
+  --text-4xl:  64px;
+
+  /* ---- Radii ---- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* ---- Shadows (warm-tinted; not neutral black) ---- */
+  --shadow-xs: 0 1px 2px rgba(75, 54, 33, 0.06);
+  --shadow-sm: 0 2px 4px rgba(75, 54, 33, 0.08),
+               0 1px 2px rgba(75, 54, 33, 0.04);
+  --shadow-md: 0 8px 20px rgba(75, 54, 33, 0.10),
+               0 2px 4px rgba(75, 54, 33, 0.05);
+  --shadow-lg: 0 20px 40px rgba(75, 54, 33, 0.14),
+               0 4px 10px rgba(75, 54, 33, 0.06);
+  /* Candle-glow — for warm "firelight" emphasis (feature card) */
+  --shadow-glow: 0 0 0 1px var(--tan-300),
+                 0 20px 40px rgba(181, 131, 90, 0.20);
+
+  /* ---- Spacing tokens (4px rhythm) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ---- Motion ---- */
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in-out: cubic-bezier(.5, 0, .2, 1);
+  --dur-fast: 120ms;
+  --dur-med:  220ms;
+  --dur-slow: 420ms;
+
+  /* ---- Layout: nav + page chrome ---- */
+  --nav-height: 64px;
+  --page-gutter-sm: 24px;
+  --page-gutter-lg: 48px;
+  --container-marketing: 1040px;
+  --container-app: 1280px;
+  --container-admin: 1440px;
+
+  /* ---- Layout: vertical rhythm ---- */
+  --section-gap: var(--space-8);      /* 64px — between major page sections */
+  --stack-gap: var(--space-5);        /* 24px — default stack within a section */
+  --tight-gap: var(--space-3);        /* 12px — tight groups, related items */
+
+  /* ---- Layout: forms ---- */
+  --form-row-gap: var(--space-4);     /* 16px between fields in a form */
+  --label-input-gap: var(--space-2);  /* 8px between label and input */
+  --button-group-gap: var(--space-3); /* 12px between buttons in a group */
+
+  /* ---- Layout: tables ---- */
+  --table-row-height: 52px;
+  --table-header-height: 44px;
+  --table-cell-padding-x: var(--space-4);
+
+  /* ---- Layout: modals ---- */
+  --modal-width-sm: 420px;
+  --modal-width-md: 560px;
+  --modal-width-lg: 720px;
+
+  /* ---- Layout: nav internals ---- */
+  --nav-logo-size: 20px;              /* Fraunces 500, tight tracking */
+  --nav-link-gap: var(--space-6);     /* 24px between nav links */
+  --nav-logo-to-links-gap: var(--space-7); /* 48px between logo and link group */
+}
+
+/* ================================================================
+   Semantic type styles — apply via class or compose into components
+   ================================================================ */
+
+.tv-h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(40px, 6vw, var(--text-4xl));
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  color: var(--fg1);
+  font-variation-settings: "opsz" 144;
+  text-wrap: balance;
+}
+
+.tv-h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(30px, 4vw, var(--text-3xl));
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--fg1);
+  font-variation-settings: "opsz" 144;
+  text-wrap: balance;
+}
+
+.tv-h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--text-xl);
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  color: var(--fg1);
+  font-variation-settings: "opsz" 72;
+}
+
+.tv-h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  line-height: 1.3;
+  color: var(--fg1);
+}
+
+.tv-eyebrow {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--fg3);
+}
+
+.tv-p {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--fg2);
+  text-wrap: pretty;
+}
+
+.tv-lede {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--fg2);
+  text-wrap: pretty;
+}
+
+.tv-small {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--fg3);
+}
+
+.tv-label {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  color: var(--fg2);
+}
+
+.tv-mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--fg2);
+}
+
+.tv-quote {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--text-xl);
+  line-height: 1.35;
+  color: var(--fg1);
+  font-variation-settings: "opsz" 144;
+}
+
+/* Body default — applied when a surface class is set */
+.tv-surface {
+  background: var(--bg);
+  color: var(--fg1);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle paper/linen texture — applied to marketing surfaces to
+   give the "textured and handmade" feel without overwhelming. */
+.tv-paper {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(181, 131, 90, 0.05), transparent 50%),
+    radial-gradient(circle at 80% 100%, rgba(194, 154, 103, 0.06), transparent 50%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.35 0 0 0 0 0.22 0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* ================================================================
+   Layout utility classes
+   ================================================================ */
+
+.tv-nav {
+  height: var(--nav-height);
+  padding-left: var(--page-gutter-sm);
+  padding-right: var(--page-gutter-sm);
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+@media (min-width: 768px) {
+  .tv-nav {
+    padding-left: var(--page-gutter-lg);
+    padding-right: var(--page-gutter-lg);
+  }
+}
+
+.tv-nav-logo {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--nav-logo-size);
+  letter-spacing: -0.01em;
+  color: var(--fg1);
+}
+
+.tv-container-marketing { max-width: var(--container-marketing); margin-inline: auto; }
+.tv-container-app       { max-width: var(--container-app);       margin-inline: auto; }
+.tv-container-admin     { max-width: var(--container-admin);     margin-inline: auto; }
+
+.tv-page-gutter {
+  padding-left: var(--page-gutter-sm);
+  padding-right: var(--page-gutter-sm);
+}
+@media (min-width: 768px) {
+  .tv-page-gutter {
+    padding-left: var(--page-gutter-lg);
+    padding-right: var(--page-gutter-lg);
+  }
+}
+
+/* Page header block — eyebrow + h1 + lede, consistent rhythm */
+.tv-page-header > * + * { margin-top: var(--tight-gap); }
+.tv-page-header + * { margin-top: var(--section-gap); }
