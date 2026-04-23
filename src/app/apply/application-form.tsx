@@ -90,7 +90,7 @@ export default function ApplicationForm() {
   const requiredStar = <span className="text-red-500"> *</span>;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-10">
+    <form onSubmit={handleSubmit} className="space-y-7">
       {/* PERSONAL INFORMATION */}
       <section>
         <h2 className="mb-4 border-b border-gray-300 pb-2 text-xs font-bold uppercase tracking-widest text-gray-500">

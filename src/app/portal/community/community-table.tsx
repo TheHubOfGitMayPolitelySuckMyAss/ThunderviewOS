@@ -104,7 +104,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
                 <th
                   key={col}
                   onClick={() => toggleSort(col)}
-                  className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-[18px] py-3 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10"
+                  className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-4 py-3 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10"
                 >
                   {col === "name" ? "Name" : col === "company" ? "Company" : "Role"}
                   <SortIcon col={col} />
@@ -118,7 +118,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
                 key={member.id}
                 className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated"
               >
-                <td className="px-[18px] py-3.5 text-sm">
+                <td className="px-4 py-3.5 text-sm">
                   <Link
                     href={`/portal/members/${member.id}`}
                     className="flex items-center gap-3 text-fg1 font-medium no-underline after:absolute after:inset-0"
@@ -127,10 +127,10 @@ export default function CommunityTable({ members }: { members: Member[] }) {
                     {formatName(member.first_name, member.last_name)}
                   </Link>
                 </td>
-                <td className="px-[18px] py-3.5 text-[13px] text-fg2">
+                <td className="px-4 py-3.5 text-[13px] text-fg2">
                   {member.company_name || "\u2014"}
                 </td>
-                <td className="px-[18px] py-3.5 text-[13px] text-fg3">
+                <td className="px-4 py-3.5 text-[13px] text-fg3">
                   {member.attendee_stagetypes.length > 0
                     ? member.attendee_stagetypes.map(formatStageType).join(", ")
                     : "\u2014"}
@@ -141,7 +141,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
               <tr>
                 <td
                   colSpan={3}
-                  className="px-[18px] py-8 text-center text-sm text-fg4"
+                  className="px-4 py-8 text-center text-sm text-fg4"
                 >
                   No members found.
                 </td>

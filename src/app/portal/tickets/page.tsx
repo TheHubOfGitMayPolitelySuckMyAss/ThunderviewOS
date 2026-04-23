@@ -45,7 +45,7 @@ export default async function TicketSelectionPage() {
   // No stagetype set
   if (!member.attendee_stagetypes || member.attendee_stagetypes.length === 0) {
     return (
-      <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+      <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
         <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
           <ArrowLeft size={14} /> Portal home
         </Link>
@@ -118,7 +118,7 @@ export default async function TicketSelectionPage() {
 
   if (dinnerOptions.length === 0) {
     return (
-      <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+      <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
         <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
           <ArrowLeft size={14} /> Portal home
         </Link>
@@ -143,7 +143,7 @@ export default async function TicketSelectionPage() {
   );
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
       <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
         <ArrowLeft size={14} /> Portal home
       </Link>

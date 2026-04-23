@@ -54,7 +54,7 @@ export default async function ProfilePage() {
     emails?.find((e) => e.is_primary)?.email ?? user.email!;
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
       <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
         <ArrowLeft size={14} /> Portal home
       </Link>

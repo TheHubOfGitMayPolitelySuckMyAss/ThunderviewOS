@@ -68,7 +68,7 @@ export default function MorningOfEditor({
       />
 
       {/* Attendee preview section */}
-      <div className="mt-10 max-w-2xl">
+      <div className="mt-7 max-w-2xl">
         <h3 className="mb-1 text-lg font-semibold text-fg1">
           Attendee Intros &amp; Asks{" "}
           <span className="text-sm font-normal text-fg3">(auto-generated)</span>

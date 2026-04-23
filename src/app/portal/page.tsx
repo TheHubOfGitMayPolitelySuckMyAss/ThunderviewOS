@@ -86,7 +86,7 @@ export default async function PortalPage({
   ];
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
       <H1 className="mb-1.5">
         {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
       </H1>
@@ -104,7 +104,7 @@ export default async function PortalPage({
             <Link
               key={btn.href}
               href={btn.href}
-              className="flex items-center justify-between px-[22px] py-[18px] bg-bg-elevated border border-border rounded-lg text-fg1 font-medium text-base no-underline mb-2.5 transition-all duration-150 hover:bg-bg-tinted hover:translate-x-0.5"
+              className="flex items-center justify-between px-5 py-4 bg-bg-elevated border border-border rounded-lg text-fg1 font-medium text-base no-underline mb-2.5 transition-all duration-150 hover:bg-bg-tinted hover:translate-x-0.5"
             >
               {btn.label}
               <ChevronRight size={16} className="text-fg3" />

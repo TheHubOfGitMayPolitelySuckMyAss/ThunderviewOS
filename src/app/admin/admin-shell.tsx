@@ -47,7 +47,7 @@ export default function AdminShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center justify-between rounded-md px-3 py-[9px] text-sm font-medium no-underline mb-0.5 ${
+                    className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium no-underline mb-0.5 ${
                       active
                         ? "bg-ink-900 text-cream-50"
                         : "text-fg2 hover:bg-bg-tinted"

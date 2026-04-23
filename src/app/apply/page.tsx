@@ -83,7 +83,7 @@ export default async function ApplyPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto max-w-2xl px-4 py-12">
+      <div className="mx-auto max-w-2xl px-4 py-7">
         <h1 className="mb-6 text-2xl font-bold text-gray-900">
           Sign Up to Attend a CEO Dinner
         </h1>
@@ -122,7 +122,7 @@ export default async function ApplyPage() {
         </div>
 
         {/* Dinner schedule */}
-        <div className="mb-10">
+        <div className="mb-7">
           <ul className="space-y-1">
             {schedule.map((s, i) => (
               <li

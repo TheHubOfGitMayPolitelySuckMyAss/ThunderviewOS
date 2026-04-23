@@ -27,8 +27,8 @@ export default async function HomePage() {
 
       {/* ---- Hero ---- */}
       <section className="tv-paper">
-        <div className="max-w-[1120px] mx-auto tv-page-gutter pt-16 md:pt-[72px] pb-10">
-          <div className="max-w-[820px] mb-12">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter pt-8 pb-7">
+          <div className="max-w-[820px] mb-7">
             <Eyebrow className="!text-accent-hover mb-5">Monthly CEO Dinners · Denver, Colorado</Eyebrow>
             <H1 className="mb-7 max-w-[900px]">
               Monthly dinners for Colorado startup CEOs.
@@ -37,7 +37,7 @@ export default async function HomePage() {
               Every attendee is vetted. No service providers, no job-seekers. CEOs are peers, not products. One long table, one evening a month.
             </Body>
 
-            <div className="flex gap-3 mb-10">
+            <div className="flex gap-3 mb-7">
               {isAuthenticated ? (
                 <Button size="lg" asChild>
                   <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
@@ -49,7 +49,7 @@ export default async function HomePage() {
               )}
             </div>
 
-            <div className="flex gap-12 text-[13px] text-fg3">
+            <div className="flex gap-7 text-[13px] text-fg3">
               {/* TODO(eric): confirm copy — pull live counts from DB? */}
               <div>
                 <span className="block font-display font-medium text-[32px] text-fg1 mb-0.5" style={{ fontVariationSettings: '"opsz" 72' }}>35+</span>
@@ -82,8 +82,8 @@ export default async function HomePage() {
 
       {/* ---- Three reasons ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px]">
-          <H2 className="mb-10 max-w-[680px]">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-8">
+          <H2 className="mb-7 max-w-[680px]">
             {/* TODO(eric): confirm copy */}
             Why CEOs keep coming back.
           </H2>
@@ -118,8 +118,8 @@ export default async function HomePage() {
 
       {/* ---- Quote ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px]">
-          <div className="bg-bg-elevated rounded-xl p-14 md:px-16 text-center shadow-glow border border-transparent">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-8">
+          <div className="bg-bg-elevated rounded-xl p-7 md:px-8 text-center shadow-glow border border-transparent">
             <p className="font-display italic font-normal text-[32px] leading-[1.3] text-fg1 max-w-[780px] mx-auto mb-6" style={{ textWrap: "balance" }}>
               {/* TODO(eric): confirm copy — real quote from a member */}
               &ldquo;The whole point of the dinner is that someone in the room has already solved your weird problem. Your job is to find them.&rdquo;
@@ -134,8 +134,8 @@ export default async function HomePage() {
 
       {/* ---- Photo gallery ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px]">
-          <H2 className="mb-10">Scenes from the last three years.</H2>
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-8">
+          <H2 className="mb-7">Scenes from the last three years.</H2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
               <Image src="/brand/photos/dinner-10-laughing-pair.webp" alt="Two CEOs laughing" fill className="!relative object-cover w-full h-full" />
@@ -161,7 +161,7 @@ export default async function HomePage() {
 
       {/* ---- Bottom CTA ---- */}
       <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto tv-page-gutter py-[72px] text-center">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-8 text-center">
           {/* TODO(eric): confirm copy — pull next dinner date from DB? */}
           <H2 className="mx-auto mb-7">Next dinner: first Thursday of the month.</H2>
           {isAuthenticated ? (
@@ -177,7 +177,7 @@ export default async function HomePage() {
       </section>
 
       {/* ---- Footer ---- */}
-      <footer className="border-t border-border-subtle py-12 text-center text-[13px] text-fg3">
+      <footer className="border-t border-border-subtle py-7 text-center text-[13px] text-fg3">
         Thunderview CEO Dinners
         <span className="text-fg4 mx-2">&middot;</span>
         Denver, Colorado

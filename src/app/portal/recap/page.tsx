@@ -20,7 +20,7 @@ export default async function RecapPage() {
 
   if (!dinner) {
     return (
-      <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+      <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
         <H1>Last Month&rsquo;s Intros &amp; Asks</H1>
         <Body className="mt-4">No dinners yet.</Body>
       </div>
@@ -74,7 +74,7 @@ export default async function RecapPage() {
     });
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
+    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
       {/* Centered header */}
       <div className="text-center pb-5 border-b border-border-subtle mb-7">
         <Eyebrow className="mb-1.5">Thunderview Dinner</Eyebrow>
@@ -89,7 +89,7 @@ export default async function RecapPage() {
       {/* Two-column card grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {attendees.map((m) => (
-          <div key={m.id} className="bg-bg-elevated border border-border-subtle rounded-lg p-[22px]">
+          <div key={m.id} className="bg-bg-elevated border border-border-subtle rounded-lg p-5">
             <div className="flex items-center gap-3 mb-3.5">
               <MemberAvatar member={m} size="md" />
               <div>

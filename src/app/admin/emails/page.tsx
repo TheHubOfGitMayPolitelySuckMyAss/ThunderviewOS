@@ -51,7 +51,7 @@ export default function EmailsPage() {
       <h1 className="tv-h2 !text-[36px] mb-6">Emails</h1>
 
       {/* Marketing */}
-      <section className="mb-10">
+      <section className="mb-7">
         <Eyebrow className="mb-3 pb-2.5 border-b border-border-subtle">Marketing</Eyebrow>
         <div className="space-y-4">
           {marketingEmails.map((email) => (
