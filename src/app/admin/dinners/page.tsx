@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import DinnersTable from "./dinners-table";
+import PageHeader from "@/components/page-header";
 
 // PostgREST on Supabase caps responses at 1000 rows server-side, so .limit()
 // above that is silently clamped. Paginate with .range() until drained.
@@ -107,10 +108,11 @@ export default async function DinnersPage() {
 
   return (
     <div className="tv-container-admin">
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="tv-h2 !text-[36px]">Dinners</h1>
-        <span className="text-fg3 text-[14px]">{dinnerStats.length} past &middot; scheduled</span>
-      </div>
+      <PageHeader
+        title="Dinners"
+        size="compact"
+        actions={<span className="text-fg3 text-[14px]">{dinnerStats.length} past &middot; scheduled</span>}
+      />
       <DinnersTable dinners={dinnerStats} nextDinnerId={nextUpcomingId} />
     </div>
   );

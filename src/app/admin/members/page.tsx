@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTodayMT } from "@/lib/format";
 import MembersTable from "./members-table";
+import PageHeader from "@/components/page-header";
 
 // PostgREST on Supabase caps responses at 1000 rows server-side.
 // Paginate with .range() until drained.
@@ -38,9 +39,7 @@ export default async function MembersPage() {
 
   return (
     <div className="tv-container-admin">
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="tv-h2 !text-[36px]">Members</h1>
-      </div>
+      <PageHeader title="Members" size="compact" />
       <MembersTable
         members={members}
         upcomingDinners={upcomingDinners || []}

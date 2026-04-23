@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Eyebrow } from "@/components/ui/typography";
+import PageHeader from "@/components/page-header";
 
 const marketingEmails = [
   {
@@ -48,7 +49,7 @@ const transactionalEmails = [
 export default function EmailsPage() {
   return (
     <div className="tv-container-admin">
-      <h1 className="tv-h2 !text-[36px] mb-6">Emails</h1>
+      <PageHeader title="Emails" size="compact" />
 
       {/* Marketing */}
       <section className="mb-7">

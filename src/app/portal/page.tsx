@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
-import { H1, Body } from "@/components/ui/typography";
+import { Body } from "@/components/ui/typography";
+import PageHeader from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
 import PurchaseConfetti from "./purchase-confetti";
@@ -87,15 +88,12 @@ export default async function PortalPage({
 
   return (
     <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
-      <H1 className="mb-1.5">
-        {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
-      </H1>
-      {bannerDinnerDate && (
-        <Body className="mb-8">
-          You&rsquo;re coming to the {formatDinnerDisplay(bannerDinnerDate)} dinner. Here&rsquo;s your corner of Thunderview.
-        </Body>
-      )}
-      {!bannerDinnerDate && <div className="mb-8" />}
+      <PageHeader
+        title={member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
+        lede={bannerDinnerDate ? (
+          <Body>You&rsquo;re coming to the {formatDinnerDisplay(bannerDinnerDate)} dinner. Here&rsquo;s your corner of Thunderview.</Body>
+        ) : undefined}
+      />
 
       <div className="grid gap-7 md:grid-cols-[1fr_1.2fr]">
         {/* Left column: navigation buttons */}

@@ -3,7 +3,8 @@ import { formatDinnerDisplay, formatName } from "@/lib/format";
 import { getTodayMT } from "@/lib/format";
 import Link from "next/link";
 import MemberAvatar from "@/components/member-avatar";
-import { H1, Eyebrow, Body } from "@/components/ui/typography";
+import { Eyebrow, Body } from "@/components/ui/typography";
+import PageHeader from "@/components/page-header";
 
 export default async function RecapPage() {
   const admin = createAdminClient();
@@ -21,8 +22,7 @@ export default async function RecapPage() {
   if (!dinner) {
     return (
       <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
-        <H1>Last Month&rsquo;s Intros &amp; Asks</H1>
-        <Body className="mt-4">No dinners yet.</Body>
+        <PageHeader title="Last Month's Intros & Asks" lede={<Body>No dinners yet.</Body>} />
       </div>
     );
   }

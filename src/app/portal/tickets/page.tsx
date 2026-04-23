@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
-import { H1, Lede, Body } from "@/components/ui/typography";
+import { Body } from "@/components/ui/typography";
+import PageHeader from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import TicketPurchase from "./ticket-purchase";
 
@@ -49,14 +50,18 @@ export default async function TicketSelectionPage() {
         <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
           <ArrowLeft size={14} /> Portal home
         </Link>
-        <H1 className="mt-2">Buy a dinner ticket.</H1>
-        <Body className="mt-4">
-          Your profile isn&rsquo;t fully set up yet. Please contact{" "}
-          <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
-            eric@marcoullier.com
-          </a>{" "}
-          for help.
-        </Body>
+        <PageHeader
+          title="Buy a dinner ticket."
+          lede={
+            <Body>
+              Your profile isn&rsquo;t fully set up yet. Please contact{" "}
+              <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
+                eric@marcoullier.com
+              </a>{" "}
+              for help.
+            </Body>
+          }
+        />
       </div>
     );
   }
@@ -122,13 +127,17 @@ export default async function TicketSelectionPage() {
         <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
           <ArrowLeft size={14} /> Portal home
         </Link>
-        <H1 className="mt-2">Buy a dinner ticket.</H1>
-        <Body className="mt-4">
-          No upcoming dinners available. Please contact{" "}
-          <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
-            eric@marcoullier.com
-          </a>.
-        </Body>
+        <PageHeader
+          title="Buy a dinner ticket."
+          lede={
+            <Body>
+              No upcoming dinners available. Please contact{" "}
+              <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
+                eric@marcoullier.com
+              </a>.
+            </Body>
+          }
+        />
       </div>
     );
   }
@@ -147,10 +156,12 @@ export default async function TicketSelectionPage() {
       <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
         <ArrowLeft size={14} /> Portal home
       </Link>
-      <H1 className="mt-2">Buy a dinner ticket.</H1>
-      <Lede>Pick a date. We&rsquo;ll send details about a week before.</Lede>
+      <PageHeader
+        title="Buy a dinner ticket."
+        lede="Pick a date. We'll send details about a week before."
+      />
 
-      <Card className="mt-6">
+      <Card>
         <TicketPurchase
           dinnerOptions={dinnerOptions}
           defaultDinnerId={defaultDinnerId}

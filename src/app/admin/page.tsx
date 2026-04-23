@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import DashboardAccordions from "./dashboard-accordions";
 import { formatDate, formatName, getTodayMT } from "@/lib/format";
-import { H1 } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import { Body } from "@/components/ui/typography";
+import PageHeader from "@/components/page-header";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -72,14 +72,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="tv-container-admin">
-      <div className="flex items-baseline justify-between mb-6">
-        <H1 className="!text-[36px]">Dashboard</H1>
-        {nextDinner && (
+      <PageHeader
+        title="Dashboard"
+        size="compact"
+        actions={nextDinner ? (
           <span className="text-fg3 text-[14px]">
             Next dinner: <strong className="text-fg1">{formatDate(nextDinner.date, { month: "short", day: "numeric" })}</strong> &middot; {daysUntil === 0 ? "today" : `${daysUntil} days away`}
           </span>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Key stats */}
       {nextDinner ? (

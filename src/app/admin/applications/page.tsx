@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import ApplicationsTable from "./applications-table";
+import PageHeader from "@/components/page-header";
 
 // PostgREST on Supabase caps responses at 1000 rows server-side.
 // Paginate with .range() until drained.
@@ -32,10 +33,11 @@ export default async function ApplicationsPage() {
 
   return (
     <div className="tv-container-admin">
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="tv-h2 !text-[36px]">Applications</h1>
-        <span className="text-fg3 text-[14px]">{applications.length} total &middot; {pendingCount} pending</span>
-      </div>
+      <PageHeader
+        title="Applications"
+        size="compact"
+        actions={<span className="text-fg3 text-[14px]">{applications.length} total &middot; {pendingCount} pending</span>}
+      />
       <ApplicationsTable applications={applications} />
     </div>
   );

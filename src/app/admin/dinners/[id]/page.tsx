@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
 import DinnerTickets from "./dinner-tickets";
 import DinnerVenue from "./dinner-venue";
+import PageHeader from "@/components/page-header";
 
 function hasFreshIntroAsk(member: {
   current_intro: string | null;
@@ -184,15 +185,16 @@ export default async function DinnerDetailPage({
         <Link href="/admin/dinners" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
           &larr; Dinners
         </Link>
-        <h1 className="tv-h2 !text-[36px]">
-          {formatDate(dinner.date, {
+        <PageHeader
+          title={formatDate(dinner.date, {
             weekday: "long",
             year: "numeric",
             month: "long",
             day: "numeric",
           })}
-        </h1>
-        <DinnerVenue dinnerId={dinner.id} venue={dinner.venue} address={dinner.address} />
+          lede={<DinnerVenue dinnerId={dinner.id} venue={dinner.venue} address={dinner.address} />}
+          size="compact"
+        />
       </div>
 
       {/* Ticket counts */}

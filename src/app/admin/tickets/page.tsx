@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatName, formatDinnerDisplay } from "@/lib/format";
 import TicketsTable from "./tickets-table";
+import PageHeader from "@/components/page-header";
 
 // PostgREST on Supabase caps responses at 1000 rows server-side.
 // Paginate with .range() until drained.
@@ -66,10 +67,11 @@ export default async function TicketsPage() {
 
   return (
     <div className="tv-container-admin">
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="tv-h2 !text-[36px]">Tickets</h1>
-        <span className="text-fg3 text-[14px]">{rows.length} total</span>
-      </div>
+      <PageHeader
+        title="Tickets"
+        size="compact"
+        actions={<span className="text-fg3 text-[14px]">{rows.length} total</span>}
+      />
       <TicketsTable tickets={rows} />
     </div>
   );
