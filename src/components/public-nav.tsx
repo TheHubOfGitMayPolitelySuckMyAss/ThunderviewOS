@@ -24,17 +24,19 @@ export default async function PublicNav() {
       </div>
 
       <div className="flex items-center gap-[var(--tv-button-group-gap)]">
-        <Button variant="secondary" asChild>
-          <Link href="/apply">Apply</Link>
-        </Button>
         {isAuthenticated ? (
           <Button asChild>
-            <Link href="/portal">Portal</Link>
+            <Link href="/portal">Member Portal</Link>
           </Button>
         ) : (
-          <Button asChild>
-            <Link href="/login">Sign In</Link>
-          </Button>
+          <>
+            <Button variant="secondary" asChild>
+              <Link href="/apply">Apply</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+          </>
         )}
       </div>
     </nav>
