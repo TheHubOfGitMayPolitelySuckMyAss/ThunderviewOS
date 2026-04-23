@@ -112,6 +112,8 @@
   --tv-nav-height: 64px;
   --tv-page-gutter-sm: 24px;
   --tv-page-gutter-lg: 48px;
+  --tv-container-narrow: 640px;
+  --tv-container-portal: 980px;
   --tv-container-marketing: 1040px;
   --tv-container-app: 1280px;
   --tv-container-admin: 1440px;
@@ -383,6 +385,8 @@
   color: var(--tv-fg1);
 }
 
+.tv-container-narrow    { max-width: var(--tv-container-narrow);    margin-inline: auto; }
+.tv-container-portal    { max-width: var(--tv-container-portal);    margin-inline: auto; }
 .tv-container-marketing { max-width: var(--tv-container-marketing); margin-inline: auto; }
 .tv-container-app       { max-width: var(--tv-container-app);       margin-inline: auto; }
 .tv-container-admin     { max-width: var(--tv-container-admin);     margin-inline: auto; }

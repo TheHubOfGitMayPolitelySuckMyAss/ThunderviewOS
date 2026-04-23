@@ -60,7 +60,7 @@ export default async function MemberProfilePage({
   const roles = (member.attendee_stagetypes ?? []) as string[];
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
+    <div className="tv-container-portal tv-page-gutter py-7">
       <Link href="/portal/community" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
         <ArrowLeft size={14} /> Community
       </Link>

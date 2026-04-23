@@ -79,7 +79,7 @@ export default async function PortalPage({
   }
 
   return (
-    <div className="max-w-[640px] mx-auto tv-page-gutter py-7">
+    <div className="tv-container-narrow tv-page-gutter py-7">
       <H1 className="mb-6">
         {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
       </H1>
@@ -87,7 +87,7 @@ export default async function PortalPage({
       {isMember && bannerDinnerDate && (
         <div className="rounded-lg border border-accent-soft bg-bg-elevated px-5 py-3.5 flex items-center gap-3 mb-6">
           <Check size={18} className="text-accent flex-shrink-0" />
-          <span className="text-[14.5px] text-fg2 leading-[1.5]">
+          <span className="text-sm text-fg2 leading-[1.5]">
             You&rsquo;re confirmed for <strong className="text-fg1">{formatDinnerDisplay(bannerDinnerDate)}</strong>.
           </span>
         </div>
@@ -105,7 +105,7 @@ export default async function PortalPage({
         </Card>
       )}
 
-      <p className="text-[13px] text-fg3 mt-5 text-center">
+      <p className="text-xs text-fg3 mt-5 text-center">
         Need to update your name, company, or photo?{" "}
         <Link href="/portal/profile" className="text-accent-hover hover:underline">
           Edit your profile

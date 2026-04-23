@@ -34,7 +34,7 @@ export default async function CommunityPage() {
   );
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
+    <div className="tv-container-portal tv-page-gutter py-7">
       <H1 className="mb-1.5">Community</H1>
       <Lede className="mb-6">{members.length} members with community access.</Lede>
       <CommunityTable members={members} />

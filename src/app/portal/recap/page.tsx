@@ -20,7 +20,7 @@ export default async function RecapPage() {
 
   if (!dinner) {
     return (
-      <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
+      <div className="tv-container-portal tv-page-gutter py-7">
         <H1 className="mb-1.5">Last Month&rsquo;s Intros &amp; Asks</H1>
         <Body>No dinners yet.</Body>
       </div>
@@ -74,7 +74,7 @@ export default async function RecapPage() {
     });
 
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
+    <div className="tv-container-portal tv-page-gutter py-7">
       {/* Centered header */}
       <div className="text-center pb-5 border-b border-border-subtle mb-7">
         <Eyebrow className="mb-1.5">Thunderview Dinner</Eyebrow>

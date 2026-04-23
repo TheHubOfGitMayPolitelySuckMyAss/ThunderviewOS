@@ -62,7 +62,7 @@ export default function PortalForm({
   return (
     <div className="space-y-4">
       <Eyebrow>Your intro &amp; ask for this dinner</Eyebrow>
-      <p className="text-[14px] text-fg2 leading-[1.55] -mt-1 mb-4">
+      <p className="text-sm text-fg2 leading-[1.55] -mt-1 mb-4">
         Every attendee gets the full list of intros and asks the week before dinner.
         People use it to find you&mdash;they&rsquo;ll walk up and say &ldquo;you&rsquo;re the one
         who needs help with fundraising&rdquo; or &ldquo;I saw you&rsquo;re building in climate
