@@ -87,6 +87,8 @@ src/
 │   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links, avatar dropdown. Uses .tv-nav (64px height)
 │   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team/Gallery), Apply + Sign In (or Portal when authenticated). Server component with auth check
 │   ├── member-avatar.tsx              # Reusable avatar: shows profile pic if set, clay-500 initials circle if not. Props: member (first_name, last_name, profile_pic_url), size (sm/md/lg)
+│   ├── page-header.tsx                # Shared page header: eyebrow/title/lede/actions with locked rhythm. size="default" (tv-h1, 64px gap) or "compact" (tv-h3, 24px gap). Portal pages don't use this yet — see "Known gap" section
+│   ├── field.tsx                       # Shared form field wrapper: label/required/help/error/children. flex-col with gap-label-input (8px). Error and help mutually exclusive
 │   └── ui/                            # Design system primitives (compose these, don't inline)
 │       ├── index.ts                   # Barrel export
 │       ├── button.tsx                 # Primary/secondary/ghost, sm/md/lg, asChild prop for wrapping Links
@@ -110,7 +112,8 @@ src/
 │   ├── faq/page.tsx                    # Placeholder (public-nav + H1)
 │   ├── team/page.tsx                   # Placeholder (public-nav + H1)
 │   ├── gallery/page.tsx                # Placeholder (public-nav + H1)
-│   ├── login/page.tsx                  # Magic link sign-in form (client component)
+│   ├── login/page.tsx                  # Magic link sign-in: server wrapper with PublicNav
+│   ├── login/login-form.tsx            # Client component: email input, send magic link, success/error states
 │   ├── apply/
 │   │   ├── page.tsx                    # Public application form (server wrapper: fetches dinners + schedule)
 │   │   ├── application-form.tsx        # Client component: form fields, validation, submit
@@ -403,8 +406,29 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Semantic alias conformance sweep**: all raw-scale Tailwind classes (`bg-cream-50`, `border-line-200`, `text-clay-600`, etc.) replaced with semantic aliases (`bg-bg`, `border-border`, `text-accent-hover`). Remaining raw-scale refs are intentional (active nav state, Pill internals).
 - **Broken motion refs fixed**: all `var(--tv-dur-fast)` / `var(--tv-ease-out)` references replaced with literal values — Tailwind arbitrary values can't resolve CSS vars for non-standard properties through `@theme inline`.
 - **Dev routes**: `/dev/ui` (primitive showcase), `/dev/emails/[slug]` (email template preview with sample data). Not linked from any page.
-- **NEEDS DESIGN REVIEW**: admin member detail (`member-detail.tsx`) has no matching UI kit screen — styled using system conventions. Portal uses `max-w-[980px]` not the `--container-app` (1280px) token — deliberate per kit layout, consider adding `--container-portal`.
+- **NEEDS DESIGN REVIEW**: Portal uses `max-w-[980px]` not the `--container-app` (1280px) token — deliberate per kit layout, consider adding `--container-portal`.
 - **NEEDS DECISION**: receipt email — using Stripe's built-in receipt. Kit has a design but no sender/template/trigger built. Fulfillment hero photo skipped in email shell — would need per-template image support.
+
+## What's done (System hardening — Sprint 16)
+
+- **Spacing token audit**: all hand-rolled pixel values (`py-[72px]`, `px-[22px]`, etc.) and off-scale standard utilities (`mb-10`, `py-24`, `gap-12`, etc.) replaced with `--space-*` tokens across 18 files. Zero bracket-pixel spacing values remain in feature components. UI primitives (`components/ui/`) untouched.
+- **`<PageHeader>` component** (`src/components/page-header.tsx`): props `eyebrow`, `title`, `lede`, `actions`, `size` (`"default"` | `"compact"`). Rhythm locked by the component — `--tight-gap` (12px) between internals, `--section-gap` (64px) default or `--stack-gap` (24px) compact after the header. 16 pages migrated (admin list pages use compact; placeholder pages use default). Detail pages and portal pages NOT migrated — see "Known gap" below.
+- **`<Field>` component** (`src/components/field.tsx`): props `label`, `required`, `help`, `error`, `children`, `className`. Uses `flex flex-col gap-label-input` (8px) with `!mb-0`/`!mt-0` overrides on Label/FieldHelp to strip built-in margins. Error and help are mutually exclusive. 8 forms migrated (39 fields total). Remaining `<label>` hits are checkbox labels inside Fields and dev showcase.
+- **Public pages restyled** (`/login`, `/apply`, `/apply/thanks`): warm cream palette, Fraunces headings, design system Input/Select/Button, Field-wrapped inputs. Zero `gray-*`/`blue-*`/`slate-*` classes remain. Login split into server wrapper (`page.tsx` with PublicNav) + client form (`login-form.tsx`). Apply form uses Eyebrow section headers, schedule in elevated two-column panel. Thanks page centered card with confetti preserved. Placeholder pages (`/about`, `/faq`, `/team`, `/gallery`) given `tv-paper` texture.
+- **Portal pages restyled** to match `ui_kits/portal/index.html`: portal home, community, tickets (3 paths), recap, member view, profile editor. Tighter heading gaps (32px vs PageHeader's 64px section-gap). Profile editor has `border-t` separator between profile details and intro sections.
+- **Admin pages restyled** to match `ui_kits/admin/index.html`: main area padding tightened to `py-7` (48px). Emails list narrowed to 720px. Member detail wrapper narrowed to 1040px, grid gap tightened to 48px. All existing patterns preserved (dl/dt/dd inline editing, STALE pill, Remove Member, Apply Credit, Comp Ticket).
+- **Email template fixes** (`src/lib/email.ts`): CTA button margin-top increased from 8px to 16px. `bodyToHtml()` now post-processes bare `<a>` tags to add inline `color:#9A7A5E` (clay) since email clients strip `<style>` blocks. Tags with existing `style` attributes left untouched. `email-send.ts` unchanged.
+- **Apply schedule** extended from 12 to 13 months so the schedule always includes the same month next year (e.g. April 2027 when viewing in April 2026).
+
+### Known gap: PageHeader on portal pages
+
+`<PageHeader>` has two sizes: `default` (tv-h1 + 64px gap) and `compact` (tv-h3 + 24px gap). Portal pages need tv-h1 heading + ~32px gap — neither size fits. Portal pages currently use inline `<H1>` + `<Lede>` with manual `mb-6` instead of PageHeader. **Next step**: add `size="portal"` (tv-h1 heading + 32px gap) and migrate portal pages back to PageHeader.
+
+### Remaining hardening opportunities
+
+- **Shared `<DataTable>` component**: admin tables (dinners, tickets, applications, members) and the portal community table all share identical th/td class patterns. A single component would enforce table-cell-padding-x, sticky headers, sort arrows, and row-click behavior.
+- **Shared `<SearchToolbar>` component**: admin pages hand-roll search input + filter tabs. A shared component would lock the toolbar layout and spacing.
+- **Admin detail layout component**: member detail, application detail, and dinner detail all use back-link + heading + two-column grid with similar patterns but different enough to resist a single abstraction today.
 
 ## What's NOT done
 
@@ -430,10 +454,12 @@ Don't build these without an explicit prompt:
 - ~~Design system~~ Done — tokens, fonts, primitives, full page restyling, email shell, layout invariants
 - Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
 - Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
-- Restyle remaining unstyled pages: `/login`, `/apply` (application form still uses old gray styles)
+- ~~Restyle remaining unstyled pages: `/login`, `/apply`~~ Done (Sprint 16)
 - Add `--container-portal: 980px` token (portal pages use 980px, not the 1280px `--container-app` token)
+- Add `size="portal"` to PageHeader (tv-h1 + 32px gap) and migrate portal pages to use it
 - Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in
 - Fulfillment email hero photo: per-template image support if wanted
+- Page-by-page detail polish pass (next session)
 
 ## Pre-launch checklist (before real users hit this)
 
