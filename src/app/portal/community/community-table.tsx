@@ -96,7 +96,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
         />
       </div>
 
-      <div className="rounded-xl border border-line-200 bg-cream-50 overflow-hidden">
+      <div className="rounded-xl border border-border bg-bg overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -104,7 +104,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
                 <th
                   key={col}
                   onClick={() => toggleSort(col)}
-                  className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-[18px] py-3 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10"
+                  className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-[18px] py-3 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10"
                 >
                   {col === "name" ? "Name" : col === "company" ? "Company" : "Role"}
                   <SortIcon col={col} />
@@ -116,7 +116,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
             {sorted.map((member) => (
               <tr
                 key={member.id}
-                className="group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100"
+                className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated"
               >
                 <td className="px-[18px] py-3.5 text-sm">
                   <Link

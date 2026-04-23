@@ -141,7 +141,7 @@ export default function ApplicationDetail({
           {app.member_id && (
             <Link
               href={`/admin/members/${app.member_id}`}
-              className="text-sm text-clay-600 no-underline hover:underline inline-flex items-center gap-1"
+              className="text-sm text-accent-hover no-underline hover:underline inline-flex items-center gap-1"
             >
               View member <ArrowRight size={14} />
             </Link>
@@ -153,7 +153,7 @@ export default function ApplicationDetail({
       <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_340px]">
         {/* Column One — application data */}
         <div>
-          <div className="tv-eyebrow border-b border-line-100 pb-2 mb-3">Application</div>
+          <div className="tv-eyebrow border-b border-border-subtle pb-2 mb-3">Application</div>
           <div className="space-y-0">
             <DetailRow label="Received" value={`${formatDate(app.submitted_on, { month: "long", day: "numeric", year: "numeric" })}`} />
             <DetailRow label="Email" value={app.email} link={`mailto:${app.email}`} />
@@ -165,7 +165,7 @@ export default function ApplicationDetail({
             )}
           </div>
 
-          <div className="tv-eyebrow border-b border-line-100 pb-2 mb-3 mt-6">Demographics</div>
+          <div className="tv-eyebrow border-b border-border-subtle pb-2 mb-3 mt-6">Demographics</div>
           <div className="space-y-0">
             <DetailRow label="Gender" value={app.gender} />
             <DetailRow label="Race" value={app.race} />
@@ -242,11 +242,11 @@ export default function ApplicationDetail({
 
 function DetailRow({ label, value, link }: { label: string; value: string; link?: string }) {
   return (
-    <div className="grid grid-cols-[140px_1fr] gap-4 py-2.5 border-b border-line-100">
+    <div className="grid grid-cols-[140px_1fr] gap-4 py-2.5 border-b border-border-subtle">
       <span className="text-[13px] text-fg3">{label}</span>
       <span className="text-[14px] text-fg1">
         {link ? (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="text-clay-600 underline decoration-line-200">
+          <a href={link} target="_blank" rel="noopener noreferrer" className="text-accent-hover underline decoration-border">
             {value}
           </a>
         ) : (
@@ -288,7 +288,7 @@ function RejectModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+      <div className="mx-4 w-full max-w-sm rounded-lg bg-bg border border-border p-6 shadow-lg">
         <h3 className="tv-h4 mb-4">Reject {name}</h3>
 
         <div className="space-y-3">
@@ -384,7 +384,7 @@ function LinkMemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+      <div className="mx-4 w-full max-w-md rounded-lg bg-bg border border-border p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="tv-h4">Link To Existing Member</h3>
           <button onClick={onClose} className="text-fg4 cursor-pointer hover:text-fg2">
@@ -406,13 +406,13 @@ function LinkMemberModal({
         )}
 
         {results.length > 0 && (
-          <div className="mt-2 max-h-60 overflow-auto rounded-md border border-line-200">
+          <div className="mt-2 max-h-60 overflow-auto rounded-md border border-border">
             {results.map((m) => (
               <button
                 key={m.id}
                 onClick={() => setSelected(m.id)}
-                className={`flex w-full items-start gap-3 px-3 py-2 text-left cursor-pointer hover:bg-cream-100 ${
-                  selected === m.id ? "bg-cream-200" : ""
+                className={`flex w-full items-start gap-3 px-3 py-2 text-left cursor-pointer hover:bg-bg-elevated ${
+                  selected === m.id ? "bg-bg-tinted" : ""
                 }`}
               >
                 <div>
@@ -422,7 +422,7 @@ function LinkMemberModal({
                   </div>
                 </div>
                 {selected === m.id && (
-                  <span className="ml-auto text-xs text-clay-600">Selected</span>
+                  <span className="ml-auto text-xs text-accent-hover">Selected</span>
                 )}
               </button>
             ))}

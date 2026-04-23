@@ -36,7 +36,7 @@ export default function MemberAvatar({ member, size }: MemberAvatarProps) {
 
   return (
     <div
-      className={`${s.container} flex items-center justify-center rounded-full bg-clay-500 font-medium text-cream-50 ${s.text}`}
+      className={`${s.container} flex items-center justify-center rounded-full bg-accent font-medium text-cream-50 ${s.text}`}
     >
       {initials}
     </div>

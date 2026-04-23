@@ -76,9 +76,9 @@ export default async function RecapPage() {
   return (
     <div className="max-w-[980px] mx-auto tv-page-gutter py-10">
       {/* Centered header */}
-      <div className="text-center pb-5 border-b border-line-100 mb-7">
+      <div className="text-center pb-5 border-b border-border-subtle mb-7">
         <Eyebrow className="mb-1.5">Thunderview Dinner</Eyebrow>
-        <p className="font-display font-medium text-[34px] italic text-clay-600">
+        <p className="font-display font-medium text-[34px] italic text-accent-hover">
           {formatDinnerDisplay(dinner.date)}
         </p>
         <p className="text-fg3 text-[14px] mt-1.5">
@@ -89,7 +89,7 @@ export default async function RecapPage() {
       {/* Two-column card grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {attendees.map((m) => (
-          <div key={m.id} className="bg-cream-100 border border-line-100 rounded-lg p-[22px]">
+          <div key={m.id} className="bg-bg-elevated border border-border-subtle rounded-lg p-[22px]">
             <div className="flex items-center gap-3 mb-3.5">
               <MemberAvatar member={m} size="md" />
               <div>
@@ -107,13 +107,13 @@ export default async function RecapPage() {
 
             {m.current_intro && (
               <>
-                <p className="font-semibold text-[11px] uppercase tracking-[0.12em] text-clay-600 mt-3 mb-1">Intro</p>
+                <p className="font-semibold text-[11px] uppercase tracking-[0.12em] text-accent-hover mt-3 mb-1">Intro</p>
                 <p className="text-[13.5px] leading-[1.55] text-fg2 whitespace-pre-wrap">{m.current_intro}</p>
               </>
             )}
             {m.current_ask && (
               <>
-                <p className="font-semibold text-[11px] uppercase tracking-[0.12em] text-clay-600 mt-3 mb-1">Ask</p>
+                <p className="font-semibold text-[11px] uppercase tracking-[0.12em] text-accent-hover mt-3 mb-1">Ask</p>
                 <p className="text-[13.5px] leading-[1.55] text-fg2 whitespace-pre-wrap">{m.current_ask}</p>
               </>
             )}

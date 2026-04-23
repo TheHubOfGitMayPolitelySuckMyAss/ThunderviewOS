@@ -104,7 +104,7 @@ export default async function PortalPage({
             <Link
               key={btn.href}
               href={btn.href}
-              className="flex items-center justify-between px-[22px] py-[18px] bg-cream-100 border border-line-200 rounded-lg text-fg1 font-medium text-base no-underline mb-2.5 transition-all duration-150 hover:bg-cream-200 hover:translate-x-0.5"
+              className="flex items-center justify-between px-[22px] py-[18px] bg-bg-elevated border border-border rounded-lg text-fg1 font-medium text-base no-underline mb-2.5 transition-all duration-150 hover:bg-bg-tinted hover:translate-x-0.5"
             >
               {btn.label}
               <ChevronRight size={16} className="text-fg3" />

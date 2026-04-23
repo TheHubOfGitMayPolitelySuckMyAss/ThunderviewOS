@@ -39,7 +39,7 @@ function Accordion({
   const [open, setOpen] = useState(defaultOpen ?? false);
 
   return (
-    <div className="border border-line-200 rounded-xl bg-cream-50 overflow-hidden mb-3">
+    <div className="border border-border rounded-xl bg-bg overflow-hidden mb-3">
       <button
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer"
@@ -95,15 +95,15 @@ export default function DashboardAccordions({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200">Received</th>
-                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200">Name</th>
-                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200">Company</th>
-                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200"></th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Received</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Name</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Company</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border"></th>
               </tr>
             </thead>
             <tbody>
               {pendingApps.map((app) => (
-                <tr key={app.id} className="group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100">
+                <tr key={app.id} className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated">
                   <td className="px-3.5 py-3 text-[14px] text-fg2">
                     {formatDate(app.submitted_on, { month: "short", day: "numeric" })}
                   </td>
@@ -137,13 +137,13 @@ export default function DashboardAccordions({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200">Name</th>
-                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200">Opted Out</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Name</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Opted Out</th>
               </tr>
             </thead>
             <tbody>
               {optOuts.map((m) => (
-                <tr key={m.id} className="group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100">
+                <tr key={m.id} className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated">
                   <td className="px-3.5 py-3 text-[14px] text-fg1 font-medium">
                     <Link
                       href={`/admin/members/${m.id}`}

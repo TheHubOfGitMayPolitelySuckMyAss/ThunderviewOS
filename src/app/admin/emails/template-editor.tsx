@@ -108,7 +108,7 @@ export default function TemplateEditor({
         {availableVariables.map((v, i) => (
           <span key={v}>
             {i > 0 && ", "}
-            <code className="rounded bg-cream-100 px-1 py-0.5 text-fg2">{v}</code>
+            <code className="rounded bg-bg-elevated px-1 py-0.5 text-fg2">{v}</code>
           </span>
         ))}
       </p>

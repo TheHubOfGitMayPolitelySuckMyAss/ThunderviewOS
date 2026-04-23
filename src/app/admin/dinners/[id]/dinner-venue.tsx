@@ -58,7 +58,7 @@ function InlineField({
           type="text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          className="rounded-md border border-border px-2 py-0.5 text-sm text-fg1 bg-cream-50 focus:border-clay-500 focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]"
+          className="rounded-md border border-border px-2 py-0.5 text-sm text-fg1 bg-bg focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();

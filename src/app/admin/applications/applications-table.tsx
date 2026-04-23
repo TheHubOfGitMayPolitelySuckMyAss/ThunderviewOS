@@ -92,7 +92,7 @@ export default function ApplicationsTable({
     return sortDir === "asc" ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
   }
 
-  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
+  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
 
   return (
     <div>
@@ -105,7 +105,7 @@ export default function ApplicationsTable({
           onChange={(e) => setSearch(e.target.value)}
           className="!max-w-[360px]"
         />
-        <div className="flex gap-1 bg-cream-100 p-1 rounded-md border border-line-200">
+        <div className="flex gap-1 bg-bg-elevated p-1 rounded-md border border-border">
           {filters.map((f) => (
             <button
               key={f}
@@ -113,7 +113,7 @@ export default function ApplicationsTable({
               className={`px-3 py-1.5 rounded-md text-[13px] font-medium cursor-pointer ${
                 filter === f
                   ? "bg-ink-900 text-cream-50"
-                  : "bg-transparent text-fg2 hover:bg-cream-200"
+                  : "bg-transparent text-fg2 hover:bg-bg-tinted"
               }`}
             >
               {f}
@@ -122,7 +122,7 @@ export default function ApplicationsTable({
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-line-200 bg-cream-50">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-border bg-bg">
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -149,7 +149,7 @@ export default function ApplicationsTable({
               return (
                 <tr
                   key={app.id}
-                  className="group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100"
+                  className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated"
                 >
                   <td className="px-3.5 py-3 text-[14px] text-fg2">
                     {formatDate(app.submitted_on, { month: "short", day: "numeric", year: "numeric" })}

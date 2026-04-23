@@ -74,18 +74,18 @@ export default function DinnersTable({ dinners, nextDinnerId }: { dinners: Dinne
     return sortDir === "asc" ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
   }
 
-  const thBase = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
-  const thNum = "w-20 text-center text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-2 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
+  const thBase = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
+  const thNum = "w-20 text-center text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-2 py-2.5 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
 
   return (
-    <div ref={scrollContainerRef} className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-line-200 bg-cream-50">
+    <div ref={scrollContainerRef} className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-border bg-bg">
       <table className="w-full border-collapse">
         <thead>
           <tr>
             <th className={thBase} onClick={() => toggleSort("date")}>
               Date<SortIcon col="date" />
             </th>
-            <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 sticky top-0 z-10">
+            <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border sticky top-0 z-10">
               Venue
             </th>
             <th className={thNum} onClick={() => toggleSort("paid")}>
@@ -94,7 +94,7 @@ export default function DinnersTable({ dinners, nextDinnerId }: { dinners: Dinne
             <th className={thNum} onClick={() => toggleSort("introAsk")}>
               Intro/Ask<SortIcon col="introAsk" />
             </th>
-            <th className="w-20 text-center text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-2 py-2.5 bg-cream-100 border-b border-line-200 sticky top-0 z-10">
+            <th className="w-20 text-center text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-2 py-2.5 bg-bg-elevated border-b border-border sticky top-0 z-10">
               Guests
             </th>
           </tr>
@@ -142,7 +142,7 @@ const DinnerRow = forwardRef<HTMLTableRowElement, { dinner: DinnerStat; isNext: 
     <>
       <tr
         ref={ref}
-        className={`group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100 ${isNext ? "bg-[rgba(181,131,90,0.06)]" : ""}`}
+        className={`group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated ${isNext ? "bg-[rgba(181,131,90,0.06)]" : ""}`}
       >
         <td className="whitespace-nowrap px-3.5 py-3 text-[14px] text-fg1 font-medium">
           <Link href={`/admin/dinners/${dinner.id}`} className="no-underline text-fg1 after:absolute after:inset-0">
@@ -161,7 +161,7 @@ const DinnerRow = forwardRef<HTMLTableRowElement, { dinner: DinnerStat; isNext: 
         </td>
         <td className="relative z-10 w-20 px-2 py-3 text-center text-[14px]">
           {isPending ? (
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-line-200 border-t-clay-500" />
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-border border-t-clay-500" />
           ) : (
             <button
               onClick={() => setShowModal(true)}
@@ -177,7 +177,7 @@ const DinnerRow = forwardRef<HTMLTableRowElement, { dinner: DinnerStat; isNext: 
         <tr>
           <td colSpan={5} className="p-0">
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+              <div className="mx-4 w-full max-w-sm rounded-lg bg-bg border border-border p-6 shadow-lg">
                 <p className="text-sm text-fg1">
                   Switch guest tickets for{" "}
                   {formatDate(dinner.date, { month: "long", day: "numeric", year: "numeric" })}{" "}

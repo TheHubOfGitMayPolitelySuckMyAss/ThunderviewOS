@@ -101,7 +101,7 @@ export default function AddMemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+      <div className="mx-4 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-bg border border-border p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="tv-h4">Add Member</h3>
           <button onClick={onClose} className="text-fg4 cursor-pointer hover:text-fg2">

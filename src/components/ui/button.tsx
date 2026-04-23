@@ -6,7 +6,7 @@ const variantClasses = {
   secondary:
     "bg-transparent text-fg1 border border-border hover:bg-bg-tinted",
   ghost:
-    "bg-transparent text-clay-600 hover:underline",
+    "bg-transparent text-accent-hover hover:underline",
 } as const;
 
 const sizeClasses = {

@@ -90,7 +90,7 @@ export default function MemberDetail({
   useEffect(() => { setM(member); }, [member]);
 
   return (
-    <div className="rounded-xl border border-line-200 bg-cream-50 p-6 shadow-xs">
+    <div className="rounded-xl border border-border bg-bg p-6 shadow-xs">
       {/* Heading */}
       <div className="mb-6">
         <Heading member={m} />
@@ -147,7 +147,7 @@ export default function MemberDetail({
             valueNotClickable
             renderDisplay={(v) =>
               v ? (
-                <a href={v} target="_blank" rel="noopener noreferrer" className="text-clay-600 underline decoration-line-200">
+                <a href={v} target="_blank" rel="noopener noreferrer" className="text-accent-hover underline decoration-border">
                   {v}
                 </a>
               ) : (
@@ -169,7 +169,7 @@ export default function MemberDetail({
                   href={v.startsWith("http") ? v : `https://${v}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-clay-600 underline decoration-line-200"
+                  className="text-accent-hover underline decoration-border"
                 >
                   {v}
                 </a>
@@ -377,7 +377,7 @@ function EditableField({
   }
 
   const inputClass =
-    "w-full rounded-md border border-border px-3 py-1.5 text-sm text-fg1 shadow-sm focus:border-clay-500 focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]";
+    "w-full rounded-md border border-border px-3 py-1.5 text-sm text-fg1 shadow-sm focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]";
 
   if (editing) {
     return (
@@ -424,7 +424,7 @@ function EditableField({
             </button>
             <button
               onClick={cancel}
-              className="rounded bg-cream-100 px-3 py-1 text-xs font-medium text-fg2 hover:bg-cream-200"
+              className="rounded bg-bg-elevated px-3 py-1 text-xs font-medium text-fg2 hover:bg-bg-tinted"
             >
               Cancel
             </button>
@@ -503,11 +503,11 @@ function ToggleField({
         onClick={toggle}
         disabled={isPending}
         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-          value ? "bg-moss-600" : "bg-cream-200"
+          value ? "bg-moss-600" : "bg-bg-tinted"
         } ${isPending ? "opacity-50" : ""}`}
       >
         <span
-          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-cream-50 shadow ring-0 transition duration-200 ${
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-bg shadow ring-0 transition duration-200 ${
             value ? "translate-x-5" : "translate-x-0"
           }`}
         />
@@ -549,7 +549,7 @@ function RemoveReinstateSection({ member }: { member: MemberData }) {
       ) : (
         <button
           onClick={() => setShowConfirm(true)}
-          className="rounded-md border border-border px-4 py-2 text-sm font-medium text-fg2 hover:bg-cream-100"
+          className="rounded-md border border-border px-4 py-2 text-sm font-medium text-fg2 hover:bg-bg-elevated"
         >
           Reinstate Member
         </button>
@@ -557,7 +557,7 @@ function RemoveReinstateSection({ member }: { member: MemberData }) {
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 p-6 shadow-lg">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-bg p-6 shadow-lg">
             <p className="text-sm text-fg1">
               {isRemove
                 ? `Remove ${formatName(member.first_name, member.last_name)} from Thunderview? This will block all emails and flag future ticket purchases for refund.`
@@ -566,7 +566,7 @@ function RemoveReinstateSection({ member }: { member: MemberData }) {
             <div className="mt-4 flex justify-end gap-3">
               <button
                 onClick={() => setShowConfirm(false)}
-                className="rounded-md bg-cream-100 px-4 py-2 text-sm font-medium text-fg2 hover:bg-cream-200"
+                className="rounded-md bg-bg-elevated px-4 py-2 text-sm font-medium text-fg2 hover:bg-bg-tinted"
               >
                 Cancel
               </button>
@@ -627,7 +627,7 @@ function ApplyCreditSection({ member }: { member: MemberData }) {
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 p-6 shadow-lg">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-bg p-6 shadow-lg">
             <p className="text-sm text-fg1">
               Apply credit for <strong>{fullName}</strong>? This will create a
               ticket for the next upcoming dinner.
@@ -640,7 +640,7 @@ function ApplyCreditSection({ member }: { member: MemberData }) {
             <div className="mt-4 flex justify-end gap-3">
               <button
                 onClick={() => { setShowConfirm(false); setError(""); }}
-                className="rounded-md bg-cream-100 px-4 py-2 text-sm font-medium text-fg2 hover:bg-cream-200"
+                className="rounded-md bg-bg-elevated px-4 py-2 text-sm font-medium text-fg2 hover:bg-bg-tinted"
               >
                 Cancel
               </button>
@@ -693,7 +693,7 @@ function CompTicketSection({ member, nextDinnerDate }: { member: MemberData; nex
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 p-6 shadow-lg">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-bg p-6 shadow-lg">
             <p className="text-sm text-fg1">
               Comp a free ticket to <strong>{fullName}</strong> for{" "}
               <strong>{formatDate(nextDinnerDate)}</strong>?
@@ -706,7 +706,7 @@ function CompTicketSection({ member, nextDinnerDate }: { member: MemberData; nex
             <div className="mt-4 flex justify-end gap-3">
               <button
                 onClick={() => { setShowConfirm(false); setError(""); }}
-                className="rounded-md bg-cream-100 px-4 py-2 text-sm font-medium text-fg2 hover:bg-cream-200"
+                className="rounded-md bg-bg-elevated px-4 py-2 text-sm font-medium text-fg2 hover:bg-bg-tinted"
               >
                 Cancel
               </button>
@@ -759,7 +759,7 @@ function EmailsSection({
               <span className="text-sm text-fg1">{me.email}</span>
               <span className="text-xs text-fg4">{me.source}</span>
               {me.is_primary && (
-                <span className="rounded-full bg-cream-200 px-2 py-0.5 text-xs font-medium text-clay-600">
+                <span className="rounded-full bg-bg-tinted px-2 py-0.5 text-xs font-medium text-accent-hover">
                   primary
                 </span>
               )}
@@ -870,11 +870,11 @@ function EmailModal({
   }
 
   const inputClass =
-    "w-full rounded-md border border-border px-3 py-1.5 text-sm text-fg1 shadow-sm focus:border-clay-500 focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]";
+    "w-full rounded-md border border-border px-3 py-1.5 text-sm text-fg1 shadow-sm focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-lg rounded-lg bg-cream-50 p-6 shadow-lg">
+      <div className="mx-4 w-full max-w-lg rounded-lg bg-bg p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-fg1">
             Manage Emails
@@ -891,13 +891,13 @@ function EmailModal({
           {member.member_emails.map((me) => (
             <div
               key={me.id}
-              className="flex items-center justify-between rounded-md border border-line-200 px-3 py-2"
+              className="flex items-center justify-between rounded-md border border-border px-3 py-2"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-fg1">{me.email}</span>
                 <span className="text-xs text-fg4">{me.source}</span>
                 {me.is_primary && (
-                  <span className="rounded-full bg-cream-200 px-2 py-0.5 text-xs font-medium text-clay-600">
+                  <span className="rounded-full bg-bg-tinted px-2 py-0.5 text-xs font-medium text-accent-hover">
                     primary
                   </span>
                 )}
@@ -912,7 +912,7 @@ function EmailModal({
                   <button
                     onClick={() => handleSetPrimary(me.id)}
                     disabled={isPending}
-                    className="text-xs text-clay-600 underline decoration-line-200 disabled:opacity-50"
+                    className="text-xs text-accent-hover underline decoration-border disabled:opacity-50"
                   >
                     Make primary
                   </button>

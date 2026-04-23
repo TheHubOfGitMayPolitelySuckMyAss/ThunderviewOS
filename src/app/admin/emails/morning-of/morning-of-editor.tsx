@@ -88,14 +88,14 @@ export default function MorningOfEditor({
             {attendees.map((a) => {
               const link = getNameLink(a);
               return (
-                <div key={a.id} className="rounded-lg border border-line-200 bg-cream-50 p-4">
+                <div key={a.id} className="rounded-lg border border-border bg-bg p-4">
                   <div className="flex items-baseline gap-2">
                     {link ? (
                       <a
                         href={link.href}
                         target={link.href.startsWith("mailto:") ? undefined : "_blank"}
                         rel="noopener noreferrer"
-                        className="font-semibold text-clay-600 no-underline hover:underline hover:underline"
+                        className="font-semibold text-accent-hover no-underline hover:underline hover:underline"
                       >
                         {link.label}
                       </a>
@@ -110,7 +110,7 @@ export default function MorningOfEditor({
                           href={a.company_website.startsWith("http") ? a.company_website : `https://${a.company_website}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-clay-600 hover:underline"
+                          className="text-sm text-accent-hover hover:underline"
                         >
                           at {a.company_name}
                         </a>

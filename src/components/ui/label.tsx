@@ -11,7 +11,7 @@ function Label({ required, className = "", children, ...props }: LabelProps) {
       {...props}
     >
       {children}
-      {required && <span className="text-clay-600 ml-0.5">*</span>}
+      {required && <span className="text-accent-hover ml-0.5">*</span>}
     </label>
   );
 }

@@ -38,7 +38,7 @@ function StatusPill({ status }: { status: string }) {
   return <Pill variant={variant} dot>{status}</Pill>;
 }
 
-const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 sticky top-0 z-10";
+const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border sticky top-0 z-10";
 
 export default function DinnerTickets({
   tickets,
@@ -59,7 +59,7 @@ export default function DinnerTickets({
       {/* Active tickets table */}
       <div>
         <h3 className="tv-h4 mb-3">Tickets</h3>
-        <div className="overflow-hidden rounded-xl border border-line-200 bg-cream-50">
+        <div className="overflow-hidden rounded-xl border border-border bg-bg">
           <table className="w-full border-collapse">
             <thead>
               <tr>
@@ -90,7 +90,7 @@ export default function DinnerTickets({
       {inactiveTickets.length > 0 && (
         <div>
           <h3 className="tv-h4 mb-3">Refunded / Credited</h3>
-          <div className="overflow-hidden rounded-xl border border-line-200 bg-cream-50">
+          <div className="overflow-hidden rounded-xl border border-border bg-bg">
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -102,7 +102,7 @@ export default function DinnerTickets({
               </thead>
               <tbody>
                 {inactiveTickets.map((ticket) => (
-                  <tr key={ticket.id} className="line-through text-fg4 border-b border-line-100 last:border-b-0">
+                  <tr key={ticket.id} className="line-through text-fg4 border-b border-border-subtle last:border-b-0">
                     <td className="px-3.5 py-3 text-sm">
                       {ticket.memberId ? (
                         <Link href={`/admin/members/${ticket.memberId}`} className="no-underline text-fg4 hover:text-fg3">
@@ -163,7 +163,7 @@ function ActiveTicketRow({ ticket, dinnerDate }: { ticket: TicketRow; dinnerDate
 
   return (
     <>
-      <tr className="border-b border-line-100 last:border-b-0 hover:bg-cream-100">
+      <tr className="border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated">
         <td className="px-3.5 py-3 text-sm text-fg1">
           {ticket.memberId ? (
             <Link
@@ -187,7 +187,7 @@ function ActiveTicketRow({ ticket, dinnerDate }: { ticket: TicketRow; dinnerDate
               {!isQty2 && (
                 <button
                   onClick={() => { setActionError(null); setModal("credit"); }}
-                  className="rounded-md border border-border px-3 py-1 text-xs font-medium text-fg2 cursor-pointer hover:bg-cream-100"
+                  className="rounded-md border border-border px-3 py-1 text-xs font-medium text-fg2 cursor-pointer hover:bg-bg-elevated"
                 >
                   Credit
                 </button>
@@ -208,7 +208,7 @@ function ActiveTicketRow({ ticket, dinnerDate }: { ticket: TicketRow; dinnerDate
         <tr>
           <td colSpan={5} className="p-0">
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+              <div className="mx-4 w-full max-w-sm rounded-lg bg-bg border border-border p-6 shadow-lg">
                 {actionError && (
                   <div className="mb-3 rounded-md bg-[#F2D4CB] p-3 text-xs text-ember-600">
                     {actionError}
@@ -269,7 +269,7 @@ function ActiveTicketRow({ ticket, dinnerDate }: { ticket: TicketRow; dinnerDate
         <tr>
           <td colSpan={5} className="p-0">
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="mx-4 w-full max-w-sm rounded-lg bg-cream-50 border border-line-200 p-6 shadow-lg">
+              <div className="mx-4 w-full max-w-sm rounded-lg bg-bg border border-border p-6 shadow-lg">
                 {actionError && (
                   <div className="mb-3 rounded-md bg-[#F2D4CB] p-3 text-xs text-ember-600">
                     {actionError}

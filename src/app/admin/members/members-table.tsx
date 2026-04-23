@@ -104,7 +104,7 @@ export default function MembersTable({
     return sortDir === "asc" ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
   }
 
-  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-cream-100 border-b border-line-200 cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
+  const thClass = "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border cursor-pointer select-none hover:text-fg2 sticky top-0 z-10";
 
   return (
     <div>
@@ -133,7 +133,7 @@ export default function MembersTable({
 
       {addedName && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 rounded-lg bg-cream-50 border border-line-200 px-8 py-6 text-center shadow-lg">
+          <div className="mx-4 rounded-lg bg-bg border border-border px-8 py-6 text-center shadow-lg">
             <p className="tv-h4">{addedName} added!</p>
             <Button variant="secondary" className="mt-4" onClick={() => setAddedName(null)}>
               Onwards!
@@ -142,7 +142,7 @@ export default function MembersTable({
         </div>
       )}
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-line-200 bg-cream-50">
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-xl border border-border bg-bg">
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -158,7 +158,7 @@ export default function MembersTable({
               return (
                 <tr
                   key={member.id}
-                  className={`group relative cursor-pointer border-b border-line-100 last:border-b-0 hover:bg-cream-100 ${kicked ? "line-through" : ""}`}
+                  className={`group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated ${kicked ? "line-through" : ""}`}
                 >
                   <td className={`px-3.5 py-3 text-[14px] ${kicked ? "text-fg4" : "text-fg1"} font-medium`}>
                     <Link

@@ -232,7 +232,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               unoptimized
             />
           ) : (
-            <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-clay-500 font-display font-medium text-[40px] text-cream-50">
+            <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-accent font-display font-medium text-[40px] text-cream-50">
               {firstName?.[0]?.toUpperCase() ?? "?"}{lastName?.[0]?.toUpperCase() ?? ""}
             </div>
           )}

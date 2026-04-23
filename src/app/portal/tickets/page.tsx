@@ -52,7 +52,7 @@ export default async function TicketSelectionPage() {
         <H1 className="mt-2">Buy a dinner ticket.</H1>
         <Body className="mt-4">
           Your profile isn&rsquo;t fully set up yet. Please contact{" "}
-          <a href="mailto:eric@marcoullier.com" className="text-clay-600 underline decoration-line-200">
+          <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
             eric@marcoullier.com
           </a>{" "}
           for help.
@@ -125,7 +125,7 @@ export default async function TicketSelectionPage() {
         <H1 className="mt-2">Buy a dinner ticket.</H1>
         <Body className="mt-4">
           No upcoming dinners available. Please contact{" "}
-          <a href="mailto:eric@marcoullier.com" className="text-clay-600 underline decoration-line-200">
+          <a href="mailto:eric@marcoullier.com" className="text-accent-hover underline decoration-border">
             eric@marcoullier.com
           </a>.
         </Body>

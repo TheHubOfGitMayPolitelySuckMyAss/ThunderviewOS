@@ -52,13 +52,13 @@ export default function EmailsPage() {
 
       {/* Marketing */}
       <section className="mb-10">
-        <Eyebrow className="mb-3 pb-2.5 border-b border-line-100">Marketing</Eyebrow>
+        <Eyebrow className="mb-3 pb-2.5 border-b border-border-subtle">Marketing</Eyebrow>
         <div className="space-y-4">
           {marketingEmails.map((email) => (
             <div key={email.href}>
               <Link
                 href={email.href}
-                className="text-sm font-medium text-clay-600 no-underline hover:underline"
+                className="text-sm font-medium text-accent-hover no-underline hover:underline"
               >
                 {email.label}
               </Link>
@@ -72,13 +72,13 @@ export default function EmailsPage() {
 
       {/* Transactional */}
       <section>
-        <Eyebrow className="mb-3 pb-2.5 border-b border-line-100">Transactional</Eyebrow>
+        <Eyebrow className="mb-3 pb-2.5 border-b border-border-subtle">Transactional</Eyebrow>
         <div className="space-y-4">
           {transactionalEmails.map((email) => (
             <div key={email.href}>
               <Link
                 href={email.href}
-                className="text-sm font-medium text-clay-600 no-underline hover:underline"
+                className="text-sm font-medium text-accent-hover no-underline hover:underline"
               >
                 {email.label}
               </Link>

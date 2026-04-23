@@ -100,7 +100,7 @@ export default function DevUIPage() {
               <Body>Lifts a step above default.</Body>
             </Card>
             <Card variant="feature">
-              <Eyebrow className="!text-clay-600">Feature</Eyebrow>
+              <Eyebrow className="!text-accent-hover">Feature</Eyebrow>
               <H3 className="mt-1.5 mb-1">Candle-glow shadow</H3>
               <Body>One per screen max.</Body>
             </Card>

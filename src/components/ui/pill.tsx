@@ -9,8 +9,8 @@ type PillProps = HTMLAttributes<HTMLSpanElement> & {
 };
 
 const variantStyles: Record<PillVariant, { pill: string; dot: string }> = {
-  stage:   { pill: "bg-cream-100 text-ink-700 border border-border", dot: "" },
-  neutral: { pill: "bg-cream-200 text-ink-900", dot: "" },
+  stage:   { pill: "bg-bg-elevated text-ink-700 border border-border", dot: "" },
+  neutral: { pill: "bg-bg-tinted text-ink-900", dot: "" },
   accent:  { pill: "bg-tan-300 text-ink-900", dot: "" },
   success: { pill: "bg-[#E4E9D4] text-moss-600", dot: "bg-moss-600" },
   warn:    { pill: "bg-[#F3E3BE] text-[#8a6a1f]", dot: "bg-mustard-500" },

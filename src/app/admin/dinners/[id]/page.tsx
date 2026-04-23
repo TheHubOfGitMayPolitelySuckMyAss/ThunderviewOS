@@ -197,19 +197,19 @@ export default async function DinnerDetailPage({
 
       {/* Ticket counts */}
       <div className="flex gap-4">
-        <div className="rounded-xl border border-line-200 bg-cream-50 px-5 py-4 shadow-xs">
+        <div className="rounded-xl border border-border bg-bg px-5 py-4 shadow-xs">
           <p className="tv-eyebrow mb-1">Purchased</p>
           <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
             {(statusCounts["purchased"] || 0) + (statusCounts["fulfilled"] || 0)}
           </p>
         </div>
-        <div className="rounded-xl border border-line-200 bg-cream-50 px-5 py-4 shadow-xs">
+        <div className="rounded-xl border border-border bg-bg px-5 py-4 shadow-xs">
           <p className="tv-eyebrow mb-1">Refunded</p>
           <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
             {statusCounts["refunded"] || 0}
           </p>
         </div>
-        <div className="rounded-xl border border-line-200 bg-cream-50 px-5 py-4 shadow-xs">
+        <div className="rounded-xl border border-border bg-bg px-5 py-4 shadow-xs">
           <p className="tv-eyebrow mb-1">Credited</p>
           <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
             {statusCounts["credited"] || 0}

@@ -77,7 +77,7 @@ export default async function MemberProfilePage({
                   href={member.company_website.startsWith("http") ? member.company_website : `https://${member.company_website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-clay-600 underline decoration-line-200"
+                  className="text-accent-hover underline decoration-border"
                 >
                   {member.company_name}
                 </a>
@@ -123,7 +123,7 @@ export default async function MemberProfilePage({
               href={member.linkedin_profile.startsWith("http") ? member.linkedin_profile : `https://${member.linkedin_profile}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-clay-600 underline decoration-line-200"
+              className="text-accent-hover underline decoration-border"
             >
               LinkedIn
             </a>
@@ -136,7 +136,7 @@ export default async function MemberProfilePage({
               href={member.company_website.startsWith("http") ? member.company_website : `https://${member.company_website}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-clay-600 underline decoration-line-200"
+              className="text-accent-hover underline decoration-border"
             >
               {member.company_website.replace(/^https?:\/\//, "")}
             </a>

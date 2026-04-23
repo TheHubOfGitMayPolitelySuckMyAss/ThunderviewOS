@@ -62,7 +62,7 @@ export default function PortalForm({
   return (
     <div className="space-y-4">
       {bannerDinnerDate && (
-        <div className="rounded-lg border border-tan-300 bg-cream-100 px-[22px] py-[18px] flex items-center gap-4 shadow-glow">
+        <div className="rounded-lg border border-tan-300 bg-bg-elevated px-[22px] py-[18px] flex items-center gap-4 shadow-glow">
           <span className="text-[28px]">🎟️</span>
           <div className="flex-1 text-[14.5px] text-fg2 leading-[1.5]">
             You&rsquo;re confirmed for <strong className="text-fg1">{bannerDinnerDate}</strong>.{" "}

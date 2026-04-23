@@ -29,7 +29,7 @@ export default async function HomePage() {
       <section className="tv-paper">
         <div className="max-w-[1120px] mx-auto tv-page-gutter pt-16 md:pt-[72px] pb-10">
           <div className="max-w-[820px] mb-12">
-            <Eyebrow className="!text-clay-600 mb-5">Monthly CEO Dinners · Denver, Colorado</Eyebrow>
+            <Eyebrow className="!text-accent-hover mb-5">Monthly CEO Dinners · Denver, Colorado</Eyebrow>
             <H1 className="mb-7 max-w-[900px]">
               Monthly dinners for Colorado startup CEOs.
             </H1>
