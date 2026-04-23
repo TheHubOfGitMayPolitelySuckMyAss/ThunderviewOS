@@ -61,25 +61,16 @@ export default function PortalForm({
 
   return (
     <div className="space-y-4">
-      {bannerDinnerDate && (
-        <div className="rounded-lg border border-tan-300 bg-bg-elevated px-5 py-4 flex items-center gap-4 shadow-glow">
-          <span className="text-[28px]">🎟️</span>
-          <div className="flex-1 text-[14.5px] text-fg2 leading-[1.5]">
-            You&rsquo;re confirmed for <strong className="text-fg1">{bannerDinnerDate}</strong>.{" "}
-            {introAskFresh
-              ? "We can\u2019t wait to see you."
-              : "Please update your Intro & Ask when you have a moment."}
-          </div>
-        </div>
-      )}
-
-      <Eyebrow className="!mt-5">Your Intro & Ask</Eyebrow>
-      <p className="text-[13px] text-fg3 -mt-1 mb-4">
-        We send these around a week before each dinner so people know who to find you for.
+      <Eyebrow>Your intro &amp; ask for this dinner</Eyebrow>
+      <p className="text-[14px] text-fg2 leading-[1.55] -mt-1 mb-4">
+        Every attendee gets the full list of intros and asks the week before dinner.
+        People use it to find you&mdash;they&rsquo;ll walk up and say &ldquo;you&rsquo;re the one
+        who needs help with fundraising&rdquo; or &ldquo;I saw you&rsquo;re building in climate
+        tech.&rdquo; The more specific you are, the more useful the room becomes.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-form-row">
-        <Field label="Intro \u2014 how you'd introduce yourself at the table">
+        <Field label="Intro \u2014 how you\u2019d introduce yourself at the table">
           <Textarea
             id="current_intro"
             name="current_intro"

@@ -2,8 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { ChevronRight } from "lucide-react";
+import { Check } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
 import { H1 } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
@@ -79,58 +78,39 @@ export default async function PortalPage({
     }
   }
 
-  const navButtons = [
-    ...(isMember ? [{ href: "/portal/tickets", label: "Buy a dinner ticket" }] : []),
-    { href: "/portal/profile", label: "Update your profile" },
-    { href: "/portal/community", label: "View the community" },
-    { href: "/portal/recap", label: "Check last month\u2019s intros & asks" },
-  ];
-
   return (
-    <div className="max-w-[980px] mx-auto tv-page-gutter py-7">
+    <div className="max-w-[640px] mx-auto tv-page-gutter py-7">
       <H1 className="mb-6">
         {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
       </H1>
 
-      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
-        {/* Left column: intro/ask form or dinner photo */}
-        {isMember && bannerDinnerDate ? (
-          <Card>
-            <PortalForm
-              initialIntro={member.current_intro}
-              initialAsk={member.current_ask}
-              initialContact={member.contact_preference}
-              bannerDinnerDate={formatDinnerDisplay(bannerDinnerDate)}
-              bannerIntroAskFresh={introAskFresh}
-            />
-          </Card>
-        ) : (
-          <div className="rounded-lg overflow-hidden">
-            <Image
-              src="/brand/photos/dinner-10-laughing-pair.webp"
-              alt="Thunderview CEO Dinner"
-              width={640}
-              height={427}
-              className="w-full h-full object-cover rounded-lg"
-              priority
-            />
-          </div>
-        )}
-
-        {/* Right column: navigation buttons */}
-        <div>
-          {navButtons.map((btn) => (
-            <Link
-              key={btn.href}
-              href={btn.href}
-              className="flex items-center justify-between px-5 py-4 bg-bg-elevated border border-border rounded-lg text-fg1 font-medium text-base no-underline mb-2.5 transition-all duration-150 hover:bg-bg-tinted hover:translate-x-0.5"
-            >
-              {btn.label}
-              <ChevronRight size={16} className="text-fg3" />
-            </Link>
-          ))}
+      {isMember && bannerDinnerDate && (
+        <div className="rounded-lg border border-tan-300 bg-bg-elevated px-5 py-3.5 flex items-center gap-3 mb-6">
+          <Check size={18} className="text-accent flex-shrink-0" />
+          <span className="text-[14.5px] text-fg2 leading-[1.5]">
+            You&rsquo;re confirmed for <strong className="text-fg1">{formatDinnerDisplay(bannerDinnerDate)}</strong>.
+          </span>
         </div>
-      </div>
+      )}
+
+      {isMember && (
+        <Card>
+          <PortalForm
+            initialIntro={member.current_intro}
+            initialAsk={member.current_ask}
+            initialContact={member.contact_preference}
+            bannerDinnerDate={bannerDinnerDate ? formatDinnerDisplay(bannerDinnerDate) : null}
+            bannerIntroAskFresh={introAskFresh}
+          />
+        </Card>
+      )}
+
+      <p className="text-[13px] text-fg3 mt-5 text-center">
+        Need to update your name, company, or photo?{" "}
+        <Link href="/portal/profile" className="text-accent-hover hover:underline">
+          Edit your profile
+        </Link>
+      </p>
 
       {purchased === "true" && <PurchaseConfetti />}
     </div>
