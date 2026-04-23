@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTodayMT } from "@/lib/format";
@@ -111,12 +112,12 @@ export default async function MemberDetailPage({
   };
 
   return (
-    <div>
+    <div className="max-w-[1280px]">
       <Link
         href="/admin/members"
-        className="mb-4 inline-block text-sm text-blue-600 hover:text-blue-800"
+        className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
       >
-        &larr; Back to members
+        <ArrowLeft size={14} /> Members
       </Link>
 
       <MemberDetail
