@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import PublicNav from "@/components/public-nav";
+import { Button } from "@/components/ui/button";
 import { Eyebrow, H1, H2, H3, Body, Small } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 
@@ -38,19 +39,13 @@ export default async function HomePage() {
 
             <div className="flex gap-3 mb-10">
               {isAuthenticated ? (
-                <Link
-                  href="/portal/tickets"
-                  className="inline-block rounded-md bg-accent px-[26px] py-[14px] text-[15px] font-semibold text-cream-50 no-underline transition-colors duration-[var(--tv-dur-fast)] hover:bg-accent-hover"
-                >
-                  Buy A Dinner Ticket
-                </Link>
+                <Button size="lg" asChild>
+                  <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
+                </Button>
               ) : (
-                <Link
-                  href="/apply"
-                  className="inline-block rounded-md bg-accent px-[26px] py-[14px] text-[15px] font-semibold text-cream-50 no-underline transition-colors duration-[var(--tv-dur-fast)] hover:bg-accent-hover"
-                >
-                  Apply To Join
-                </Link>
+                <Button size="lg" asChild>
+                  <Link href="/apply">Apply To Join</Link>
+                </Button>
               )}
             </div>
 
@@ -170,19 +165,13 @@ export default async function HomePage() {
           {/* TODO(eric): confirm copy — pull next dinner date from DB? */}
           <H2 className="mx-auto mb-7">Next dinner: first Thursday of the month.</H2>
           {isAuthenticated ? (
-            <Link
-              href="/portal/tickets"
-              className="inline-block rounded-md bg-accent px-[26px] py-[14px] text-[15px] font-semibold text-cream-50 no-underline transition-colors duration-[var(--tv-dur-fast)] hover:bg-accent-hover"
-            >
-              Buy A Dinner Ticket
-            </Link>
+            <Button size="lg" asChild>
+              <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
+            </Button>
           ) : (
-            <Link
-              href="/apply"
-              className="inline-block rounded-md bg-accent px-[26px] py-[14px] text-[15px] font-semibold text-cream-50 no-underline transition-colors duration-[var(--tv-dur-fast)] hover:bg-accent-hover"
-            >
-              Apply To Attend
-            </Link>
+            <Button size="lg" asChild>
+              <Link href="/apply">Apply To Attend</Link>
+            </Button>
           )}
         </div>
       </section>

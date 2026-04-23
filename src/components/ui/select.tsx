@@ -10,7 +10,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <select
         ref={ref}
         className={[
-          "w-full font-sans text-[15px] text-fg1 bg-cream-50 border rounded-md px-3.5 py-[11px] outline-none transition-[border-color,box-shadow] duration-[var(--tv-dur-fast)] appearance-none",
+          "w-full font-sans text-[15px] text-fg1 bg-cream-50 border rounded-md px-3.5 py-[11px] outline-none transition-[border-color,box-shadow] duration-[120ms] appearance-none",
           "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2375695B%22 stroke-width=%222%22><polyline points=%226 9 12 14 18 9%22/></svg>')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat",
           error
             ? "border-ember-600"

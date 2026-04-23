@@ -34,7 +34,7 @@ function Card({
 }: CardProps) {
   return (
     <div
-      className={`${variantStyles[variant]} transition-shadow duration-[var(--tv-dur-fast)] hover:shadow-md ${className}`}
+      className={`${variantStyles[variant]} transition-shadow duration-[120ms] hover:shadow-md ${className}`}
       {...props}
     >
       {variant === "photo" && photoSrc && (

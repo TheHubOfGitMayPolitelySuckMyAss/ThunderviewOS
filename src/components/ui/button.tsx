@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactElement, cloneElement, isValidElement } from "react";
 
 const variantClasses = {
   primary:
@@ -18,30 +18,52 @@ const sizeClasses = {
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof variantClasses;
   size?: "sm" | "md" | "lg";
+  /** Render as the child element (e.g. <Button asChild><Link>…</Link></Button>) */
+  asChild?: boolean;
 };
 
+function buildClassName(
+  variant: keyof typeof variantClasses,
+  size: "sm" | "md" | "lg",
+  disabled: boolean | undefined,
+  className: string
+): string {
+  return [
+    "inline-flex items-center justify-center font-semibold rounded-md tracking-[-0.005em] no-underline transition-all duration-[120ms] ease-[cubic-bezier(.2,.7,.2,1)] cursor-pointer",
+    "focus-visible:outline-2 focus-visible:outline-clay-500 focus-visible:outline-offset-2",
+    "active:scale-[0.98] active:transition-transform active:duration-[80ms]",
+    variantClasses[variant],
+    sizeClasses[size],
+    disabled
+      ? "!bg-bg-tinted !text-fg4 !border-transparent cursor-not-allowed active:!scale-100"
+      : "",
+    variant === "ghost" ? "px-3" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "primary", size = "md", className = "", disabled, ...props }, ref) => {
+  ({ variant = "primary", size = "md", className = "", disabled, asChild, children, ...props }, ref) => {
+    const cn = buildClassName(variant, size, disabled, className);
+
+    if (asChild && isValidElement(children)) {
+      return cloneElement(children as ReactElement<Record<string, unknown>>, {
+        className: cn,
+        ref,
+      });
+    }
+
     return (
       <button
         ref={ref}
         disabled={disabled}
-        className={[
-          "inline-flex items-center justify-center font-semibold rounded-md tracking-[-0.005em] transition-all duration-[var(--tv-dur-fast)] ease-[var(--tv-ease-out)] cursor-pointer",
-          "focus-visible:outline-2 focus-visible:outline-clay-500 focus-visible:outline-offset-2",
-          "active:scale-[0.98] active:transition-transform active:duration-[80ms]",
-          variantClasses[variant],
-          sizeClasses[size],
-          disabled
-            ? "!bg-bg-tinted !text-fg4 !border-transparent cursor-not-allowed active:!scale-100"
-            : "",
-          variant === "ghost" ? "px-3" : "",
-          className,
-        ]
-          .filter(Boolean)
-          .join(" ")}
+        className={cn}
         {...props}
-      />
+      >
+        {children}
+      </button>
     );
   }
 );

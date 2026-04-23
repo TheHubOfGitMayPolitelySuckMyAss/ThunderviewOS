@@ -10,7 +10,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         className={[
-          "w-full font-sans text-[15px] text-fg1 bg-cream-50 border rounded-md px-3.5 py-[11px] outline-none transition-[border-color,box-shadow] duration-[var(--tv-dur-fast)]",
+          "w-full font-sans text-[15px] text-fg1 bg-cream-50 border rounded-md px-3.5 py-[11px] outline-none transition-[border-color,box-shadow] duration-[120ms]",
           error
             ? "border-ember-600"
             : "border-border focus:border-clay-500 focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]",

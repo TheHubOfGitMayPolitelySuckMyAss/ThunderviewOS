@@ -71,7 +71,7 @@ export default function TicketPurchase({
           <button
             onClick={() => handlePurchase(false)}
             disabled={isPending}
-            className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[120ms] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="font-semibold text-[15px] text-fg1 mb-1">{ticketLabel}</div>
             <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
@@ -81,7 +81,7 @@ export default function TicketPurchase({
           <button
             onClick={() => handlePurchase(true)}
             disabled={isPending}
-            className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[120ms] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="font-semibold text-[15px] text-fg1 mb-1">{ticketLabel} + Guest</div>
             <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>
@@ -93,7 +93,7 @@ export default function TicketPurchase({
         <button
           onClick={() => handlePurchase(false)}
           disabled={isPending}
-          className="w-full p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[var(--tv-dur-fast)] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full p-4 border border-line-200 rounded-xl bg-cream-50 text-left cursor-pointer transition-all duration-[120ms] hover:border-clay-500 hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="font-semibold text-[15px] text-fg1 mb-1">{ticketLabel}</div>
           <div className="text-clay-600 font-display font-medium text-[22px] mt-2" style={{ fontVariationSettings: '"opsz" 72' }}>

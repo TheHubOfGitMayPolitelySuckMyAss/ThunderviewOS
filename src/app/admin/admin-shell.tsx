@@ -32,7 +32,7 @@ export default function AdminShell({
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
-      <aside className="flex w-[220px] flex-col bg-cream-100 border-r border-line-200">
+      <aside className="flex w-[220px] flex-col bg-bg-elevated border-r border-border">
         <nav className="flex-1 px-3 py-5">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
@@ -50,7 +50,7 @@ export default function AdminShell({
                     className={`flex items-center justify-between rounded-md px-3 py-[9px] text-sm font-medium no-underline mb-0.5 ${
                       active
                         ? "bg-ink-900 text-cream-50"
-                        : "text-fg2 hover:bg-cream-200"
+                        : "text-fg2 hover:bg-bg-tinted"
                     }`}
                   >
                     {item.label}
@@ -64,7 +64,7 @@ export default function AdminShell({
 
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto bg-cream-50 px-10 py-8">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-bg tv-page-gutter py-8">{children}</main>
       </div>
     </div>
   );
