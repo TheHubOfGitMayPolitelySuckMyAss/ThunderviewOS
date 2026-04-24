@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { User, ExternalLink, Globe } from "lucide-react";
+import { ExternalLink, Globe } from "lucide-react";
 import { formatName } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
 import { Eyebrow } from "@/components/ui/typography";
@@ -54,12 +53,6 @@ export default function DinnerDetailsBlock({ details }: { details: DinnerDetails
                       <div className="text-sm text-fg3 mt-0.5">{s.company_name}</div>
                     )}
                     <div className="flex items-center gap-2 mt-2">
-                      <Link
-                        href={`/portal/members/${s.member_id}`}
-                        className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs text-fg3 no-underline hover:text-fg1 hover:border-accent transition-colors duration-[120ms]"
-                      >
-                        <User size={12} /> Profile
-                      </Link>
                       {s.linkedin_profile && (
                         <a
                           href={s.linkedin_profile.startsWith("http") ? s.linkedin_profile : `https://${s.linkedin_profile}`}

@@ -50,6 +50,7 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
   }
 
   const navLinks = [
+    { href: "/portal/tickets", label: "Tickets" },
     { href: "/portal/community", label: "Community" },
     { href: "/portal/recap", label: "Monthly Recap" },
     ...((isAdmin || isTeam) ? [{ href: "/admin", label: "Admin" }] : []),

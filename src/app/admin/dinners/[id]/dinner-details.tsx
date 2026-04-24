@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { X, User, ExternalLink, Globe } from "lucide-react";
+import { X, ExternalLink, Globe } from "lucide-react";
 import { updateDinnerField, searchMembersForSpeaker, addDinnerSpeaker, removeDinnerSpeaker } from "./actions";
 import { formatName } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
@@ -265,19 +265,13 @@ function SpeakersSection({
               size="lg"
             />
             <div className="flex-1 min-w-0 pt-1">
-              <div className="text-base font-medium text-fg1">
+              <Link href={`/admin/members/${s.member_id}`} className="text-base font-medium text-fg1 no-underline hover:text-accent-hover hover:underline">
                 {formatName(s.first_name, s.last_name)}
-              </div>
+              </Link>
               {s.company_name && (
                 <div className="text-sm text-fg3 mt-0.5">{s.company_name}</div>
               )}
               <div className="flex items-center gap-2 mt-2">
-                <Link
-                  href={`/admin/members/${s.member_id}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs text-fg3 no-underline hover:text-fg1 hover:border-accent transition-colors duration-[120ms]"
-                >
-                  <User size={12} /> Profile
-                </Link>
                 {s.linkedin_profile && (
                   <a
                     href={s.linkedin_profile.startsWith("http") ? s.linkedin_profile : `https://${s.linkedin_profile}`}
