@@ -147,8 +147,7 @@ export default async function TicketSelectionPage() {
       <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
         <ArrowLeft size={14} /> Portal home
       </Link>
-      <H1 className="mt-2 mb-1.5">Buy a dinner ticket.</H1>
-      <Lede className="mb-6">Pick a date. We&rsquo;ll send details about a week before.</Lede>
+      <H1 className="mt-2 mb-6">Buy a dinner ticket.</H1>
 
       <Card>
         <TicketPurchase
