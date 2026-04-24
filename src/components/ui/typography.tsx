@@ -1,15 +1,15 @@
 import type { HTMLAttributes, ElementType } from "react";
 
-type TypographyProps<T extends ElementType> = HTMLAttributes<HTMLElement> & {
-  as?: T;
+type TypographyProps = HTMLAttributes<HTMLElement> & {
+  as?: ElementType;
 };
 
-function createTypo<T extends ElementType>(
-  defaultTag: T,
+function createTypo(
+  defaultTag: ElementType,
   tvClass: string,
   displayName: string
 ) {
-  function Component({ as, className = "", ...props }: TypographyProps<T>) {
+  function Component({ as, className = "", ...props }: TypographyProps) {
     const Tag = (as || defaultTag) as ElementType;
     return <Tag className={`${tvClass} ${className}`} {...props} />;
   }

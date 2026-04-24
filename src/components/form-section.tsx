@@ -24,7 +24,7 @@ export default function FormSection({
 
   return (
     <section className={classes}>
-      <Eyebrow>{eyebrow}</Eyebrow>
+      <Eyebrow as="div">{eyebrow}</Eyebrow>
       {children}
     </section>
   );
