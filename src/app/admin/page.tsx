@@ -37,7 +37,7 @@ export default async function DashboardPage() {
       .from("applications")
       .select("*", { count: "exact", head: true })
       .gt("submitted_on", appCutoff)
-      .in("status", ["pending", "approved"]);
+      .eq("status", "pending");
     newAppsSinceLastDinner = appCount ?? 0;
 
     const { data: soldTickets } = await supabase
@@ -62,6 +62,13 @@ export default async function DashboardPage() {
     .select("id, first_name, last_name, company_name, submitted_on")
     .eq("status", "pending")
     .order("submitted_on", { ascending: false });
+
+  // Active community members
+  const { count: communityCount } = await supabase
+    .from("members")
+    .select("*", { count: "exact", head: true })
+    .eq("has_community_access", true)
+    .eq("kicked_out", false);
 
   // Marketing opt-outs
   const { data: optOuts } = await supabase
@@ -111,10 +118,9 @@ export default async function DashboardPage() {
           <Card>
             <div className="tv-eyebrow mb-2">Community</div>
             <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
-              {/* This stat was hardcoded before; keeping same pattern */}
-              &mdash;
+              {communityCount ?? 0}
             </div>
-            <div className="text-[12px] text-fg3">members</div>
+            <div className="text-[12px] text-fg3">active members</div>
           </Card>
         </div>
       ) : (
