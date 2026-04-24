@@ -82,11 +82,6 @@ export default async function DashboardPage() {
       <PageHeader
         title="Dashboard"
         size="compact"
-        actions={nextDinner ? (
-          <span className="text-fg3 text-[14px]">
-            Next dinner: <strong className="text-fg1">{formatDate(nextDinner.date, { month: "short", day: "numeric" })}</strong> &middot; {daysUntil === 0 ? "today" : `${daysUntil} days away`}
-          </span>
-        ) : undefined}
       />
 
       {/* Key stats */}

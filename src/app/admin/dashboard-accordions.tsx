@@ -128,8 +128,7 @@ export default function DashboardAccordions({
       <Accordion
         title="Marketing opt-outs"
         count={optOuts.length}
-        pillLabel={`${optOuts.length} this month`}
-        meta="opt-outs this month"
+        pillLabel={`${optOuts.length}`}
       >
         {optOuts.length === 0 ? (
           <p className="py-4 text-sm text-fg4">No marketing opt-outs.</p>

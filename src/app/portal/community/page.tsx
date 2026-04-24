@@ -36,7 +36,7 @@ export default async function CommunityPage() {
   return (
     <div className="tv-container-portal tv-page-gutter py-7">
       <H1 className="mb-1.5">Community</H1>
-      <Lede className="mb-6">{members.length} members with community access.</Lede>
+      <Lede className="mb-6">{members.length} members of the Thunderview community.</Lede>
       <CommunityTable members={members} />
     </div>
   );
