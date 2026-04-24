@@ -62,16 +62,16 @@ export default function PortalForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-tight">
       <H4>Your intro &amp; ask for this dinner</H4>
-      <p className="text-sm text-fg2 leading-[1.55] mt-1 mb-4">
+      <p className="text-sm text-fg2 leading-[1.55] mb-form-row">
         Every attendee gets the full list of intros and asks the morning of the dinner.
         People use it to find you. They&rsquo;ll walk up and say &ldquo;you&rsquo;re the one
         who needs help with fundraising&rdquo; or &ldquo;I saw you&rsquo;re building in climate
         tech.&rdquo; We also send out these Intros &amp; Asks to the entire community the Monday after the dinner.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-form-row">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-form-row">
         <Field
           label="Intro: Your market, their problem, the problem\u2019s impact and your solution"
           help={<span className="text-xs text-fg3">&ldquo;My name is [name] and I&rsquo;m the CEO of [company]. We help [market] with [problem] which has [specific impact] by giving them [solution].&rdquo;</span>}
@@ -85,7 +85,7 @@ export default function PortalForm({
             onChange={(e) => setIntro(e.target.value)}
             placeholder="My name is..."
           />
-          <div className={`text-xs text-right -mt-1 ${intro.length > INTRO_MAX * 0.9 ? "text-danger" : "text-fg4"}`}>
+          <div className={`text-xs text-right ${intro.length > INTRO_MAX * 0.9 ? "text-danger" : "text-fg4"}`}>
             {intro.length}/{INTRO_MAX}
           </div>
         </Field>
@@ -103,7 +103,7 @@ export default function PortalForm({
             onChange={(e) => setAsk(e.target.value)}
             placeholder="I could use help with..."
           />
-          <div className={`text-xs text-right -mt-1 ${ask.length > ASK_MAX * 0.9 ? "text-danger" : "text-fg4"}`}>
+          <div className={`text-xs text-right ${ask.length > ASK_MAX * 0.9 ? "text-danger" : "text-fg4"}`}>
             {ask.length}/{ASK_MAX}
           </div>
         </Field>
@@ -129,10 +129,10 @@ export default function PortalForm({
 
         {toast && (
           <div
-            className={`rounded-md px-4 py-2 text-sm ${
+            className={`rounded-md px-[var(--tv-space-4)] py-[var(--tv-space-2)] text-sm ${
               toast.type === "success"
-                ? "bg-[#E4E9D4] text-moss-600"
-                : "bg-[#F2D4CB] text-ember-600"
+                ? "bg-[rgba(91,106,59,0.08)] text-success"
+                : "bg-[rgba(192,68,42,0.08)] text-danger"
             }`}
           >
             {toast.message}
