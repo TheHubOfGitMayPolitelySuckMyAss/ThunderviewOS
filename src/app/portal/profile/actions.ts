@@ -30,7 +30,7 @@ export async function saveProfile(formData: FormData) {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, profile_pic_url)"
+      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, profile_pic_url)"
     )
     .eq("email", user.email!)
     .limit(1)
@@ -46,6 +46,7 @@ export async function saveProfile(formData: FormData) {
     attendee_stagetypes: string[];
     current_intro: string | null;
     current_ask: string | null;
+    current_give: string | null;
     contact_preference: string | null;
     profile_pic_url: string | null;
   } | null;
@@ -60,6 +61,7 @@ export async function saveProfile(formData: FormData) {
   const newLinkedin = (formData.get("linkedin_profile") as string)?.trim() || null;
   const newIntro = (formData.get("current_intro") as string)?.trim() || null;
   const newAsk = (formData.get("current_ask") as string)?.trim() || null;
+  const newGive = (formData.get("current_give") as string)?.trim() || null;
   const newContact = (formData.get("contact_preference") as string)?.trim() || null;
   const newPrimaryEmail = (formData.get("primary_email") as string)?.trim()?.toLowerCase() || null;
 
@@ -103,6 +105,7 @@ export async function saveProfile(formData: FormData) {
   maybeUpdate("attendee_stagetypes", newStagetypes, member.attendee_stagetypes);
   maybeUpdate("current_intro", newIntro, oldIntro);
   maybeUpdate("current_ask", newAsk, oldAsk);
+  maybeUpdate("current_give", newGive, norm(member.current_give));
   maybeUpdate("contact_preference", newContact, member.contact_preference);
 
   if (introChanged) {

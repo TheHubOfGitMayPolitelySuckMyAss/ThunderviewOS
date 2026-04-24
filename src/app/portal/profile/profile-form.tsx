@@ -38,6 +38,7 @@ type ProfileFormProps = {
     attendeeStagetypes: string[];
     currentIntro: string | null;
     currentAsk: string | null;
+    currentGive: string | null;
     contactPreference: string | null;
     primaryEmail: string;
     profilePicUrl: string | null;
@@ -60,6 +61,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
   );
   const [intro, setIntro] = useState(member.currentIntro ?? "");
   const [ask, setAsk] = useState(member.currentAsk ?? "");
+  const [give, setGive] = useState(member.currentGive ?? "");
   const [contact, setContact] = useState(
     member.contactPreference ?? "linkedin"
   );
@@ -376,7 +378,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
             </div>
           </Field>
 
-          <Eyebrow className="mt-7 pt-5 border-t border-border-subtle mb-4">Intro & Ask</Eyebrow>
+          <Eyebrow className="mt-7 pt-5 border-t border-border-subtle mb-4">Intro, Ask &amp; Give</Eyebrow>
 
           <Field label="Intro">
             <Textarea
@@ -397,6 +399,17 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               value={ask}
               onChange={(e) => setAsk(e.target.value)}
               placeholder="What can the group help you with?"
+            />
+          </Field>
+
+          <Field label="Give" className="mt-form-row">
+            <Textarea
+              id="current_give"
+              name="current_give"
+              rows={4}
+              value={give}
+              onChange={(e) => setGive(e.target.value)}
+              placeholder="What can you offer the community?"
             />
           </Field>
 

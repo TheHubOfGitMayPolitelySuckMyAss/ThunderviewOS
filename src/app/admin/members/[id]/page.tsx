@@ -96,6 +96,7 @@ export default async function MemberDetailPage({
     intro_updated_at: member.intro_updated_at,
     current_ask: member.current_ask,
     ask_updated_at: member.ask_updated_at,
+    current_give: member.current_give,
     contact_preference: member.contact_preference,
     marketing_opted_in: member.marketing_opted_in,
     is_team: member.is_team,

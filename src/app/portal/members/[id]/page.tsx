@@ -21,7 +21,7 @@ export default async function MemberProfilePage({
   const { data: member } = await admin
     .from("members")
     .select(
-      "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, has_community_access, kicked_out, profile_pic_url"
+      "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, has_community_access, kicked_out, profile_pic_url"
     )
     .eq("id", id)
     .single();
@@ -112,6 +112,15 @@ export default async function MemberProfilePage({
             <Eyebrow>Ask</Eyebrow>
             <p className="text-[15px] text-fg2 leading-[1.6] mt-1 mb-5 whitespace-pre-wrap">
               {member.current_ask}
+            </p>
+          </>
+        )}
+
+        {member.current_give && (
+          <>
+            <Eyebrow>Give</Eyebrow>
+            <p className="text-[15px] text-fg2 leading-[1.6] mt-1 mb-5 whitespace-pre-wrap">
+              {member.current_give}
             </p>
           </>
         )}

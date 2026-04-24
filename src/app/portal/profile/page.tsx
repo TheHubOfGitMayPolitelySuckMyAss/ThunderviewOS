@@ -21,7 +21,7 @@ export default async function ProfilePage() {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, contact_preference, kicked_out, profile_pic_url)"
+      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, kicked_out, profile_pic_url)"
     )
     .eq("email", user.email!)
     .limit(1)
@@ -37,6 +37,7 @@ export default async function ProfilePage() {
     attendee_stagetypes: string[];
     current_intro: string | null;
     current_ask: string | null;
+    current_give: string | null;
     contact_preference: string | null;
     kicked_out: boolean;
     profile_pic_url: string | null;
@@ -68,6 +69,7 @@ export default async function ProfilePage() {
           attendeeStagetypes: member.attendee_stagetypes ?? [],
           currentIntro: member.current_intro,
           currentAsk: member.current_ask,
+          currentGive: member.current_give,
           contactPreference: member.contact_preference,
           primaryEmail,
           profilePicUrl: member.profile_pic_url,

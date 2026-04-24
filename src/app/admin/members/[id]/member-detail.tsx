@@ -57,6 +57,7 @@ type MemberData = {
   intro_updated_at: string | null;
   current_ask: string | null;
   ask_updated_at: string | null;
+  current_give: string | null;
   contact_preference: string;
   marketing_opted_in: boolean;
   is_team: boolean;
@@ -211,6 +212,15 @@ export default function MemberDetail({
                 : undefined
             }
             onSaved={(v) => setM({ ...m, current_ask: v as string | null })}
+          />
+
+          <EditableField
+            label="Give"
+            value={m.current_give}
+            memberId={m.id}
+            field="current_give"
+            type="textarea"
+            onSaved={(v) => setM({ ...m, current_give: v as string | null })}
           />
 
           <EditableField
