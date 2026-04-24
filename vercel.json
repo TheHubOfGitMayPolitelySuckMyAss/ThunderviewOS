@@ -11,10 +11,6 @@
     {
       "path": "/api/cron/fulfill-tickets",
       "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/morning-of",
-      "schedule": "0 13 * * *"
     }
   ]
 }
