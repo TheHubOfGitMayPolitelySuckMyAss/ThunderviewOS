@@ -37,49 +37,56 @@ type Attendee = {
 
 function buildAttendeeHtml(attendees: Attendee[]): string {
   if (attendees.length === 0) {
-    return "<p><em>No fulfilled attendees for this dinner yet.</em></p>";
+    return '<p style="font-size:14px;color:#75695B;font-style:italic;">No attendees confirmed yet.</p>';
   }
 
   return attendees
-    .map((a) => {
+    .map((a, i) => {
       const name = formatName(a.first_name, a.last_name);
-      // Name links to LinkedIn or mailto based on contact preference
       let nameHtml: string;
       if (a.contact_preference === "linkedin" && a.linkedin_profile) {
-        nameHtml = `<a href="${a.linkedin_profile}"><strong>${name}</strong></a>`;
+        nameHtml = `<a href="${a.linkedin_profile}" style="color:#9A7A5E;text-decoration:none;font-weight:600;font-size:15px;">${name}</a>`;
       } else if (a.primary_email) {
-        nameHtml = `<a href="mailto:${a.primary_email}"><strong>${name}</strong></a>`;
+        nameHtml = `<a href="mailto:${a.primary_email}" style="color:#9A7A5E;text-decoration:none;font-weight:600;font-size:15px;">${name}</a>`;
       } else {
-        nameHtml = `<strong>${name}</strong>`;
+        nameHtml = `<span style="font-weight:600;font-size:15px;color:#2B241C;">${name}</span>`;
       }
-      // Company links to website if available
+
       let companyHtml = "";
       if (a.company_name) {
         if (a.company_website) {
           const url = a.company_website.startsWith("http") ? a.company_website : `https://${a.company_website}`;
-          companyHtml = ` — <a href="${url}"><em>${a.company_name}</em></a>`;
+          companyHtml = `<p style="font-size:13px;color:#75695B;margin:0 0 10px;">${a.company_name} &middot; <a href="${url}" style="color:#9A7A5E;">${url.replace(/^https?:\/\//, "")}</a></p>`;
         } else {
-          companyHtml = ` — <em>${a.company_name}</em>`;
+          companyHtml = `<p style="font-size:13px;color:#75695B;margin:0 0 10px;">${a.company_name}</p>`;
         }
       }
-      const lines: string[] = [];
-      lines.push(`${nameHtml}${companyHtml}`);
+
       const showAsk = a.current_ask && (
         !a.last_dinner_attended ||
         (a.ask_updated_at && a.ask_updated_at > a.last_dinner_attended)
       );
+
+      const sections: string[] = [];
       if (a.current_intro) {
-        lines.push(`<br>${a.current_intro}`);
-      }
-      if (a.current_intro && showAsk) {
-        lines.push("<br>");
+        sections.push(
+          `<p style="font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#9A7A5E;margin:10px 0 3px;">Intro</p>` +
+          `<p style="font-size:14px;color:#2B241C;margin:0;line-height:1.55;">${a.current_intro}</p>`
+        );
       }
       if (showAsk) {
-        lines.push(`${a.current_ask}`);
+        sections.push(
+          `<p style="font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#9A7A5E;margin:10px 0 3px;">Ask</p>` +
+          `<p style="font-size:14px;color:#2B241C;margin:0;line-height:1.55;">${a.current_ask}</p>`
+        );
       }
-      return lines.join("");
+
+      const borderTop = i > 0 ? "border-top:1px solid #EDE3D1;" : "";
+      const paddingTop = i > 0 ? "padding-top:16px;" : "";
+
+      return `<div style="${borderTop}${paddingTop}padding-bottom:16px;">${nameHtml}${companyHtml ? `<br>${companyHtml}` : ""}${sections.join("")}</div>`;
     })
-    .join("<br><br>---<br><br>");
+    .join("");
 }
 
 async function getNextDinnerWithAttendees(admin: ReturnType<typeof createAdminClient>) {
@@ -179,10 +186,9 @@ export async function sendTestEmail(
 
   const renderedSubject = renderTemplate(subject, vars);
   const renderedBody = renderTemplate(body, vars);
-  const templateHtml = bodyToHtml(renderedBody);
   const attendeeHtml = buildAttendeeHtml(attendees);
-
-  const fullHtml = `${templateHtml}<br><br><hr><br><strong>Tonight's Attendees</strong><br><br>${attendeeHtml}`;
+  const appendedHtml = `<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight\u2019s Attendees</p>${attendeeHtml}`;
+  const fullHtml = bodyToHtml(renderedBody, appendedHtml);
 
   const { error } = await resend.emails.send({
     from: EMAIL_FROM,
