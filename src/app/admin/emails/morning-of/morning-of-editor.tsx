@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import TemplateEditor from "../template-editor";
-import { sendTestEmail, saveTemplate } from "./actions";
-import { formatName } from "@/lib/format";
+import { sendTestEmail, sendToAllAttendees, saveTemplate } from "./actions";
+import { formatName, formatTimestamp } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 
 type Attendee = {
   id: string;
@@ -37,6 +39,9 @@ interface MorningOfEditorProps {
   lastUpdatedByName: string | null;
   attendees: Attendee[];
   dinnerDisplay: string | null;
+  dinnerId: string | null;
+  morningOfSentAt: string | null;
+  morningOfSentByName: string | null;
 }
 
 export default function MorningOfEditor({
@@ -47,7 +52,47 @@ export default function MorningOfEditor({
   lastUpdatedByName,
   attendees,
   dinnerDisplay,
+  dinnerId,
+  morningOfSentAt,
+  morningOfSentByName,
 }: MorningOfEditorProps) {
+  const [showModal, setShowModal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [sentAt, setSentAt] = useState(morningOfSentAt);
+  const [sentByName, setSentByName] = useState(morningOfSentByName);
+  const [sendResult, setSendResult] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  async function handleSendToAll() {
+    if (!dinnerId) return;
+    setSending(true);
+    setSendResult(null);
+    const result = await sendToAllAttendees(dinnerId);
+    setSending(false);
+
+    if (result.success) {
+      setSentAt(result.sentAt ?? null);
+      setSentByName(result.sentByName ?? null);
+      setSendResult({ message: `Sent to ${result.sent} attendee${result.sent !== 1 ? "s" : ""}.`, type: "success" });
+      setTimeout(() => setShowModal(false), 2000);
+    } else {
+      setSendResult({ message: result.error || "Send failed", type: "error" });
+    }
+  }
+
+  async function handleSendTest() {
+    setSendingTest(true);
+    setSendResult(null);
+    const result = await sendTestEmail(slug, initialSubject, initialBody);
+    setSendingTest(false);
+
+    if (result.success) {
+      setSendResult({ message: "Test email sent to your inbox.", type: "success" });
+    } else {
+      setSendResult({ message: result.error || "Test send failed", type: "error" });
+    }
+  }
+
   return (
     <div>
       {/* Template editor */}
@@ -95,7 +140,7 @@ export default function MorningOfEditor({
                         href={link.href}
                         target={link.href.startsWith("mailto:") ? undefined : "_blank"}
                         rel="noopener noreferrer"
-                        className="font-semibold text-accent-hover no-underline hover:underline hover:underline"
+                        className="font-semibold text-accent-hover no-underline hover:underline"
                       >
                         {link.label}
                       </a>
@@ -131,7 +176,57 @@ export default function MorningOfEditor({
             })}
           </div>
         )}
+
+        {/* Send to attendees */}
+        {dinnerId && attendees.length > 0 && (
+          <div className="mt-7 border-t border-border-subtle pt-5">
+            <Button onClick={() => { setSendResult(null); setShowModal(true); }}>
+              Send To Attendees
+            </Button>
+            {sentAt && (
+              <p className="text-xs text-fg3 mt-2">
+                Last sent{sentByName ? ` by ${sentByName}` : ""} on {formatTimestamp(sentAt)}
+              </p>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Confirmation modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-bg border border-border rounded-xl shadow-lg w-[420px] p-6">
+            <h3 className="tv-h4 mb-2">Send morning-of email</h3>
+            <p className="text-sm text-fg2 mb-5">
+              You&rsquo;re about to send this email to <strong className="text-fg1">{attendees.length}</strong> guest{attendees.length !== 1 ? "s" : ""}.
+            </p>
+
+            {sendResult && (
+              <div
+                className={`rounded-md px-[var(--tv-space-4)] py-[var(--tv-space-2)] text-sm mb-4 ${
+                  sendResult.type === "success"
+                    ? "bg-[rgba(91,106,59,0.08)] text-success"
+                    : "bg-[rgba(192,68,42,0.08)] text-danger"
+                }`}
+              >
+                {sendResult.message}
+              </div>
+            )}
+
+            <div className="flex gap-tight justify-end">
+              <Button variant="ghost" onClick={() => setShowModal(false)} disabled={sending}>
+                Cancel
+              </Button>
+              <Button variant="secondary" onClick={handleSendTest} disabled={sending || sendingTest}>
+                {sendingTest ? "Sending\u2026" : "Send Test Email"}
+              </Button>
+              <Button onClick={handleSendToAll} disabled={sending || sendingTest}>
+                {sending ? "Sending\u2026" : "Send To All"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

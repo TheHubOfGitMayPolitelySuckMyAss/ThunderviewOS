@@ -195,6 +195,117 @@ export async function sendTestEmail(
   return { success: true };
 }
 
+export async function sendToAllAttendees(
+  dinnerId: string
+): Promise<{ success: boolean; error?: string; sent?: number; sentAt?: string; sentByName?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  // Get sender's member record
+  const { data: senderEmail } = await admin
+    .from("member_emails")
+    .select("members!inner(id, first_name, last_name)")
+    .eq("email", user.email!)
+    .eq("is_primary", true)
+    .limit(1)
+    .single();
+
+  if (!senderEmail) return { success: false, error: "Member not found" };
+
+  const sender = senderEmail.members as unknown as {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
+
+  // Get dinner details
+  const { data: dinner } = await admin
+    .from("dinners")
+    .select("id, date, venue, address")
+    .eq("id", dinnerId)
+    .single();
+
+  if (!dinner) return { success: false, error: "Dinner not found" };
+
+  // Get fulfilled attendees
+  const { data: tickets } = await admin
+    .from("tickets")
+    .select(
+      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, member_emails(email, is_primary))"
+    )
+    .eq("dinner_id", dinner.id)
+    .eq("fulfillment_status", "fulfilled");
+
+  type TicketRow = {
+    member_id: string;
+    members: Attendee & { id: string; member_emails: { email: string; is_primary: boolean }[] };
+  };
+
+  const rows = (tickets ?? []) as unknown as TicketRow[];
+  const seen = new Set<string>();
+  const attendees = rows
+    .filter((r) => {
+      const m = r.members;
+      if (!m || m.kicked_out || !m.has_community_access) return false;
+      if (seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    })
+    .map((r) => {
+      const m = r.members;
+      const primaryEmail = m.member_emails?.find((e) => e.is_primary)?.email ?? m.member_emails?.[0]?.email ?? null;
+      return { ...m, primary_email: primaryEmail } as Attendee;
+    })
+    .sort((a, b) => {
+      const aHas = a.current_intro || a.current_ask ? 0 : 1;
+      const bHas = b.current_intro || b.current_ask ? 0 : 1;
+      if (aHas !== bHas) return aHas - bHas;
+      return formatName(a.first_name, a.last_name)
+        .toLowerCase()
+        .localeCompare(formatName(b.first_name, b.last_name).toLowerCase());
+    });
+
+  const attendeeHtml = buildAttendeeHtml(attendees);
+
+  // Import sendMorningOfEmail dynamically to avoid circular deps
+  const { sendMorningOfEmail } = await import("@/lib/email-send");
+
+  let sent = 0;
+  for (const attendee of attendees) {
+    if (!attendee.primary_email) continue;
+    await sendMorningOfEmail(
+      attendee.primary_email,
+      attendee.first_name,
+      dinner.date,
+      dinner.venue,
+      dinner.address,
+      attendeeHtml
+    );
+    sent++;
+  }
+
+  const sentAt = new Date().toISOString();
+
+  // Mark dinner as sent
+  await admin
+    .from("dinners")
+    .update({
+      morning_of_sent_at: sentAt,
+      morning_of_sent_by: sender.id,
+    })
+    .eq("id", dinner.id);
+
+  const sentByName = formatName(sender.first_name, sender.last_name);
+
+  return { success: true, sent, sentAt, sentByName };
+}
+
 export async function saveTemplate(
   slug: string,
   subject: string,

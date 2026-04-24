@@ -32,13 +32,16 @@ export default async function MorningOfTemplatePage() {
   const todayMT = getTodayMT();
   const { data: dinner } = await admin
     .from("dinners")
-    .select("id, date")
+    .select("id, date, morning_of_sent_at, morning_of_sent_by")
     .gte("date", todayMT)
     .order("date", { ascending: true })
     .limit(1)
     .single();
 
+  let dinnerId: string | null = null;
   let dinnerDisplay: string | null = null;
+  let morningOfSentAt: string | null = null;
+  let morningOfSentByName: string | null = null;
   let attendees: {
     id: string;
     first_name: string;
@@ -54,7 +57,20 @@ export default async function MorningOfTemplatePage() {
   }[] = [];
 
   if (dinner) {
+    dinnerId = dinner.id;
     dinnerDisplay = formatDinnerDisplay(dinner.date);
+    morningOfSentAt = dinner.morning_of_sent_at ?? null;
+
+    if (dinner.morning_of_sent_by) {
+      const { data: sentByMember } = await admin
+        .from("members")
+        .select("first_name, last_name")
+        .eq("id", dinner.morning_of_sent_by)
+        .single();
+      if (sentByMember) {
+        morningOfSentByName = formatName(sentByMember.first_name, sentByMember.last_name);
+      }
+    }
 
     const { data: tickets } = await admin
       .from("tickets")
@@ -148,6 +164,9 @@ export default async function MorningOfTemplatePage() {
         lastUpdatedByName={updatedByName}
         attendees={attendees}
         dinnerDisplay={dinnerDisplay}
+        dinnerId={dinnerId}
+        morningOfSentAt={morningOfSentAt}
+        morningOfSentByName={morningOfSentByName}
       />
     </div>
   );
