@@ -315,7 +315,7 @@ If you're building production code for the real `thunderview-os` repo, the mappi
 
 ### Portal back-link convention
 
-Top-nav destinations (Home, Community, Recap) show no back link — the sticky top nav handles navigation. Leaf pages reached by clicking through (Tickets, Members/[id], Profile) show a back link to their logical parent: usually Portal home, except Members/[id] which links back to Community. See `ui_kits/portal/index.html` for reference.
+Pages in the top nav (Home, Tickets, Community, Recap) show no back link — the sticky top nav is how you move between them. Pages not in the top nav (Members/[id], Profile edit) show a back link to their logical parent (Community or Portal home respectively). See `ui_kits/portal/index.html` for reference.
 
 ### Known hazard: Tailwind 4 `--spacing-*` collision
 

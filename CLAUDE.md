@@ -425,7 +425,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 
 ### Portal back-link convention
 
-Top-nav destinations (Home, Community, Recap) show **no** back link — the sticky top nav handles navigation. Leaf pages reached by clicking through (Tickets, Members/[id], Profile) show a back link to their logical parent: usually Portal home, except Members/[id] which links back to Community. Documented in a comment at the top of `src/app/portal/layout.tsx`. Reference mock: `ui_kits/portal/index.html`.
+Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link — the sticky top nav is how you move between them. Pages not in the top nav (Members/[id], Profile edit) show a back link to their logical parent (Community or Portal home respectively). Documented in a comment at the top of `src/app/portal/layout.tsx`. Reference mock: `ui_kits/portal/index.html`.
 
 ### Known gap: PageHeader on portal pages
 
