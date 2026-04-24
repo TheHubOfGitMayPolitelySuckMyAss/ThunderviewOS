@@ -66,7 +66,7 @@ export default async function DinnerDetailPage({
   // Fetch speakers
   const { data: speakerRows } = await supabase
     .from("dinner_speakers")
-    .select("member_id, members(first_name, last_name, company_name, profile_pic_url)")
+    .select("member_id, members(first_name, last_name, company_name, linkedin_profile, company_website, profile_pic_url)")
     .eq("dinner_id", id);
 
   const speakers = (speakerRows || []).map((row) => {
@@ -74,6 +74,8 @@ export default async function DinnerDetailPage({
       first_name: string;
       last_name: string;
       company_name: string | null;
+      linkedin_profile: string | null;
+      company_website: string | null;
       profile_pic_url: string | null;
     };
     return {
@@ -81,6 +83,8 @@ export default async function DinnerDetailPage({
       first_name: m.first_name,
       last_name: m.last_name,
       company_name: m.company_name,
+      linkedin_profile: m.linkedin_profile,
+      company_website: m.company_website,
       profile_pic_url: m.profile_pic_url,
     };
   });

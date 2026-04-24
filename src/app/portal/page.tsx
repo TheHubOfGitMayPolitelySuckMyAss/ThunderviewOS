@@ -173,6 +173,7 @@ export default async function PortalPage({
     title: string | null;
     description: string | null;
     speakers: {
+      member_id: string;
       first_name: string;
       last_name: string;
       company_name: string | null;
@@ -195,7 +196,7 @@ export default async function PortalPage({
     if (nextDinner) {
       const { data: speakerRows } = await admin
         .from("dinner_speakers")
-        .select("members(first_name, last_name, company_name, linkedin_profile, company_website, profile_pic_url)")
+        .select("member_id, members(first_name, last_name, company_name, linkedin_profile, company_website, profile_pic_url)")
         .eq("dinner_id", nextDinner.id);
 
       const speakers = (speakerRows || []).map((row) => {
@@ -207,7 +208,7 @@ export default async function PortalPage({
           company_website: string | null;
           profile_pic_url: string | null;
         };
-        return m;
+        return { member_id: row.member_id, ...m };
       });
 
       dinnerDetails = {
