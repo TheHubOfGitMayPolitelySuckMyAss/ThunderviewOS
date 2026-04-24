@@ -57,7 +57,7 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
   ];
 
   return (
-    <nav className="tv-nav sticky top-0 z-10 bg-bg relative">
+    <nav className="tv-nav sticky top-0 z-10 bg-bg relative justify-between">
       {/* Left: logo */}
       <Link href="/portal" className="tv-nav-logo no-underline flex-shrink-0 relative z-[1]">
         Thunderview
