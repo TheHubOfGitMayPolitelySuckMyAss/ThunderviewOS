@@ -313,6 +313,10 @@ If you're building production code for the real `thunderview-os` repo, the mappi
 - **Fonts** → swap `Geist`/`Geist_Mono` in `src/app/layout.tsx` for `Inter` and `Fraunces` from `next/font/google`.
 - **Components** → treat `ui_kits/*/*.jsx` as visual specs, not drop-in. Re-implement inside the real app with real Supabase wiring.
 
+### Portal back-link convention
+
+Top-nav destinations (Home, Community, Recap) show no back link — the sticky top nav handles navigation. Leaf pages reached by clicking through (Tickets, Members/[id], Profile) show a back link to their logical parent: usually Portal home, except Members/[id] which links back to Community. See `ui_kits/portal/index.html` for reference.
+
 ### Known hazard: Tailwind 4 `--spacing-*` collision
 
 Tailwind 4 computes numeric spacing utilities (`h-9`, `p-4`, `gap-6`) as `calc(var(--spacing) * N)` from a single base variable. If you define `--spacing-9` in `@theme inline`, Tailwind treats it as a named override for that step — so `h-9` resolves to your value, not `0.25rem * 9`. Our spacing scale is non-linear (e.g. `--tv-space-9 = 96px`), so this silently breaks every numeric utility that happens to hit an overridden step. Only semantic aliases (`--spacing-stack`, `--spacing-section`, etc.) belong in `@theme inline`. See `colors_and_type.css` header and `ui_kits/system/index.html` §01 for details.

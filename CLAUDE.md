@@ -423,6 +423,10 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Email template fixes** (`src/lib/email.ts`): CTA button margin-top increased from 8px to 16px. `bodyToHtml()` now post-processes bare `<a>` tags to add inline `color:#9A7A5E` (clay) since email clients strip `<style>` blocks. Tags with existing `style` attributes left untouched. `email-send.ts` unchanged.
 - **Apply schedule** extended from 12 to 13 months so the schedule always includes the same month next year (e.g. April 2027 when viewing in April 2026).
 
+### Portal back-link convention
+
+Top-nav destinations (Home, Community, Recap) show **no** back link — the sticky top nav handles navigation. Leaf pages reached by clicking through (Tickets, Members/[id], Profile) show a back link to their logical parent: usually Portal home, except Members/[id] which links back to Community. Documented in a comment at the top of `src/app/portal/layout.tsx`. Reference mock: `ui_kits/portal/index.html`.
+
 ### Known gap: PageHeader on portal pages
 
 `<PageHeader>` has two sizes: `default` (tv-h1 + 64px gap) and `compact` (tv-h3 + 24px gap). Portal pages need tv-h1 heading + ~32px gap — neither size fits. Portal pages currently use inline `<H1>` + `<Lede>` with manual `mb-6` instead of PageHeader. **Next step**: add `size="portal"` (tv-h1 heading + 32px gap) and migrate portal pages back to PageHeader.

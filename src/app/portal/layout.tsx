@@ -1,3 +1,10 @@
+// Back-link convention:
+// - Top-nav destinations (Home, Community, Recap) show NO back link —
+//   the sticky top nav is how you get there, so "back" is redundant.
+// - Leaf pages reached by clicking through (Tickets, Members/[id], Profile)
+//   show a back link to their logical parent (usually Portal home,
+//   except Members/[id] which returns to Community).
+
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
