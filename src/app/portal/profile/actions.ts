@@ -63,6 +63,17 @@ export async function saveProfile(formData: FormData) {
   const newAsk = (formData.get("current_ask") as string)?.trim() || null;
   const newGive = (formData.get("current_give") as string)?.trim() || null;
   const newContact = (formData.get("contact_preference") as string)?.trim() || null;
+
+  // Validate character limits
+  if (newIntro && newIntro.length > 1000) {
+    return { success: false, error: "Intro must be 1,000 characters or fewer" };
+  }
+  if (newAsk && newAsk.length > 250) {
+    return { success: false, error: "Ask must be 250 characters or fewer" };
+  }
+  if (newGive && newGive.length > 500) {
+    return { success: false, error: "Give must be 500 characters or fewer" };
+  }
   const newPrimaryEmail = (formData.get("primary_email") as string)?.trim()?.toLowerCase() || null;
 
   // Parse stagetypes from comma-separated hidden field

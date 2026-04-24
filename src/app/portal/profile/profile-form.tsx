@@ -16,6 +16,12 @@ import { Card } from "@/components/ui/card";
 
 const CropModal = dynamic(() => import("./crop-modal"), { ssr: false });
 
+function counterClass(len: number, max: number): string {
+  if (len >= max) return "text-danger";
+  if (len >= max * 0.9) return "text-warning";
+  return "text-fg3";
+}
+
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
   "Exited CEO (Acquisition or IPO)",
@@ -385,10 +391,14 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               id="current_intro"
               name="current_intro"
               rows={4}
+              maxLength={1000}
               value={intro}
               onChange={(e) => setIntro(e.target.value)}
               placeholder="How would you introduce yourself to the group?"
             />
+            <div className={`text-xs text-right ${counterClass(intro.length, 1000)}`}>
+              {intro.length}/1,000
+            </div>
           </Field>
 
           <Field label="Ask" className="mt-form-row">
@@ -396,10 +406,14 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               id="current_ask"
               name="current_ask"
               rows={4}
+              maxLength={250}
               value={ask}
               onChange={(e) => setAsk(e.target.value)}
               placeholder="What can the group help you with?"
             />
+            <div className={`text-xs text-right ${counterClass(ask.length, 250)}`}>
+              {ask.length}/250
+            </div>
           </Field>
 
           <Field label="Give" className="mt-form-row">
@@ -407,10 +421,14 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               id="current_give"
               name="current_give"
               rows={4}
+              maxLength={500}
               value={give}
               onChange={(e) => setGive(e.target.value)}
               placeholder="What can you offer the community?"
             />
+            <div className={`text-xs text-right ${counterClass(give.length, 500)}`}>
+              {give.length}/500
+            </div>
           </Field>
 
           <Field label="Preferred contact" className="mt-form-row">
