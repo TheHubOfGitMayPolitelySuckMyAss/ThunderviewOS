@@ -149,10 +149,16 @@ export async function searchMembersForSpeaker(
 > {
   const admin = createAdminClient();
 
-  const { data } = await admin
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  let q = admin
     .from("members")
-    .select("id, first_name, last_name, company_name")
-    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+    .select("id, first_name, last_name, company_name");
+
+  for (const word of words) {
+    q = q.or(`first_name.ilike.%${word}%,last_name.ilike.%${word}%`);
+  }
+
+  const { data } = await q
     .order("first_name")
     .limit(10);
 
