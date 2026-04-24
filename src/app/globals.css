@@ -127,6 +127,9 @@
   --tv-form-row-gap: var(--tv-space-4);
   --tv-label-input-gap: var(--tv-space-2);
   --tv-button-group-gap: var(--tv-space-3);
+  --tv-form-eyebrow-gap: var(--tv-space-4);
+  --tv-form-section-break-gap: 28px;
+  --tv-form-section-break-pad: var(--tv-space-5);
 
   /* ---- Layout: tables ---- */
   --tv-table-row-height: 52px;
@@ -404,6 +407,19 @@
 
 .tv-page-header > * + * { margin-top: var(--tv-tight-gap); }
 .tv-page-header + * { margin-top: var(--tv-section-gap); }
+
+/* Form section — eyebrow + fields group, used inside a Card. */
+.tv-form-section + .tv-form-section {
+  margin-top: var(--tv-form-section-break-gap);
+}
+.tv-form-section--divider {
+  margin-top: var(--tv-form-section-break-gap);
+  padding-top: var(--tv-form-section-break-pad);
+  border-top: 1px solid var(--tv-border-subtle);
+}
+.tv-form-section > .tv-eyebrow {
+  margin: 0 0 var(--tv-form-eyebrow-gap);
+}
 
 /* ================================================================
    Base body

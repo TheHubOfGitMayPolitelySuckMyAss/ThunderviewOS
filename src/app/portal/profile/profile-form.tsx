@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Eyebrow, H1 } from "@/components/ui/typography";
+import { H1 } from "@/components/ui/typography";
 import Field from "@/components/field";
+import FormSection from "@/components/form-section";
 import { Card } from "@/components/ui/card";
 
 const CropModal = dynamic(() => import("./crop-modal"), { ssr: false });
@@ -297,7 +298,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
 
       <form onSubmit={handleSubmit}>
         <Card>
-          <Eyebrow className="mb-4">Profile details</Eyebrow>
+          <FormSection eyebrow="Profile details">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <Field label="First name" required>
               <Input
@@ -383,9 +384,9 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               })}
             </div>
           </Field>
+          </FormSection>
 
-          <Eyebrow className="mt-7 pt-5 border-t border-border-subtle mb-4">Intro, Ask &amp; Give</Eyebrow>
-
+          <FormSection eyebrow="Intro, Ask & Give" divider>
           <Field label="Intro">
             <Textarea
               id="current_intro"
@@ -445,6 +446,7 @@ export default function ProfileForm({ member }: ProfileFormProps) {
               ))}
             </Select>
           </Field>
+          </FormSection>
 
           <div className="mt-6">
             <Button type="submit" disabled={saving}>
