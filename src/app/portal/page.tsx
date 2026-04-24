@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
+import { getTicketInfo } from "@/lib/ticket-assignment";
 import { H1 } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
+import TicketPurchase from "./tickets/ticket-purchase";
 import PurchaseConfetti from "./purchase-confetti";
 
 export default async function PortalPage({
@@ -30,7 +32,7 @@ export default async function PortalPage({
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, first_name, kicked_out, current_intro, current_ask, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended)"
+      "email, members!inner(id, first_name, attendee_stagetypes, has_community_access, kicked_out, current_intro, current_ask, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended)"
     )
     .eq("email", email)
     .limit(1)
@@ -39,6 +41,8 @@ export default async function PortalPage({
   const member = memberEmail?.members as unknown as {
     id: string;
     first_name: string;
+    attendee_stagetypes: string[];
+    has_community_access: boolean;
     kicked_out: boolean;
     current_intro: string | null;
     current_ask: string | null;
@@ -78,6 +82,91 @@ export default async function PortalPage({
     }
   }
 
+  // Build ticket purchase data when member has no upcoming ticket
+  let ticketPurchaseData: {
+    dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[];
+    defaultDinnerId: string;
+    ticketLabel: string;
+    ticketPrice: number;
+    memberEmail: string;
+  } | null = null;
+
+  if (isMember && !bannerDinnerDate && member.attendee_stagetypes?.length > 0) {
+    const todayMT = getTodayMT();
+
+    const { data: existingTickets } = await admin
+      .from("tickets")
+      .select("dinner_id")
+      .eq("member_id", member.id)
+      .in("fulfillment_status", ["purchased", "fulfilled"]);
+
+    const ticketedDinnerIds = new Set(
+      (existingTickets || []).map((t) => t.dinner_id)
+    );
+
+    const { data: pastDinner } = await admin
+      .from("dinners")
+      .select("id, date, guests_allowed")
+      .lt("date", todayMT)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single();
+
+    const { data: upcomingDinners } = await admin
+      .from("dinners")
+      .select("id, date, guests_allowed")
+      .gte("date", todayMT)
+      .order("date", { ascending: true })
+      .limit(3);
+
+    const dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[] = [];
+
+    if (pastDinner && !ticketedDinnerIds.has(pastDinner.id)) {
+      dinnerOptions.push({
+        id: pastDinner.id,
+        date: pastDinner.date,
+        label: formatDinnerDisplay(pastDinner.date),
+        isPast: true,
+        guestsAllowed: pastDinner.guests_allowed,
+      });
+    }
+
+    for (const d of upcomingDinners || []) {
+      if (ticketedDinnerIds.has(d.id)) continue;
+      dinnerOptions.push({
+        id: d.id,
+        date: d.date,
+        label: formatDinnerDisplay(d.date),
+        isPast: false,
+        guestsAllowed: d.guests_allowed,
+      });
+    }
+
+    if (dinnerOptions.length > 0) {
+      const defaultDinnerId =
+        dinnerOptions.find((d) => !d.isPast)?.id || dinnerOptions[0].id;
+      const { label, price } = getTicketInfo(
+        member.attendee_stagetypes,
+        member.has_community_access
+      );
+
+      // Get primary email for Stripe
+      const { data: emails } = await admin
+        .from("member_emails")
+        .select("email, is_primary")
+        .eq("member_id", member.id);
+      const primaryEmail = emails?.find((e) => e.is_primary)?.email ?? email;
+
+      ticketPurchaseData = {
+        dinnerOptions,
+        defaultDinnerId,
+        ticketLabel: label,
+        ticketPrice: price,
+        memberEmail: primaryEmail,
+      };
+    }
+  }
+
   return (
     <div className="tv-container-narrow tv-page-gutter py-7">
       <H1 className="mb-6">
@@ -93,17 +182,27 @@ export default async function PortalPage({
         </div>
       )}
 
-      {isMember && (
+      {isMember && bannerDinnerDate ? (
         <Card>
           <PortalForm
             initialIntro={member.current_intro}
             initialAsk={member.current_ask}
             initialContact={member.contact_preference}
-            bannerDinnerDate={bannerDinnerDate ? formatDinnerDisplay(bannerDinnerDate) : null}
+            bannerDinnerDate={formatDinnerDisplay(bannerDinnerDate)}
             bannerIntroAskFresh={introAskFresh}
           />
         </Card>
-      )}
+      ) : isMember && ticketPurchaseData ? (
+        <Card>
+          <TicketPurchase
+            dinnerOptions={ticketPurchaseData.dinnerOptions}
+            defaultDinnerId={ticketPurchaseData.defaultDinnerId}
+            ticketLabel={ticketPurchaseData.ticketLabel}
+            ticketPrice={ticketPurchaseData.ticketPrice}
+            memberEmail={ticketPurchaseData.memberEmail}
+          />
+        </Card>
+      ) : null}
 
       <p className="text-xs text-fg3 mt-5 text-center">
         Need to update your name, company, or photo?{" "}
