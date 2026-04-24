@@ -34,9 +34,16 @@ export async function savePortalProfile(formData: FormData) {
   const newAsk = formData.get("current_ask") as string | null;
   const newContact = formData.get("contact_preference") as string | null;
 
-  // Normalize: treat empty strings as null
+  // Normalize: treat empty strings as null, enforce length limits
   const normalizedIntro = newIntro?.trim() || null;
   const normalizedAsk = newAsk?.trim() || null;
+
+  if (normalizedIntro && normalizedIntro.length > 1000) {
+    return { success: false, error: "Intro must be 1,000 characters or fewer" };
+  }
+  if (normalizedAsk && normalizedAsk.length > 250) {
+    return { success: false, error: "Ask must be 250 characters or fewer" };
+  }
   const normalizedContact = newContact?.trim() || null;
 
   const oldIntro = member.current_intro?.trim() || null;

@@ -18,6 +18,7 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -33,6 +34,15 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  function handleMouseEnter() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setDropdownOpen(true);
+  }
+
+  function handleMouseLeave() {
+    closeTimer.current = setTimeout(() => setDropdownOpen(false), 200);
+  }
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -47,14 +57,14 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
   ];
 
   return (
-    <nav className="tv-nav sticky top-0 z-10 bg-bg">
+    <nav className="tv-nav sticky top-0 z-10 bg-bg relative">
       {/* Left: logo */}
-      <Link href="/portal" className="tv-nav-logo no-underline flex-shrink-0">
+      <Link href="/portal" className="tv-nav-logo no-underline flex-shrink-0 relative z-[1]">
         Thunderview
       </Link>
 
-      {/* Center: links */}
-      <div className="hidden md:flex items-center gap-[var(--tv-nav-link-gap)] flex-1 justify-center">
+      {/* Center: links — absolutely positioned to align with viewport center */}
+      <div className="hidden md:flex items-center gap-[var(--tv-nav-link-gap)] absolute inset-0 justify-center pointer-events-none">
         {navLinks.map((link) => {
           const active = link.href === "/admin"
             ? pathname.startsWith("/admin")
@@ -63,7 +73,7 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm font-medium no-underline ${
+              className={`text-sm font-medium no-underline pointer-events-auto ${
                 active
                   ? "text-fg1 border-b-2 border-accent pb-[3px]"
                   : "text-fg2 hover:text-fg1"
@@ -76,7 +86,12 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
       </div>
 
       {/* Right: avatar */}
-      <div className="relative flex-shrink-0" ref={dropdownRef}>
+      <div
+        className="relative flex-shrink-0 z-[1]"
+        ref={dropdownRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
           className="flex h-[40px] w-[40px] items-center justify-center rounded-full bg-accent text-sm font-semibold text-cream-50 cursor-pointer overflow-hidden transition-colors duration-[120ms]"
