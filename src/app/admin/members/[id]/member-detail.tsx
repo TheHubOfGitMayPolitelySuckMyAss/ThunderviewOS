@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
+import { useState, useTransition, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import { Pencil, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatName, formatStageType } from "@/lib/format";
@@ -21,8 +23,11 @@ import {
   checkEmailForMember,
   applyCredit,
   compTicket,
+  adminUploadProfilePic,
 } from "./actions";
 import type { EmailCheckResult } from "./actions";
+
+const CropModal = dynamic(() => import("@/app/portal/profile/crop-modal"), { ssr: false });
 
 const STAGE_OPTIONS = [
   "Active CEO (Bootstrapping or VC-Backed)",
@@ -94,7 +99,7 @@ export default function MemberDetail({
     <div className="rounded-xl border border-border bg-bg p-6 shadow-xs">
       {/* Heading */}
       <div className="mb-6">
-        <Heading member={m} />
+        <Heading member={m} onPicUpdated={(url) => { setM({ ...m, profile_pic_url: url }); router.refresh(); }} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-7">
@@ -300,24 +305,137 @@ export default function MemberDetail({
 
 // ── Heading ──
 
-function Heading({ member }: { member: MemberData }) {
+function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (url: string | null) => void }) {
   const fullName = formatName(member.first_name, member.last_name);
-  const heading = member.company_name
-    ? `${fullName} at ${member.company_name}`
-    : fullName;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+  const [picPreview, setPicPreview] = useState<string | null>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
+    if (isHeic) {
+      uploadFile(file);
+      return;
+    }
+
+    setCropImageUrl(URL.createObjectURL(file));
+  }
+
+  async function handleCropApply(blob: Blob) {
+    setCropImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    const file = new File([blob], "cropped.png", { type: "image/png" });
+    setPicPreview(URL.createObjectURL(blob));
+    await uploadFile(file);
+  }
+
+  function handleCropCancel() {
+    setCropImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function uploadFile(file: File) {
+    setSavingPhoto(true);
+    const formData = new FormData();
+    formData.set("profile_pic", file);
+    const result = await adminUploadProfilePic(member.id, formData);
+    setSavingPhoto(false);
+
+    if (result.success && result.profilePicUrl !== undefined) {
+      onPicUpdated(result.profilePicUrl ?? null);
+      setPicPreview(null);
+    }
+  }
+
+  async function handleRemovePic() {
+    setSavingPhoto(true);
+    const formData = new FormData();
+    formData.set("remove_pic", "true");
+    const result = await adminUploadProfilePic(member.id, formData);
+    setSavingPhoto(false);
+
+    if (result.success) {
+      onPicUpdated(null);
+      setPicPreview(null);
+    }
+  }
+
+  const showPic = picPreview || member.profile_pic_url;
 
   return (
-    <div className="flex items-center gap-4">
-      <MemberAvatar member={member} size="lg" />
-      <h1
-        className={`tv-h2 !text-[36px] ${member.kicked_out ? "line-through text-fg4" : ""}`}
-      >
-        {fullName}{" "}
-        {member.company_name && (
-          <span className="font-sans font-normal text-[22px] text-fg3">at {member.company_name}</span>
-        )}
-      </h1>
-    </div>
+    <>
+      <div className="flex items-center gap-4">
+        <div className="relative group">
+          {showPic ? (
+            <Image
+              src={picPreview || member.profile_pic_url!}
+              alt={fullName}
+              width={120}
+              height={120}
+              className="h-[120px] w-[120px] rounded-full object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-accent font-display font-medium text-[40px] text-cream-50">
+              {member.first_name?.[0]?.toUpperCase() ?? "?"}{member.last_name?.[0]?.toUpperCase() ?? ""}
+            </div>
+          )}
+          {savingPhoto && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/60">
+              <svg className="h-6 w-6 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+          )}
+          {!savingPhoto && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 group-hover:opacity-100 group-hover:bg-black/40 transition-all duration-[120ms] cursor-pointer"
+            >
+              <Pencil size={20} className="text-white" />
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+        <div>
+          <h1
+            className={`tv-h2 !text-[36px] ${member.kicked_out ? "line-through text-fg4" : ""}`}
+          >
+            {fullName}{" "}
+            {member.company_name && (
+              <span className="font-sans font-normal text-[22px] text-fg3">at {member.company_name}</span>
+            )}
+          </h1>
+          {member.profile_pic_url && !savingPhoto && (
+            <button
+              onClick={handleRemovePic}
+              className="text-xs text-ember-600 cursor-pointer hover:underline mt-1"
+            >
+              Remove photo
+            </button>
+          )}
+        </div>
+      </div>
+
+      {cropImageUrl && (
+        <CropModal
+          imageUrl={cropImageUrl}
+          onApply={handleCropApply}
+          onCancel={handleCropCancel}
+        />
+      )}
+    </>
   );
 }
 

@@ -273,6 +273,72 @@ export async function compTicket(
   return { success: true };
 }
 
+export async function adminUploadProfilePic(
+  memberId: string,
+  formData: FormData
+): Promise<{ success: boolean; error?: string; profilePicUrl?: string | null }> {
+  const admin = createAdminClient();
+  const sharp = (await import("sharp")).default;
+
+  const file = formData.get("profile_pic") as File | null;
+  const removePic = formData.get("remove_pic") === "true";
+
+  if (removePic) {
+    await admin.storage.from("profile-pics").remove([`${memberId}.webp`]);
+    const { error } = await admin
+      .from("members")
+      .update({ profile_pic_url: null })
+      .eq("id", memberId);
+    if (error) return { success: false, error: error.message };
+    return { success: true, profilePicUrl: null };
+  }
+
+  if (!file || file.size === 0) {
+    return { success: false, error: "No file provided" };
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    return { success: false, error: "Image must be under 5MB" };
+  }
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: "Image must be JPEG, PNG, WebP, or HEIC" };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const processed = await sharp(buffer)
+    .resize(400, 400, { fit: "cover", position: "centre" })
+    .webp({ quality: 80 })
+    .rotate()
+    .toBuffer();
+
+  const filePath = `${memberId}.webp`;
+  const { error: uploadError } = await admin.storage
+    .from("profile-pics")
+    .upload(filePath, processed, {
+      contentType: "image/webp",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    return { success: false, error: `Upload failed: ${uploadError.message}` };
+  }
+
+  const { data: urlData } = admin.storage
+    .from("profile-pics")
+    .getPublicUrl(filePath);
+
+  const profilePicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+  const { error } = await admin
+    .from("members")
+    .update({ profile_pic_url: profilePicUrl })
+    .eq("id", memberId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, profilePicUrl };
+}
+
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
   pendingApp?: { id: string };

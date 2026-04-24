@@ -3,13 +3,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { formatDinnerDisplay, getTodayMT, toDateMT } from "@/lib/format";
+import { formatDinnerDisplay, formatName, getTodayMT, toDateMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
 import { H1 } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
 import TicketPurchase from "./tickets/ticket-purchase";
 import PurchaseConfetti from "./purchase-confetti";
+import DinnerDetailsBlock from "./dinner-details-block";
 
 export default async function PortalPage({
   searchParams,
@@ -167,6 +168,56 @@ export default async function PortalPage({
     }
   }
 
+  // Fetch dinner details for next upcoming dinner (shown when no ticket)
+  let dinnerDetails: {
+    title: string | null;
+    description: string | null;
+    speakers: {
+      first_name: string;
+      last_name: string;
+      company_name: string | null;
+      linkedin_profile: string | null;
+      company_website: string | null;
+      profile_pic_url: string | null;
+    }[];
+  } | null = null;
+
+  if (isMember && !bannerDinnerDate) {
+    const todayMT = getTodayMT();
+    const { data: nextDinner } = await admin
+      .from("dinners")
+      .select("id, title, description")
+      .gte("date", todayMT)
+      .order("date", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (nextDinner) {
+      const { data: speakerRows } = await admin
+        .from("dinner_speakers")
+        .select("members(first_name, last_name, company_name, linkedin_profile, company_website, profile_pic_url)")
+        .eq("dinner_id", nextDinner.id);
+
+      const speakers = (speakerRows || []).map((row) => {
+        const m = row.members as unknown as {
+          first_name: string;
+          last_name: string;
+          company_name: string | null;
+          linkedin_profile: string | null;
+          company_website: string | null;
+          profile_pic_url: string | null;
+        };
+        return m;
+      });
+
+      dinnerDetails = {
+        title: nextDinner.title,
+        description: nextDinner.description,
+        speakers,
+      };
+    }
+  }
+
   return (
     <div className="tv-container-narrow tv-page-gutter py-7">
       <H1 className="mb-6">
@@ -180,6 +231,10 @@ export default async function PortalPage({
             You&rsquo;re confirmed for <strong className="text-fg1">{formatDinnerDisplay(bannerDinnerDate)}</strong>.
           </span>
         </div>
+      )}
+
+      {isMember && !bannerDinnerDate && dinnerDetails && (
+        <DinnerDetailsBlock details={dinnerDetails} />
       )}
 
       {isMember && bannerDinnerDate ? (

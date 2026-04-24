@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
 import DinnerTickets from "./dinner-tickets";
 import DinnerVenue from "./dinner-venue";
+import DinnerDetails from "./dinner-details";
 import PageHeader from "@/components/page-header";
 
 function hasFreshIntroAsk(member: {
@@ -61,6 +62,28 @@ export default async function DinnerDetailPage({
     .select("*, members(id, first_name, last_name, current_intro, current_ask, ask_updated_at, last_dinner_attended, profile_pic_url, member_emails(email, is_primary))")
     .eq("dinner_id", id)
     .order("purchased_at", { ascending: false });
+
+  // Fetch speakers
+  const { data: speakerRows } = await supabase
+    .from("dinner_speakers")
+    .select("member_id, members(first_name, last_name, company_name, profile_pic_url)")
+    .eq("dinner_id", id);
+
+  const speakers = (speakerRows || []).map((row) => {
+    const m = row.members as unknown as {
+      first_name: string;
+      last_name: string;
+      company_name: string | null;
+      profile_pic_url: string | null;
+    };
+    return {
+      member_id: row.member_id,
+      first_name: m.first_name,
+      last_name: m.last_name,
+      company_name: m.company_name,
+      profile_pic_url: m.profile_pic_url,
+    };
+  });
 
   const { data: applications } = await supabase
     .from("applications")
@@ -218,6 +241,14 @@ export default async function DinnerDetailPage({
           </p>
         </div>
       </div>
+
+      {/* Dinner details (title, description, speakers) */}
+      <DinnerDetails
+        dinnerId={dinner.id}
+        title={dinner.title ?? null}
+        description={dinner.description ?? null}
+        speakers={speakers}
+      />
 
       {/* Tickets (client component with actions) */}
       <DinnerTickets tickets={ticketRows} dinnerDate={dinner.date} />

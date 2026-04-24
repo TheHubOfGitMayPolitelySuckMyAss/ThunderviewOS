@@ -128,14 +128,68 @@ export async function creditTicket(
 
 export async function updateDinnerField(
   dinnerId: string,
-  field: "venue" | "address",
-  value: string
+  field: "venue" | "address" | "title" | "description",
+  value: string | null
 ): Promise<{ success: boolean; error?: string }> {
   const admin = createAdminClient();
   const { error } = await admin
     .from("dinners")
-    .update({ [field]: value })
+    .update({ [field]: value || null })
     .eq("id", dinnerId);
+
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/dinners");
+  return { success: true };
+}
+
+export async function searchMembersForSpeaker(
+  query: string
+): Promise<
+  { id: string; name: string; company_name: string | null }[]
+> {
+  const admin = createAdminClient();
+
+  const { data } = await admin
+    .from("members")
+    .select("id, first_name, last_name, company_name")
+    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+    .order("first_name")
+    .limit(10);
+
+  return (data || []).map((m) => ({
+    id: m.id,
+    name: `${m.first_name} ${m.last_name || ""}`.trim(),
+    company_name: m.company_name,
+  }));
+}
+
+export async function addDinnerSpeaker(
+  dinnerId: string,
+  memberId: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("dinner_speakers")
+    .insert({ dinner_id: dinnerId, member_id: memberId });
+
+  if (error) {
+    if (error.code === "23505") return { success: false, error: "Already a speaker" };
+    return { success: false, error: error.message };
+  }
+  revalidatePath("/admin/dinners");
+  return { success: true };
+}
+
+export async function removeDinnerSpeaker(
+  dinnerId: string,
+  memberId: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("dinner_speakers")
+    .delete()
+    .eq("dinner_id", dinnerId)
+    .eq("member_id", memberId);
 
   if (error) return { success: false, error: error.message };
   revalidatePath("/admin/dinners");
