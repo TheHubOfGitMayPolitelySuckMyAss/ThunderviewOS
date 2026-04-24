@@ -108,7 +108,7 @@ export default function MembersTable({
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-4">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <Input
           type="text"
           placeholder="Search name, company, email…"
