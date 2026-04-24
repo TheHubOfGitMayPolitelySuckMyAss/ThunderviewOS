@@ -5,7 +5,7 @@ import { savePortalProfile } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Eyebrow } from "@/components/ui/typography";
+import { H4 } from "@/components/ui/typography";
 import Field from "@/components/field";
 
 const CONTACT_OPTIONS = ["linkedin", "email"];
@@ -61,7 +61,7 @@ export default function PortalForm({
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Your intro &amp; ask for this dinner</Eyebrow>
+      <H4>Your intro &amp; ask for this dinner</H4>
       <p className="text-sm text-fg2 leading-[1.55] mt-1 mb-4">
         Every attendee gets the full list of intros and asks the week before dinner.
         People use it to find you&mdash;they&rsquo;ll walk up and say &ldquo;you&rsquo;re the one
