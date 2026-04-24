@@ -40,7 +40,8 @@ The v4 handoff doc is the source of truth for product decisions. It lives outsid
 - **Data model philosophy:** Three distinct tables — `applications` (vetting events, persist forever), `members` (current-standing approved people), `tickets` (paid entry for a specific dinner). Plus `credits` and `dinners`.
 - **No row deletions.** Soft-delete via `kicked_out` flag on members. Rejected applications stay in the applications table — that table IS the rejection/suppression list.
 - **Demographics (gender, race, orientation) live on `applications` only.** Never copied to `members`.
-- **One Ask per member.** `members.current_ask` is overwritten on save. Prefill logic: `ask_updated_at > last_dinner_attended`. Character limits: intro 1,000, ask 250. Enforced client-side (`maxLength`) and server-side (portal save action). DB columns are unconstrained TEXT.
+- **One Ask per member.** `members.current_ask` is overwritten on save. Prefill logic: `ask_updated_at > last_dinner_attended`. Character limits: intro 1,000, ask 250, give 500. Enforced client-side (`maxLength`) and server-side (portal save actions). DB columns are unconstrained TEXT.
+- **Give field.** `members.current_give` TEXT. Shown on portal profile editor and member detail pages only — not on the portal home intro/ask form. No timestamp tracking.
 - **Multi-email members.** Members can have multiple email addresses via the `member_emails` table. Lookups (auth, ticket matching, application matching) check against ALL of a member's emails. Primary email = the email on the member's most recent approved application; this is what's used for outbound communication. Primary flips automatically when a new application is approved with a different email. Tickets do NOT change primary email (Stripe autofill is noisy).
   - ~~TODO: When an application is approved with a different email than primary, flip primary to the application email.~~ Done — `approve_application` and `link_application_to_member` RPCs handle this.
   - TODO: When a ticket is fulfilled with an unrecognized email, insert a new `member_emails` row with `is_primary = false`, `source = 'ticket'` (add to fulfill action in Phase 3).
@@ -84,11 +85,12 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 src/
 ├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect (Next.js 16 "proxy", replaces middleware.ts)
 ├── components/
-│   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links, avatar dropdown. Uses .tv-nav (64px height)
+│   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links (Community, Monthly Recap, Admin for team), avatar dropdown (hover + click). Links absolutely centered on viewport
 │   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team/Gallery), Apply + Sign In (or Portal when authenticated). Server component with auth check
 │   ├── member-avatar.tsx              # Reusable avatar: shows profile pic if set, clay-500 initials circle if not. Props: member (first_name, last_name, profile_pic_url), size (sm/md/lg)
 │   ├── page-header.tsx                # Shared page header: eyebrow/title/lede/actions with locked rhythm. size="default" (tv-h1, 64px gap) or "compact" (tv-h3, 24px gap). Portal pages don't use this yet — see "Known gap" section
 │   ├── field.tsx                       # Shared form field wrapper: label/required/help/error/children. flex-col with gap-label-input (8px). Error and help mutually exclusive
+│   ├── form-section.tsx               # Eyebrow-labeled field group inside a Card. Props: eyebrow, divider (adds hairline rule). Uses .tv-form-section CSS
 │   └── ui/                            # Design system primitives (compose these, don't inline)
 │       ├── index.ts                   # Barrel export
 │       ├── button.tsx                 # Primary/secondary/ghost, sm/md/lg, asChild prop for wrapping Links
@@ -126,8 +128,8 @@ src/
 │   │   └── callback/route.ts           # Code exchange flow (secondary)
 │   ├── portal/
 │   │   ├── layout.tsx                  # Portal layout: auth check, TopNav, wraps all /portal/* pages
-│   │   ├── page.tsx                    # Two-column portal home: nav buttons (left) + inline Intro/Ask/Contact form (right)
-│   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas, Contact dropdown, Save with toast. Ticket banner with glow shadow
+│   │   ├── page.tsx                    # Portal home: single-column (640px). Shows intro/ask form when member has ticket, inline ticket purchase when not
+│   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas with char limits (1000/250), Contact dropdown, three-state counter, Save with toast
 │   │   ├── purchase-confetti.tsx       # Client component: fires confetti on ?purchased=true, cleans up param
 │   │   ├── actions.ts                  # Server action: savePortalProfile (updates intro/ask/contact, sets timestamps only on change)
 │   │   ├── sign-out-button.tsx         # Client component: sign-out button (unused — sign-out now in TopNav dropdown)
@@ -155,8 +157,7 @@ src/
 │   │   └── route.ts                    # Vercel Cron: day after each dinner, sets last_dinner_attended for all fulfilled attendees
 │   ├── api/cron/fulfill-tickets/
 │   │   └── route.ts                    # Vercel Cron: 27 days before each dinner, flips purchased→fulfilled + sends fulfillment email
-│   ├── api/cron/morning-of/
-│   │   └── route.ts                    # Vercel Cron: morning of dinner (7am MT), sends morning-of email to all fulfilled attendees
+│   ├── api/cron/morning-of/              # REMOVED — morning-of email is now manually triggered from /admin/emails/morning-of
 │   ├── api/webhooks/stripe/
 │   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
 │   ├── dev/
@@ -255,7 +256,9 @@ supabase/
 │   ├── 20260420800000_dinner_venue_address.sql          # Add address column, update venue default to 'ID345', backfill future dinners
 │   ├── 20260420900000_post_dinner_cron_and_trigger_fix.sql  # Remove last_dinner_attended from fulfillment trigger; now set by post-dinner cron
 │   ├── 20260421000000_morning_of_sent_at.sql                # dinners.morning_of_sent_at column for morning-of cron idempotency
-│   └── 20260421100000_fix_has_community_access_on_approval.sql  # Backfill has_community_access = true for 161 existing members
+│   ├── 20260421100000_fix_has_community_access_on_approval.sql  # Backfill has_community_access = true for 161 existing members
+│   ├── 20260424000000_add_current_give.sql                     # Add current_give TEXT to members
+│   └── 20260424100000_morning_of_sent_by.sql                   # Add morning_of_sent_by UUID FK to dinners (tracks who sent morning-of email)
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -409,7 +412,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Broken motion refs fixed**: all `var(--tv-dur-fast)` / `var(--tv-ease-out)` references replaced with literal values — Tailwind arbitrary values can't resolve CSS vars for non-standard properties through `@theme inline`.
 - **Mobile responsive** across all three tiers: marketing pages, portal pages, and admin pages. Two-column layouts stack on mobile, tables scroll horizontally, nav collapses appropriately. Responsive breakpoints applied during the page restyling work in these sprints and polished in Sprint 16.
 - **Dev routes**: `/dev/ui` (primitive showcase), `/dev/emails/[slug]` (email template preview with sample data). Not linked from any page.
-- **NEEDS DESIGN REVIEW**: Portal uses `max-w-[980px]` not the `--container-app` (1280px) token — deliberate per kit layout, consider adding `--container-portal`.
+- ~~**NEEDS DESIGN REVIEW**: Portal uses `max-w-[980px]`~~ Resolved — `--tv-container-portal: 980px` token added, all portal pages use `tv-container-portal` or `tv-container-narrow` (640px for single-column pages).
 - **NEEDS DECISION**: receipt email — using Stripe's built-in receipt. Kit has a design but no sender/template/trigger built. Fulfillment hero photo skipped in email shell — would need per-template image support.
 
 ## What's done (System hardening — Sprint 16)
@@ -445,7 +448,7 @@ Don't build these without an explicit prompt:
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
 - ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
-- ~~Email sending (Resend wiring)~~ Done (Phase 5). All transactional emails wired: approval (on approve), re-application (on approve existing / link), rejection (on reject), fulfillment (on Stripe webhook auto-fulfill + comp ticket), morning-of (cron at 7am MT on dinner day). Templates editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Refund confirmations handled natively by Stripe.
+- ~~Email sending (Resend wiring)~~ Done (Phase 5). All transactional emails wired: approval (on approve), re-application (on approve existing / link), rejection (on reject), fulfillment (on Stripe webhook auto-fulfill + comp ticket), morning-of (manually triggered from `/admin/emails/morning-of` — cron removed). Templates editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Refund confirmations handled natively by Stripe.
 - ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
 - Bulk email templates — future sprint
 - Streak API integration — Phase 7
@@ -463,7 +466,7 @@ Don't build these without an explicit prompt:
 - Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
 - Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
 - ~~Restyle remaining unstyled pages: `/login`, `/apply`~~ Done (Sprint 16)
-- Add `--container-portal: 980px` token (portal pages use 980px, not the 1280px `--container-app` token)
+- ~~Add `--container-portal: 980px` token~~ Done — `--tv-container-portal: 980px` and `--tv-container-narrow: 640px` added, all portal pages migrated
 - Add `size="portal"` to PageHeader (tv-h1 + 32px gap) and migrate portal pages to use it
 - ~~Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in~~ Decided — keeping Stripe's built-in receipt
 - Fulfillment email hero photo: per-template image support if wanted
