@@ -36,6 +36,7 @@ const CONTACT_OPTIONS = [
 ];
 
 type ProfileFormProps = {
+  returnTo?: string;
   member: {
     firstName: string;
     lastName: string;
@@ -52,7 +53,7 @@ type ProfileFormProps = {
   };
 };
 
-export default function ProfileForm({ member }: ProfileFormProps) {
+export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
   const router = useRouter();
   const [firstName, setFirstName] = useState(member.firstName);
   const [lastName, setLastName] = useState(member.lastName);
@@ -215,19 +216,27 @@ export default function ProfileForm({ member }: ProfileFormProps) {
     }
 
     if (result.noChanges) {
-      showToast("No changes to save", "success");
+      if (returnTo) {
+        router.push(returnTo);
+      } else {
+        showToast("No changes to save", "success");
+      }
     } else {
-      showToast("Saved!", "success");
-      if (result.profilePicUrl !== undefined) {
-        setProfilePicUrl(result.profilePicUrl ?? null);
+      if (returnTo) {
+        router.push(returnTo);
+      } else {
+        showToast("Saved!", "success");
+        if (result.profilePicUrl !== undefined) {
+          setProfilePicUrl(result.profilePicUrl ?? null);
+        }
+        if (removePic) {
+          setProfilePicUrl(null);
+        }
+        setSelectedFile(null);
+        setPicPreview(null);
+        setRemovePic(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
-      if (removePic) {
-        setProfilePicUrl(null);
-      }
-      setSelectedFile(null);
-      setPicPreview(null);
-      setRemovePic(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 

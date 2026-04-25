@@ -7,7 +7,13 @@ import { H1, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import ProfileForm from "./profile-form";
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; id?: string }>;
+}) {
+  const { from, id: returnMemberId } = await searchParams;
+  const fromMember = from === "member" && returnMemberId;
   const supabase = await createClient();
   const {
     data: { user },
@@ -56,10 +62,14 @@ export default async function ProfilePage() {
 
   return (
     <div className="tv-container-portal tv-page-gutter py-7">
-      <Link href="/portal" className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3">
-        <ArrowLeft size={14} /> Portal home
+      <Link
+        href={fromMember ? "/portal/community" : "/portal"}
+        className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
+      >
+        <ArrowLeft size={14} /> {fromMember ? "Community" : "Portal home"}
       </Link>
       <ProfileForm
+        returnTo={fromMember ? `/portal/members/${returnMemberId}` : undefined}
         member={{
           firstName: member.first_name,
           lastName: member.last_name,

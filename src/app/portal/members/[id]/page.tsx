@@ -90,7 +90,7 @@ export default async function MemberProfilePage({
             {roles.length > 0 ? roles.map(formatStageType).join(" \u00B7 ") : "Member"}
           </p>
           {isSelf && (
-            <Link href="/portal/profile" className="no-underline mt-2.5 inline-block">
+            <Link href={`/portal/profile?from=member&id=${member.id}`} className="no-underline mt-2.5 inline-block">
               <Button variant="secondary" size="sm">Edit Profile</Button>
             </Link>
           )}
