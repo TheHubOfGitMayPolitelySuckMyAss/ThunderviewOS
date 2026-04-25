@@ -365,6 +365,10 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
 
           <FormSection eyebrow="Intro, Ask & Give" divider>
           <Field label="Intro">
+            <p className="text-sm text-fg3 italic leading-[1.5]">
+              &ldquo;My name is [name] and I&rsquo;m the CEO of [company]. We help [market]
+              with [problem] which has [specific impact] by giving them [solution].&rdquo;
+            </p>
             <Textarea
               id="current_intro"
               name="current_intro"
@@ -372,7 +376,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
               maxLength={1000}
               value={intro}
               onChange={(e) => setIntro(e.target.value)}
-              placeholder="How would you introduce yourself to the group?"
+              placeholder="My name is..."
             />
             <div className={`text-xs text-right ${counterClass(intro.length, 1000)}`}>
               {intro.length}/1,000
@@ -380,6 +384,10 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
           </Field>
 
           <Field label="Ask" className="mt-form-row">
+            <p className="text-sm text-fg3 italic leading-[1.5]">
+              Anything you need, other than requests for sales and fundraising
+              (help with sales and fundraising strategy is ok though).
+            </p>
             <Textarea
               id="current_ask"
               name="current_ask"
@@ -387,7 +395,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
               maxLength={250}
               value={ask}
               onChange={(e) => setAsk(e.target.value)}
-              placeholder="What can the group help you with?"
+              placeholder="I could use help with..."
             />
             <div className={`text-xs text-right ${counterClass(ask.length, 250)}`}>
               {ask.length}/250
