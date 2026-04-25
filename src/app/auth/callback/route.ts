@@ -31,10 +31,15 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const response = NextResponse.redirect(new URL("/portal", origin));
+      const redirectCookie = cookieStore.get("auth_redirect")?.value;
+      const redirectPath = redirectCookie ? decodeURIComponent(redirectCookie) : "/portal";
+      const safePath = redirectPath.startsWith("/") ? redirectPath : "/portal";
+
+      const response = NextResponse.redirect(new URL(safePath, origin));
       cookiesToApply.forEach(({ name, value, options }) =>
         response.cookies.set(name, value, options as Record<string, string>)
       );
+      response.cookies.set("auth_redirect", "", { path: "/", maxAge: 0 });
       return response;
     }
   }

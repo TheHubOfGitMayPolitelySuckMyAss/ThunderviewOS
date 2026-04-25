@@ -38,7 +38,9 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/admin")) {
     if (!user) {
       const url = request.nextUrl.clone();
+      const redirectPath = request.nextUrl.pathname + request.nextUrl.search;
       url.pathname = "/login";
+      url.search = `?redirect=${encodeURIComponent(redirectPath)}`;
       return NextResponse.redirect(url);
     }
 
@@ -72,7 +74,9 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/portal")) {
     if (!user) {
       const url = request.nextUrl.clone();
+      const redirectPath = request.nextUrl.pathname + request.nextUrl.search;
       url.pathname = "/login";
+      url.search = `?redirect=${encodeURIComponent(redirectPath)}`;
       return NextResponse.redirect(url);
     }
 
@@ -103,8 +107,10 @@ export async function proxy(request: NextRequest) {
 
   // Redirect authenticated users away from login
   if (request.nextUrl.pathname === "/login" && user) {
+    const redirectParam = request.nextUrl.searchParams.get("redirect");
     const url = request.nextUrl.clone();
-    url.pathname = "/portal";
+    url.pathname = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/portal";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

@@ -6,7 +6,7 @@ import Field from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export default function LoginForm() {
+export default function LoginForm({ redirect }: { redirect?: string }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -16,6 +16,11 @@ export default function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Store redirect target in a cookie so /auth/confirm can read it
+    if (redirect) {
+      document.cookie = `auth_redirect=${encodeURIComponent(redirect)}; path=/; max-age=600; SameSite=Lax`;
+    }
 
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({

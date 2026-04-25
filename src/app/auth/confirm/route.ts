@@ -35,10 +35,18 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
-      const response = NextResponse.redirect(`${origin}/portal`);
+      // Check for a stored redirect target
+      const redirectCookie = cookieStore.get("auth_redirect")?.value;
+      const redirectPath = redirectCookie ? decodeURIComponent(redirectCookie) : "/portal";
+      // Only allow relative paths starting with /
+      const safePath = redirectPath.startsWith("/") ? redirectPath : "/portal";
+
+      const response = NextResponse.redirect(`${origin}${safePath}`);
       cookiesToApply.forEach(({ name, value, options }) =>
         response.cookies.set(name, value, options as Record<string, string>)
       );
+      // Clear the redirect cookie
+      response.cookies.set("auth_redirect", "", { path: "/", maxAge: 0 });
       return response;
     }
   }
