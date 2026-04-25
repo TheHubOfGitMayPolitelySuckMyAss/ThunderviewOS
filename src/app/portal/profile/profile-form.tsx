@@ -135,6 +135,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     formData.set("attendee_stagetypes", stagetypes.join(","));
     formData.set("current_intro", intro);
     formData.set("current_ask", ask);
+    formData.set("current_give", give);
     formData.set("contact_preference", contact);
     formData.set("primary_email", primaryEmail);
 
@@ -178,6 +179,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     formData.set("attendee_stagetypes", stagetypes.join(","));
     formData.set("current_intro", intro);
     formData.set("current_ask", ask);
+    formData.set("current_give", give);
     formData.set("contact_preference", contact);
     formData.set("primary_email", primaryEmail);
 
