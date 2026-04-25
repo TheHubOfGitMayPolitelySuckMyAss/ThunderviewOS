@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { saveProfile } from "./actions";
+import { saveProfile, portalUpdateProfilePic } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,8 +76,6 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
   const [primaryEmail, setPrimaryEmail] = useState(member.primaryEmail);
   const [profilePicUrl, setProfilePicUrl] = useState(member.profilePicUrl);
   const [picPreview, setPicPreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [removePic, setRemovePic] = useState(false);
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,15 +101,26 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     );
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
     if (isHeic) {
-      setSelectedFile(file);
-      setRemovePic(false);
-      setPicPreview(null);
+      // HEIC can't be cropped client-side — upload directly, server does center-crop
+      setSavingPhoto(true);
+      const formData = new FormData();
+      formData.set("profile_pic", file);
+      const result = await portalUpdateProfilePic(formData);
+      setSavingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (!result.success) {
+        showToast(result.error || "Upload failed", "error");
+        return;
+      }
+      showToast("Photo saved!", "success");
+      if (result.profilePicUrl) setProfilePicUrl(result.profilePicUrl);
+      router.refresh();
       return;
     }
 
@@ -127,24 +136,12 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("profile_pic", file);
-    formData.set("first_name", firstName);
-    formData.set("last_name", lastName);
-    formData.set("company_name", companyName);
-    formData.set("company_website", companyWebsite);
-    formData.set("linkedin_profile", linkedinProfile);
-    formData.set("attendee_stagetypes", stagetypes.join(","));
-    formData.set("current_intro", intro);
-    formData.set("current_ask", ask);
-    formData.set("current_give", give);
-    formData.set("contact_preference", contact);
-    formData.set("primary_email", primaryEmail);
 
-    const result = await saveProfile(formData);
+    const result = await portalUpdateProfilePic(formData);
     setSavingPhoto(false);
 
     if (!result.success) {
       showToast(result.error || "Upload failed", "error");
-      setSelectedFile(file);
       return;
     }
 
@@ -152,9 +149,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     if (result.profilePicUrl) {
       setProfilePicUrl(result.profilePicUrl);
     }
-    setSelectedFile(null);
     setPicPreview(null);
-    setRemovePic(false);
     router.refresh();
   }
 
@@ -164,26 +159,14 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
   }
 
   async function handleRemovePic() {
-    setSelectedFile(null);
     setPicPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("remove_pic", "true");
-    formData.set("first_name", firstName);
-    formData.set("last_name", lastName);
-    formData.set("company_name", companyName);
-    formData.set("company_website", companyWebsite);
-    formData.set("linkedin_profile", linkedinProfile);
-    formData.set("attendee_stagetypes", stagetypes.join(","));
-    formData.set("current_intro", intro);
-    formData.set("current_ask", ask);
-    formData.set("current_give", give);
-    formData.set("contact_preference", contact);
-    formData.set("primary_email", primaryEmail);
 
-    const result = await saveProfile(formData);
+    const result = await portalUpdateProfilePic(formData);
     setSavingPhoto(false);
 
     if (!result.success) {
@@ -193,7 +176,6 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
 
     showToast("Photo removed!", "success");
     setProfilePicUrl(null);
-    setRemovePic(false);
     router.refresh();
   }
 
@@ -202,12 +184,6 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     setSaving(true);
 
     const formData = new FormData(e.currentTarget);
-    if (selectedFile) {
-      formData.set("profile_pic", selectedFile);
-    }
-    if (removePic) {
-      formData.set("remove_pic", "true");
-    }
     const result = await saveProfile(formData);
 
     setSaving(false);
@@ -228,16 +204,6 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
         router.push(returnTo);
       } else {
         showToast("Saved!", "success");
-        if (result.profilePicUrl !== undefined) {
-          setProfilePicUrl(result.profilePicUrl ?? null);
-        }
-        if (removePic) {
-          setProfilePicUrl(null);
-        }
-        setSelectedFile(null);
-        setPicPreview(null);
-        setRemovePic(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     }
   }
@@ -247,7 +213,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
       {/* Profile head */}
       <div className="flex items-center gap-5 mb-6">
         <div className="relative">
-          {picPreview || (!removePic && profilePicUrl) ? (
+          {picPreview || profilePicUrl ? (
             <Image
               src={picPreview || profilePicUrl!}
               alt="Profile"
@@ -292,9 +258,9 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
               size="sm"
               onClick={() => fileInputRef.current?.click()}
             >
-              {profilePicUrl && !removePic ? "Change Photo" : "Upload Photo"}
+              {profilePicUrl ? "Change Photo" : "Upload Photo"}
             </Button>
-            {profilePicUrl && !removePic && !picPreview && (
+            {profilePicUrl && !picPreview && (
               <button
                 type="button"
                 onClick={handleRemovePic}

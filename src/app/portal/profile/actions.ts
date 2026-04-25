@@ -7,6 +7,94 @@ import sharp from "sharp";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
+/**
+ * Standalone portal profile pic upload/remove.
+ * Only touches profile_pic_url — no other member fields.
+ */
+export async function portalUpdateProfilePic(
+  formData: FormData
+): Promise<{ success: boolean; error?: string; profilePicUrl?: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  const { data: memberEmail } = await admin
+    .from("member_emails")
+    .select("members!inner(id, profile_pic_url)")
+    .eq("email", user.email!)
+    .limit(1)
+    .single();
+
+  const member = memberEmail?.members as unknown as {
+    id: string;
+    profile_pic_url: string | null;
+  } | null;
+
+  if (!member) return { success: false, error: "Member not found" };
+
+  const file = formData.get("profile_pic") as File | null;
+  const removePic = formData.get("remove_pic") === "true";
+
+  if (removePic) {
+    if (member.profile_pic_url) {
+      await admin.storage.from("profile-pics").remove([`${member.id}.webp`]);
+    }
+    const { error } = await admin
+      .from("members")
+      .update({ profile_pic_url: null })
+      .eq("id", member.id);
+    if (error) return { success: false, error: error.message };
+    return { success: true, profilePicUrl: null };
+  }
+
+  if (!file || file.size === 0) {
+    return { success: false, error: "No file provided" };
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return { success: false, error: "Image must be under 5MB" };
+  }
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return { success: false, error: "Image must be JPEG, PNG, WebP, or HEIC" };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const processed = await sharp(buffer)
+    .resize(400, 400, { fit: "cover", position: "centre" })
+    .webp({ quality: 80 })
+    .rotate()
+    .toBuffer();
+
+  const filePath = `${member.id}.webp`;
+  const { error: uploadError } = await admin.storage
+    .from("profile-pics")
+    .upload(filePath, processed, {
+      contentType: "image/webp",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    return { success: false, error: `Upload failed: ${uploadError.message}` };
+  }
+
+  const { data: urlData } = admin.storage
+    .from("profile-pics")
+    .getPublicUrl(filePath);
+
+  const profilePicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+  const { error } = await admin
+    .from("members")
+    .update({ profile_pic_url: profilePicUrl })
+    .eq("id", member.id);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, profilePicUrl };
+}
+
 const VALID_STAGETYPES = [
   "Active CEO (Bootstrapping or VC-Backed)",
   "Exited CEO (Acquisition or IPO)",
@@ -30,7 +118,7 @@ export async function saveProfile(formData: FormData) {
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select(
-      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, profile_pic_url)"
+      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference)"
     )
     .eq("email", user.email!)
     .limit(1)
@@ -48,7 +136,6 @@ export async function saveProfile(formData: FormData) {
     current_ask: string | null;
     current_give: string | null;
     contact_preference: string | null;
-    profile_pic_url: string | null;
   } | null;
 
   if (!member) return { success: false, error: "Member not found" };
@@ -178,55 +265,6 @@ export async function saveProfile(formData: FormData) {
     }
   }
 
-  // Handle profile pic upload
-  const profilePicFile = formData.get("profile_pic") as File | null;
-  const removePic = formData.get("remove_pic") === "true";
-
-  if (removePic && member.profile_pic_url) {
-    // Remove from storage
-    await admin.storage.from("profile-pics").remove([`${member.id}.webp`]);
-    updates.profile_pic_url = null;
-    anyChange = true;
-  } else if (profilePicFile && profilePicFile.size > 0) {
-    // Validate size
-    if (profilePicFile.size > MAX_FILE_SIZE) {
-      return { success: false, error: "Image must be under 5MB" };
-    }
-    // Validate type
-    if (!ALLOWED_TYPES.includes(profilePicFile.type)) {
-      return { success: false, error: "Image must be JPEG, PNG, WebP, or HEIC" };
-    }
-
-    // Process with sharp: resize, crop, convert to webp, strip EXIF
-    const buffer = Buffer.from(await profilePicFile.arrayBuffer());
-    const processed = await sharp(buffer)
-      .resize(400, 400, { fit: "cover", position: "centre" })
-      .webp({ quality: 80 })
-      .rotate() // auto-rotate based on EXIF, then strip
-      .toBuffer();
-
-    // Upload to storage (overwrite)
-    const filePath = `${member.id}.webp`;
-    const { error: uploadError } = await admin.storage
-      .from("profile-pics")
-      .upload(filePath, processed, {
-        contentType: "image/webp",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      return { success: false, error: `Upload failed: ${uploadError.message}` };
-    }
-
-    // Build public URL with cache-bust
-    const { data: urlData } = admin.storage
-      .from("profile-pics")
-      .getPublicUrl(filePath);
-
-    updates.profile_pic_url = `${urlData.publicUrl}?v=${Date.now()}`;
-    anyChange = true;
-  }
-
   if (!anyChange && !emailChanged) {
     return { success: true, noChanges: true };
   }
@@ -240,5 +278,5 @@ export async function saveProfile(formData: FormData) {
     if (error) return { success: false, error: error.message };
   }
 
-  return { success: true, noChanges: false, profilePicUrl: updates.profile_pic_url as string | null | undefined };
+  return { success: true, noChanges: false };
 }
