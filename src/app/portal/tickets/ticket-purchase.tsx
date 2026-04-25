@@ -56,7 +56,7 @@ export default function TicketPurchase({
           >
             {dinnerOptions.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.label} — ${ticketPrice}
+                {d.label}
               </option>
             ))}
           </Select>
