@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { formatDinnerDisplay, formatName, getTodayMT, toDateMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
-import { H1, H3 } from "@/components/ui/typography";
+import { H1, Eyebrow } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
 import TicketPurchase from "./tickets/ticket-purchase";
@@ -234,7 +234,7 @@ export default async function PortalPage({
         </Card>
       ) : isMember && ticketPurchaseData ? (
         <>
-        <H3 className="mb-3 mt-stack">Join This Dinner</H3>
+        <Eyebrow className="mb-3 mt-stack">Join This Dinner</Eyebrow>
         <Card>
           <TicketPurchase
             dinnerOptions={ticketPurchaseData.dinnerOptions}
