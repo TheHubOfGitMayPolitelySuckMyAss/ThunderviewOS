@@ -403,6 +403,9 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
           </Field>
 
           <Field label="Give" className="mt-form-row">
+            <p className="text-sm text-fg3 italic leading-[1.5]">
+              What can you do to help Thunderview members build their own startups?
+            </p>
             <Textarea
               id="current_give"
               name="current_give"
