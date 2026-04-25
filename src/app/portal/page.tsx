@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { formatDinnerDisplay, formatName, getTodayMT, toDateMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
-import { H1 } from "@/components/ui/typography";
+import { H1, H3 } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
 import TicketPurchase from "./tickets/ticket-purchase";
@@ -170,6 +170,9 @@ export default async function PortalPage({
 
   // Fetch dinner details for next upcoming dinner (shown when no ticket)
   let dinnerDetails: {
+    date: string;
+    venue: string;
+    address: string;
     title: string | null;
     description: string | null;
     speakers: {
@@ -187,7 +190,7 @@ export default async function PortalPage({
     const todayMT = getTodayMT();
     const { data: nextDinner } = await admin
       .from("dinners")
-      .select("id, title, description")
+      .select("id, date, venue, address, title, description")
       .gte("date", todayMT)
       .order("date", { ascending: true })
       .limit(1)
@@ -212,6 +215,9 @@ export default async function PortalPage({
       });
 
       dinnerDetails = {
+        date: nextDinner.date,
+        venue: nextDinner.venue,
+        address: nextDinner.address,
         title: nextDinner.title,
         description: nextDinner.description,
         speakers,
@@ -249,6 +255,8 @@ export default async function PortalPage({
           />
         </Card>
       ) : isMember && ticketPurchaseData ? (
+        <>
+        <H3 className="mb-3">Join This Dinner</H3>
         <Card>
           <TicketPurchase
             dinnerOptions={ticketPurchaseData.dinnerOptions}
@@ -258,6 +266,7 @@ export default async function PortalPage({
             memberEmail={ticketPurchaseData.memberEmail}
           />
         </Card>
+        </>
       ) : null}
 
       <p className="text-xs text-fg3 mt-5 text-center">
