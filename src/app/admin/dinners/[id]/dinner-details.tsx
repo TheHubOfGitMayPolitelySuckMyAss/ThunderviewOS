@@ -254,24 +254,24 @@ function SpeakersSection({
       {speakers.length === 0 && !showSearch && (
         <p className="text-sm text-fg4 italic">No speakers added.</p>
       )}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {speakers.map((s) => (
           <div
             key={s.member_id}
-            className="flex items-start gap-4 rounded-lg border border-border px-4 py-3"
+            className="flex items-center gap-3 rounded-lg border border-border px-3 py-2"
           >
             <MemberAvatar
               member={{ first_name: s.first_name, last_name: s.last_name, profile_pic_url: s.profile_pic_url }}
-              size="lg"
+              size="md"
             />
-            <div className="flex-1 min-w-0 pt-1">
-              <Link href={`/admin/members/${s.member_id}`} className="text-base font-medium text-fg1 no-underline hover:text-accent-hover hover:underline">
+            <div className="flex-1 min-w-0">
+              <Link href={`/admin/members/${s.member_id}`} className="text-sm font-medium text-fg1 no-underline hover:text-accent-hover hover:underline">
                 {formatName(s.first_name, s.last_name)}
               </Link>
               {s.company_name && (
-                <div className="text-sm text-fg3 mt-0.5">{s.company_name}</div>
+                <div className="text-xs text-fg3">{s.company_name}</div>
               )}
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-1.5 mt-1">
                 {s.linkedin_profile && (
                   <a
                     href={s.linkedin_profile.startsWith("http") ? s.linkedin_profile : `https://${s.linkedin_profile}`}
@@ -295,7 +295,7 @@ function SpeakersSection({
               </div>
             </div>
             {confirmRemove === s.member_id ? (
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   onClick={() => handleRemove(s.member_id)}
@@ -314,7 +314,7 @@ function SpeakersSection({
             ) : (
               <button
                 onClick={() => setConfirmRemove(s.member_id)}
-                className="text-fg4 cursor-pointer hover:text-ember-600 pt-1"
+                className="text-fg4 cursor-pointer hover:text-ember-600"
               >
                 <X size={16} />
               </button>
