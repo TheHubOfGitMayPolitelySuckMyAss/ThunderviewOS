@@ -6,6 +6,7 @@ import PublicNav from "@/components/public-nav";
 import { Button } from "@/components/ui/button";
 import { Eyebrow, H1, H2, H3, Body, Small } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
+import ThisMonthsDinner from "./_components/this-months-dinner";
 
 export const metadata: Metadata = {
   title: "Thunderview CEO Dinners — Monthly dinners for Colorado startup CEOs",
@@ -79,6 +80,9 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ---- This month's dinner ---- */}
+      <ThisMonthsDinner />
 
       {/* ---- Three reasons ---- */}
       <section className="border-t border-border-subtle">

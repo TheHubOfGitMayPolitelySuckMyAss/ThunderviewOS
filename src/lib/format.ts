@@ -87,6 +87,15 @@ export function firstThursdayOf(year: number, month: number): string {
 }
 
 /**
+ * Format a dinner date as short "May 7" — for inline CTA text.
+ */
+export function formatDinnerShort(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const month = d.toLocaleDateString("en-US", { month: "short" });
+  return `${month} ${d.getDate()}`;
+}
+
+/**
  * Format a dinner date for display: "May 7th, 2026" style.
  */
 export function formatDinnerDisplay(dateStr: string): string {
