@@ -21,12 +21,14 @@ export default function TicketPurchase({
   ticketLabel,
   ticketPrice,
   memberEmail,
+  hideSelector,
 }: {
   dinnerOptions: DinnerOption[];
   defaultDinnerId: string;
   ticketLabel: string;
   ticketPrice: number;
   memberEmail: string;
+  hideSelector?: boolean;
 }) {
   const [selectedDinnerId, setSelectedDinnerId] = useState(defaultDinnerId);
   const [isPending, startTransition] = useTransition();
@@ -45,24 +47,26 @@ export default function TicketPurchase({
 
   return (
     <div className="flex flex-col gap-stack">
-      {/* Dinner dropdown */}
-      <Field label="Which dinner?">
-        <Select
-          value={selectedDinnerId}
-          onChange={(e) => setSelectedDinnerId(e.target.value)}
-        >
-          {dinnerOptions.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.label} — ${ticketPrice}
-            </option>
-          ))}
-        </Select>
-        {selectedDinner?.isPast && (
-          <FieldHelp className="!text-mustard-500 !mt-0">
-            Buying a ticket for a past dinner.
-          </FieldHelp>
-        )}
-      </Field>
+      {/* Dinner dropdown — hidden when only selling for one dinner */}
+      {!hideSelector && (
+        <Field label="Which dinner?">
+          <Select
+            value={selectedDinnerId}
+            onChange={(e) => setSelectedDinnerId(e.target.value)}
+          >
+            {dinnerOptions.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label} — ${ticketPrice}
+              </option>
+            ))}
+          </Select>
+          {selectedDinner?.isPast && (
+            <FieldHelp className="!text-mustard-500 !mt-0">
+              Buying a ticket for a past dinner.
+            </FieldHelp>
+          )}
+        </Field>
+      )}
 
       {/* Buy buttons — stacked */}
       <div className="flex flex-col gap-tight">

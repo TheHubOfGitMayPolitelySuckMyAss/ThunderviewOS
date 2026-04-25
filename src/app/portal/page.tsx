@@ -95,76 +95,54 @@ export default async function PortalPage({
   if (isMember && !bannerDinnerDate && member.attendee_stagetypes?.length > 0) {
     const todayMT = getTodayMT();
 
-    const { data: existingTickets } = await admin
-      .from("tickets")
-      .select("dinner_id")
-      .eq("member_id", member.id)
-      .in("fulfillment_status", ["purchased", "fulfilled"]);
-
-    const ticketedDinnerIds = new Set(
-      (existingTickets || []).map((t) => t.dinner_id)
-    );
-
-    const { data: pastDinner } = await admin
-      .from("dinners")
-      .select("id, date, guests_allowed")
-      .lt("date", todayMT)
-      .order("date", { ascending: false })
-      .limit(1)
-      .single();
-
-    const { data: upcomingDinners } = await admin
+    // Find the next upcoming dinner
+    const { data: nextDinnerForTicket } = await admin
       .from("dinners")
       .select("id, date, guests_allowed")
       .gte("date", todayMT)
       .order("date", { ascending: true })
-      .limit(3);
+      .limit(1)
+      .single();
 
-    const dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[] = [];
+    if (nextDinnerForTicket) {
+      // Check if member already has a ticket for this dinner
+      const { data: existingTicket } = await admin
+        .from("tickets")
+        .select("id")
+        .eq("member_id", member.id)
+        .eq("dinner_id", nextDinnerForTicket.id)
+        .in("fulfillment_status", ["purchased", "fulfilled"])
+        .limit(1)
+        .single();
 
-    if (pastDinner && !ticketedDinnerIds.has(pastDinner.id)) {
-      dinnerOptions.push({
-        id: pastDinner.id,
-        date: pastDinner.date,
-        label: formatDinnerDisplay(pastDinner.date),
-        isPast: true,
-        guestsAllowed: pastDinner.guests_allowed,
-      });
-    }
+      if (!existingTicket) {
+        const { label, price } = getTicketInfo(
+          member.attendee_stagetypes,
+          member.has_community_access
+        );
 
-    for (const d of upcomingDinners || []) {
-      if (ticketedDinnerIds.has(d.id)) continue;
-      dinnerOptions.push({
-        id: d.id,
-        date: d.date,
-        label: formatDinnerDisplay(d.date),
-        isPast: false,
-        guestsAllowed: d.guests_allowed,
-      });
-    }
+        const { data: emails } = await admin
+          .from("member_emails")
+          .select("email, is_primary")
+          .eq("member_id", member.id);
+        const primaryEmail = emails?.find((e) => e.is_primary)?.email ?? email;
 
-    if (dinnerOptions.length > 0) {
-      const defaultDinnerId =
-        dinnerOptions.find((d) => !d.isPast)?.id || dinnerOptions[0].id;
-      const { label, price } = getTicketInfo(
-        member.attendee_stagetypes,
-        member.has_community_access
-      );
+        const dinnerOption = {
+          id: nextDinnerForTicket.id,
+          date: nextDinnerForTicket.date,
+          label: formatDinnerDisplay(nextDinnerForTicket.date),
+          isPast: false,
+          guestsAllowed: nextDinnerForTicket.guests_allowed,
+        };
 
-      // Get primary email for Stripe
-      const { data: emails } = await admin
-        .from("member_emails")
-        .select("email, is_primary")
-        .eq("member_id", member.id);
-      const primaryEmail = emails?.find((e) => e.is_primary)?.email ?? email;
-
-      ticketPurchaseData = {
-        dinnerOptions,
-        defaultDinnerId,
-        ticketLabel: label,
-        ticketPrice: price,
-        memberEmail: primaryEmail,
-      };
+        ticketPurchaseData = {
+          dinnerOptions: [dinnerOption],
+          defaultDinnerId: dinnerOption.id,
+          ticketLabel: label,
+          ticketPrice: price,
+          memberEmail: primaryEmail,
+        };
+      }
     }
   }
 
@@ -256,7 +234,7 @@ export default async function PortalPage({
         </Card>
       ) : isMember && ticketPurchaseData ? (
         <>
-        <H3 className="mb-3">Join This Dinner</H3>
+        <H3 className="mb-3 mt-stack">Join This Dinner</H3>
         <Card>
           <TicketPurchase
             dinnerOptions={ticketPurchaseData.dinnerOptions}
@@ -264,6 +242,7 @@ export default async function PortalPage({
             ticketLabel={ticketPurchaseData.ticketLabel}
             ticketPrice={ticketPurchaseData.ticketPrice}
             memberEmail={ticketPurchaseData.memberEmail}
+            hideSelector
           />
         </Card>
         </>
