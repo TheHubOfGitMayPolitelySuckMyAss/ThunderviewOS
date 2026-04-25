@@ -143,7 +143,7 @@ export default function ApplicationDetail({
               href={`/admin/members/${app.member_id}`}
               className="text-sm text-accent-hover no-underline hover:underline inline-flex items-center gap-1"
             >
-              View member <ArrowRight size={14} />
+              View Member <ArrowRight size={14} />
             </Link>
           )}
         </div>

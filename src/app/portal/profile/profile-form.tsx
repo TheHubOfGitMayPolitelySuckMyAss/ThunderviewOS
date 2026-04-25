@@ -290,7 +290,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
               size="sm"
               onClick={() => fileInputRef.current?.click()}
             >
-              {profilePicUrl && !removePic ? "Change photo" : "Upload photo"}
+              {profilePicUrl && !removePic ? "Change Photo" : "Upload Photo"}
             </Button>
             {profilePicUrl && !removePic && !picPreview && (
               <button
@@ -298,7 +298,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
                 onClick={handleRemovePic}
                 className="text-sm text-ember-600 cursor-pointer hover:underline"
               >
-                Remove
+                Remove Photo
               </button>
             )}
           </div>

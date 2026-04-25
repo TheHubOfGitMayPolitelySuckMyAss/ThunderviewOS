@@ -369,7 +369,7 @@ function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (
   return (
     <>
       <div className="flex items-center gap-4">
-        <div className="relative group">
+        <div className="relative">
           {showPic ? (
             <Image
               src={picPreview || member.profile_pic_url!}
@@ -392,21 +392,6 @@ function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (
               </svg>
             </div>
           )}
-          {!savingPhoto && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 group-hover:opacity-100 group-hover:bg-black/40 transition-all duration-[120ms] cursor-pointer"
-            >
-              <Pencil size={20} className="text-white" />
-            </button>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic"
-            onChange={handleFileChange}
-            className="hidden"
-          />
         </div>
         <div>
           <h1
@@ -417,14 +402,30 @@ function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (
               <span className="font-sans font-normal text-[22px] text-fg3">at {member.company_name}</span>
             )}
           </h1>
-          {member.profile_pic_url && !savingPhoto && (
-            <button
-              onClick={handleRemovePic}
-              className="text-xs text-ember-600 cursor-pointer hover:underline mt-1"
+          <div className="flex gap-2 mt-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
             >
-              Remove photo
-            </button>
-          )}
+              {member.profile_pic_url ? "Change Photo" : "Upload Photo"}
+            </Button>
+            {member.profile_pic_url && !savingPhoto && (
+              <button
+                onClick={handleRemovePic}
+                className="text-sm text-ember-600 cursor-pointer hover:underline"
+              >
+                Remove Photo
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
