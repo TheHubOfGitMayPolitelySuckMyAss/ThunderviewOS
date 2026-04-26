@@ -36,10 +36,10 @@ export default function TeamPage() {
         <div className="max-w-[1120px] mx-auto tv-page-gutter py-section">
           <H1 className="mb-section">Our team.</H1>
 
-          <div className="flex flex-col gap-stack">
+          <div className="flex flex-col gap-stack max-w-[640px] mx-auto">
             {team.map((member) => (
               <Card key={member.name} className="overflow-hidden !p-0">
-                <div className="relative h-[320px] md:h-[400px]">
+                <div className="relative h-[280px]">
                   <Image
                     src={member.photo}
                     alt={member.name}
