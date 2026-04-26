@@ -78,14 +78,13 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
         <div className="mt-3 pl-[26px]">
           {answer === "LINK_APPLY" ? (
             <p className="text-[14.5px] leading-[1.6] text-fg2">
-              Fill out the application form{" "}
               <Link
                 href="/apply"
-                className="text-accent-hover underline decoration-border hover:decoration-accent"
+                className="font-semibold text-accent-hover underline decoration-border hover:decoration-accent"
               >
-                here
+                Fill out the application form here.
               </Link>
-              . Once we know who you are and what you&rsquo;re working on,
+              {" "}Once we know who you are and what you&rsquo;re working on,
               we&rsquo;ll respond shortly (usually get back same day). When
               you&rsquo;re approved, you get access to the member portal and
               purchase a ticket to the dinner of your choice.
