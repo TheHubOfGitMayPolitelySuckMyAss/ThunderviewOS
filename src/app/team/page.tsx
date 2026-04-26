@@ -39,7 +39,7 @@ export default function TeamPage() {
           <div className="flex flex-col gap-stack max-w-[640px] mx-auto">
             {team.map((member) => (
               <Card key={member.name} className="overflow-hidden !p-0">
-                <div className="relative h-[280px]">
+                <div className="relative aspect-square">
                   <Image
                     src={member.photo}
                     alt={member.name}
