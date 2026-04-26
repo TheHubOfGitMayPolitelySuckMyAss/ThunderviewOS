@@ -100,7 +100,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 
 export default function FaqList() {
   return (
-    <div className="flex flex-col gap-tight max-w-[780px]">
+    <div className="flex flex-col gap-tight max-w-[640px] mx-auto">
       {faqs.map((faq) => (
         <FaqItem key={faq.question} question={faq.question} answer={faq.answer} />
       ))}
