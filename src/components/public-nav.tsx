@@ -20,7 +20,6 @@ export default async function PublicNav() {
         <Link href="/about" className="hover:text-fg1 no-underline">About</Link>
         <Link href="/faq" className="hover:text-fg1 no-underline">FAQ</Link>
         <Link href="/team" className="hover:text-fg1 no-underline">Team</Link>
-        <Link href="/gallery" className="hover:text-fg1 no-underline">Gallery</Link>
       </div>
 
       <div className="flex items-center gap-[var(--tv-button-group-gap)]">

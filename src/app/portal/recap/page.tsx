@@ -4,6 +4,7 @@ import { getTodayMT } from "@/lib/format";
 import Link from "next/link";
 import MemberAvatar from "@/components/member-avatar";
 import { H1, Eyebrow, Body } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
 
 export default async function RecapPage() {
   const admin = createAdminClient();
@@ -89,7 +90,7 @@ export default async function RecapPage() {
       {/* Two-column card grid */}
       <div className="flex flex-col gap-stack">
         {attendees.map((m) => (
-          <div key={m.id} className="bg-bg-elevated border border-border-subtle rounded-lg p-5">
+          <Card key={m.id}>
             <div className="flex items-center gap-3 mb-3.5">
               <MemberAvatar member={m} size="md" />
               <div>
@@ -117,7 +118,7 @@ export default async function RecapPage() {
                 <p className="text-[13.5px] leading-[1.55] text-fg2 whitespace-pre-wrap">{m.current_ask}</p>
               </>
             )}
-          </div>
+          </Card>
         ))}
       </div>
 

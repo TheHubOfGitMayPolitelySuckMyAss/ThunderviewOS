@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
 import PublicNav from "@/components/public-nav";
 import { Eyebrow } from "@/components/ui/typography";
+import { Card } from "@/components/ui/card";
 import ApplicationForm from "./application-form";
 
 function ordinalDay(day: number): string {
@@ -128,7 +129,7 @@ export default async function ApplyPage() {
         </div>
 
         {/* Schedule panel */}
-        <div className="bg-bg-elevated border border-border-subtle rounded-lg px-6 py-5 mb-8">
+        <Card className="mb-8">
           <h3 className="font-sans font-semibold text-[11px] uppercase tracking-[0.12em] text-fg3 mb-3">
             Upcoming schedule
           </h3>
@@ -142,7 +143,7 @@ export default async function ApplyPage() {
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
 
         <ApplicationForm />
       </div>
