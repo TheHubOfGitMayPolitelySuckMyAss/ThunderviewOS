@@ -103,7 +103,7 @@ export default async function AboutPage() {
           <div>
             <H1 className="mb-stack">About Thunderview.</H1>
             <p className="text-[19px] leading-[1.55] text-fg2 italic opacity-60 max-w-[520px]" style={{ textWrap: "pretty" as never }}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo. <em>(placeholder &mdash; Eric to provide real lede copy)</em>
+              Thunderview CEO Dinners is a monthly dinner in Denver for startup CEOs. Each dinner is capped at 40 people. The format runs three hours: introductions where each attendee brings a non-investment Ask, dinner where attendees can dive deep into business issues, and a main presentation. The point is to give CEOs a room of peers who aren't their employees, board, or co-founders — people who can offer an unbiased outside perspective on the problems they're carrying.
             </p>
           </div>
           <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-lg">
@@ -141,7 +141,7 @@ export default async function AboutPage() {
               their experiences and receive outside perspectives.
             </p>
             <p className="text-[17px] leading-[1.6] text-fg2" style={{ textWrap: "pretty" as never }}>
-              Each dinner is capped at 50 participants &mdash; a mix of early-stage, scaling,
+              Each dinner is capped at 40 participants &mdash; a mix of early-stage, scaling,
               exited and bootstrapping CEOs, plus a few VCs to provide capital&rsquo;s point
               of view, with a strong focus on representation for traditionally underrepresented
               founders. We help each other, celebrate wins and work together to solve hard problems.
