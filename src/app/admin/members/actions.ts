@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
+import { ensureAuthUser } from "@/lib/ensure-auth-user";
 
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
@@ -84,6 +85,9 @@ export async function addMember(formData: {
   if (error) {
     return { success: false, error: error.message };
   }
+
+  // Ensure auth.users row exists so the member can log in
+  await ensureAuthUser(formData.email);
 
   return { success: true, memberId: data as string };
 }

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendApprovalEmail, sendReApplicationEmail, sendRejectionEmail } from "@/lib/email-send";
+import { ensureAuthUser } from "@/lib/ensure-auth-user";
 
 type ApproveResult = {
   success: boolean;
@@ -39,6 +40,18 @@ export async function approveApplication(
       memberId: result.member_id,
       kickedOutName: result.member_name,
     };
+  }
+
+  // Ensure auth.users row exists so the member can log in via magic link
+  const { data: primaryEmail } = await admin
+    .from("member_emails")
+    .select("email")
+    .eq("member_id", result.member_id)
+    .eq("is_primary", true)
+    .limit(1)
+    .single();
+  if (primaryEmail) {
+    await ensureAuthUser(primaryEmail.email);
   }
 
   if (result.is_existing) {
@@ -110,6 +123,18 @@ export async function linkApplicationToMember(
       memberId: result.member_id,
       memberName: result.member_name,
     };
+  }
+
+  // Ensure auth.users row exists for the (possibly new) primary email
+  const { data: primaryEmail } = await admin
+    .from("member_emails")
+    .select("email")
+    .eq("member_id", result.member_id)
+    .eq("is_primary", true)
+    .limit(1)
+    .single();
+  if (primaryEmail) {
+    await ensureAuthUser(primaryEmail.email);
   }
 
   await sendReApplicationEmail(result.member_id);
