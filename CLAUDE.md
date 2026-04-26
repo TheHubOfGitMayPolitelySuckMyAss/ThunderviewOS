@@ -70,13 +70,13 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 ## Auth flow
 
-1. User enters email at `/login`
-2. Client calls `supabase.auth.signInWithOtp` with `shouldCreateUser: false` and `emailRedirectTo` set to `${NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`
-3. Supabase sends magic link email (PKCE flow). If the email is not in `auth.users`, the call succeeds silently but no email is sent (prevents orphan auth rows for unknown emails)
+1. User enters email at `/login` (may have `?redirect=/portal/profile` from proxy)
+2. Client stores redirect target in `auth_redirect` cookie (10 min TTL, SameSite=Lax) if present, then calls `supabase.auth.signInWithOtp` with `shouldCreateUser: false` and `emailRedirectTo` set to `${NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`
+3. Supabase sends magic link email (PKCE flow). If the email is not in `auth.users`, the call succeeds silently but no email is sent (prevents orphan auth rows for unknown emails). **All members must have an `auth.users` row to log in** — created automatically on approval/add via `ensureAuthUser()`. Existing members backfilled 2026-04-26.
 4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
 5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
-6. Both `/auth/confirm` and `/auth/callback` always redirect to `/portal` after successful auth, regardless of role. Portal page checks role and shows admin button for admin/team.
-7. Proxy (`src/proxy.ts`) refreshes session on every request, protects `/admin/*` routes (unauthenticated → `/login`, non-admin/non-team → `/portal`), protects `/portal/*` routes (unauthenticated → `/login`, non-admin without `has_community_access = true` → `/`), and redirects authenticated users from `/login` to `/portal`. Since kick-out revokes `has_community_access` via trigger, no separate `kicked_out` check is needed in the portal guard.
+6. Both `/auth/confirm` and `/auth/callback` read the `auth_redirect` cookie. If set, redirect there (validated to start with `/`); otherwise redirect to `/portal`. Cookie is cleared after use. Portal page checks role and shows admin button for admin/team.
+7. Proxy (`src/proxy.ts`) refreshes session on every request, protects `/admin/*` routes (unauthenticated → `/login?redirect=...`, non-admin/non-team → `/portal`), protects `/portal/*` routes (unauthenticated → `/login?redirect=...`, non-admin without `has_community_access = true` → `/`), and redirects authenticated users from `/login` to the redirect param or `/portal`. Since kick-out revokes `has_community_access` via trigger, no separate `kicked_out` check is needed in the portal guard.
 
 **Gotcha:** `/auth/callback` (code exchange flow) also exists but the primary magic link flow uses `/auth/confirm` (token hash flow). Both are needed. The PKCE flow via `@supabase/ssr` generates email templates that use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`.
 
@@ -84,7 +84,7 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 
 ```
 src/
-├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect (Next.js 16 "proxy", replaces middleware.ts)
+├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect with ?redirect= param preservation (Next.js 16 "proxy", replaces middleware.ts)
 ├── components/
 │   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links (Tickets, Community, Monthly Recap, Admin for team), avatar dropdown (hover + click). Links absolutely centered on viewport
 │   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team/Gallery), Apply + Sign In (or Portal when authenticated). Server component with auth check
@@ -109,14 +109,16 @@ src/
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
 │   └── admin.ts                        # Service role client (bypasses RLS)
 ├── app/
-│   ├── page.tsx                        # Marketing home: hero + stats + three-reason grid + quote + gallery + CTA. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
+│   ├── _components/
+│   │   └── this-months-dinner.tsx     # Server component: next upcoming dinner section (title, date/venue, description, speakers, Apply CTA). Returns null if no future dinner. Used on marketing home
+│   ├── page.tsx                        # Marketing home: hero + stats + This Month's Dinner + three-reason grid + quote + gallery + CTA. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
 │   ├── layout.tsx                      # Root layout (Inter + Fraunces + JetBrains Mono via next/font/google, Tailwind)
 │   ├── about/page.tsx                  # Placeholder (public-nav + H1)
 │   ├── faq/page.tsx                    # Placeholder (public-nav + H1)
 │   ├── team/page.tsx                   # Placeholder (public-nav + H1)
 │   ├── gallery/page.tsx                # Placeholder (public-nav + H1)
-│   ├── login/page.tsx                  # Magic link sign-in: server wrapper with PublicNav
-│   ├── login/login-form.tsx            # Client component: email input, send magic link, success/error states
+│   ├── login/page.tsx                  # Magic link sign-in: server wrapper with PublicNav, reads ?redirect param
+│   ├── login/login-form.tsx            # Client component: email input, send magic link, stores redirect in auth_redirect cookie
 │   ├── apply/
 │   │   ├── page.tsx                    # Public application form (server wrapper: fetches dinners + schedule)
 │   │   ├── application-form.tsx        # Client component: form fields, validation, submit
@@ -125,25 +127,26 @@ src/
 │   │       ├── page.tsx                # Thank-you page (static)
 │   │       └── confetti.tsx            # Client component: canvas-confetti on page load
 │   ├── auth/
-│   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler)
-│   │   └── callback/route.ts           # Code exchange flow (secondary)
+│   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler). Reads auth_redirect cookie for post-login destination
+│   │   └── callback/route.ts           # Code exchange flow (secondary). Same auth_redirect cookie logic
 │   ├── portal/
 │   │   ├── layout.tsx                  # Portal layout: auth check, TopNav, wraps all /portal/* pages
-│   │   ├── page.tsx                    # Portal home: single-column (640px). Shows intro/ask form when member has ticket, inline ticket purchase when not
+│   │   ├── page.tsx                    # Portal home: single-column (640px). Ticket state: confirmation banner + intro/ask form. No-ticket state: dinner details block + ticket purchase for next dinner only
 │   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas with char limits (1000/250), Contact dropdown, three-state counter, Save with toast
 │   │   ├── dinner-details-block.tsx   # Server component: next dinner details (title, date/time/venue, description, speakers with LinkedIn/Website links). Shown when no ticket
 │   │   ├── purchase-confetti.tsx       # Client component: fires confetti on ?purchased=true, cleans up param
 │   │   ├── actions.ts                  # Server action: savePortalProfile (updates intro/ask/contact, sets timestamps only on change)
 │   │   ├── sign-out-button.tsx         # Client component: sign-out button (unused — sign-out now in TopNav dropdown)
 │   │   ├── profile/
-│   │   │   ├── page.tsx                # Profile editor: all member fields + intro/ask/contact + primary email
-│   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, toast
-│   │   │   └── actions.ts             # Server action: saveProfile (member fields + email swap/insert + timestamps)
+│   │   │   ├── page.tsx                # Profile editor: context-aware back link and save (from dropdown → /portal + toast; from Edit Profile → /portal/community + redirect to member page)
+│   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, toast. Photo upload/remove uses standalone portalUpdateProfilePic (decoupled from saveProfile)
+│   │   │   ├── crop-modal.tsx          # Client component: react-easy-crop square crop modal (dynamically imported, SSR disabled)
+│   │   │   └── actions.ts             # Server actions: saveProfile (member fields + email swap/insert + timestamps, no photo handling), portalUpdateProfilePic (standalone photo upload/remove via sharp)
 │   │   ├── community/
 │   │   │   ├── page.tsx                # Community directory: fetchAll paginated, filtered (has_community_access + not kicked_out)
 │   │   │   └── community-table.tsx     # Client component: searchable, sortable table (Name/Company/Role), rows link to /portal/members/[id]
 │   │   ├── members/
-│   │   │   └── [id]/page.tsx           # Read-only member profile: details + intro/ask. 404 if kicked_out or no community access. Self-view shows Edit Profile button
+│   │   │   └── [id]/page.tsx           # Read-only member profile: details + intro/ask. 404 if kicked_out or no community access. Self-view shows Edit Profile button (links to /portal/profile?from=member&id=X)
 │   │   ├── recap/page.tsx              # Last month's recap: fulfilled attendees of most recent past dinner with intro/ask cards
 │   │   └── tickets/
 │   │       ├── page.tsx                # Ticket selection: dinner dropdown + buy buttons (server component)
@@ -219,12 +222,13 @@ src/
 │       │   ├── actions.ts             # Server actions: checkEmail, addMember (for Add Member modal)
 │       │   └── [id]/
 │       │       ├── page.tsx            # Server wrapper: fetches member + determines admin role
-│       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate, profile pic upload (hover-to-edit avatar with crop modal)
+│       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate, profile pic upload (Upload Photo/Change Photo buttons + Remove Photo link, same layout as portal profile)
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management, adminUploadProfilePic
 ├── lib/
 │   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
 │   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification). All use bodyToHtml() for branded shell
-│   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
+│   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatDinnerShort, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
+│   ├── ensure-auth-user.ts            # ensureAuthUser(email) — creates auth.users row via admin API if not exists. Called on member approval/add
 │   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
 │   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
 public/
@@ -502,4 +506,6 @@ Don't build these without an explicit prompt:
 - **Button `asChild` pattern.** Any `<Link>` that looks like a button must use `<Button asChild><Link href="...">Label</Link></Button>`. No anchor-styled-as-button with hand-tuned padding/colors. The Button component merges its classes onto the child element.
 - **`bodyToHtml()` wraps in a full HTML document.** It's no longer just `\n` → `<br>`. Every caller gets a branded shell. The `appendHtml` parameter lets you inject pre-rendered HTML inside the shell (used by morning-of for attendee list). Don't concatenate HTML after calling `bodyToHtml()` — it would land outside the `</html>` tag.
 - **Stripe sandbox does not auto-send receipts.** Even with `receipt_email` set on the Checkout Session and the dashboard toggle enabled, sandbox mode silently skips receipt emails. Integration is correct — auto-send will be validated at Phase 8 live cutover. Do not debug further.
+- **Members need an `auth.users` row to log in.** `shouldCreateUser: false` on the OTP call means Supabase won't auto-create auth users. Every member-creation flow (approve, add, link) must call `ensureAuthUser(email)` from `src/lib/ensure-auth-user.ts`. If a member reports they can't log in, check `auth.users` first — the member_emails row alone is not enough. Discovered 2026-04-26 when 632 imported members had no auth rows.
+- **Photo upload is decoupled from profile save.** Portal profile uses `portalUpdateProfilePic` (standalone action that only touches `profile_pic_url`). Admin uses `adminUploadProfilePic`. Neither passes other member fields through. `saveProfile` does not handle photos. This prevents silent data loss when a new field is added but not included in the photo handler's FormData.
 - **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
