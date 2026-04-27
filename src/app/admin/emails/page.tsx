@@ -5,6 +5,7 @@ import PageHeader from "@/components/page-header";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateFriendly, getTodayMT } from "@/lib/format";
 import CreateInstanceButton from "./create-instance-button";
+import CreateMondayBeforeButton from "./create-monday-before-button";
 
 const transactionalEmails = [
   {
@@ -37,33 +38,11 @@ const transactionalEmails = [
   },
 ];
 
-type MarketingTemplate = {
-  slug: string;
-  label: string;
-  description: string;
-  targetDinnerQuery: "next" | "last";
-};
-
-const marketingTemplates: MarketingTemplate[] = [
-  {
-    slug: "monday-before",
-    label: "Monday Before",
-    description: "Reminder email, sent the Monday before a dinner",
-    targetDinnerQuery: "next",
-  },
-  {
-    slug: "monday-after",
-    label: "Monday After",
-    description: "Recap email, sent the Monday after a dinner",
-    targetDinnerQuery: "last",
-  },
-];
-
 export default async function EmailsPage() {
   const admin = createAdminClient();
   const todayMT = getTodayMT();
 
-  // Fetch target dinners for marketing templates
+  // Fetch target dinners
   const { data: nextDinner } = await admin
     .from("dinners")
     .select("id, date")
@@ -80,25 +59,31 @@ export default async function EmailsPage() {
     .limit(1)
     .single();
 
-  // Fetch existing instances for target dinners
-  const dinnerIds = [nextDinner?.id, lastDinner?.id].filter(Boolean) as string[];
-  let instances: { id: string; template_slug: string; dinner_id: string; status: string }[] = [];
-  if (dinnerIds.length > 0) {
+  // Monday Before: check monday_before_emails for the next dinner
+  let mondayBeforeEmail: { id: string; status: string } | null = null;
+  if (nextDinner) {
+    const { data } = await admin
+      .from("monday_before_emails")
+      .select("id, status")
+      .eq("dinner_id", nextDinner.id)
+      .single();
+    mondayBeforeEmail = data;
+  }
+
+  // Monday After: still uses generic email_instances (for now)
+  let mondayAfterInstance: { id: string; status: string } | null = null;
+  if (lastDinner) {
     const { data } = await admin
       .from("email_instances")
-      .select("id, template_slug, dinner_id, status")
-      .in("dinner_id", dinnerIds);
-    instances = data ?? [];
+      .select("id, status")
+      .eq("template_slug", "monday-after")
+      .eq("dinner_id", lastDinner.id)
+      .single();
+    mondayAfterInstance = data;
   }
 
-  function getTargetDinner(query: "next" | "last") {
-    return query === "next" ? nextDinner : lastDinner;
-  }
-
-  function getInstance(slug: string, dinnerId: string | undefined) {
-    if (!dinnerId) return null;
-    return instances.find((i) => i.template_slug === slug && i.dinner_id === dinnerId) ?? null;
-  }
+  const nextDinnerLabel = nextDinner ? formatDateFriendly(nextDinner.date) : null;
+  const lastDinnerLabel = lastDinner ? formatDateFriendly(lastDinner.date) : null;
 
   return (
     <div className="max-w-[720px]">
@@ -128,57 +113,86 @@ export default async function EmailsPage() {
       <section>
         <Eyebrow className="mb-3 pb-2.5 border-b border-border-subtle">Marketing</Eyebrow>
         <div className="space-y-5">
-          {marketingTemplates.map((tmpl) => {
-            const dinner = getTargetDinner(tmpl.targetDinnerQuery);
-            const instance = getInstance(tmpl.slug, dinner?.id);
-            const dinnerLabel = dinner ? formatDateFriendly(dinner.date) : null;
 
-            return (
-              <div key={tmpl.slug}>
+          {/* Monday Before */}
+          <div>
+            <Link
+              href="/admin/emails/monday-before"
+              className="text-sm font-medium text-accent-hover no-underline hover:underline"
+            >
+              Monday Before
+            </Link>
+            <p className="mt-0.5 text-sm text-fg3">
+              Reminder email, sent the Monday before a dinner
+            </p>
+            <div className="mt-2">
+              {!nextDinner ? (
+                <span className="text-xs text-fg3 italic">No upcoming dinner</span>
+              ) : !mondayBeforeEmail ? (
+                <CreateMondayBeforeButton
+                  dinnerId={nextDinner.id}
+                  dinnerLabel={nextDinnerLabel!}
+                />
+              ) : mondayBeforeEmail.status === "sent" ? (
                 <Link
-                  href={`/admin/emails/${tmpl.slug}`}
-                  className="text-sm font-medium text-accent-hover no-underline hover:underline"
+                  href={`/admin/emails/monday-before/${mondayBeforeEmail.id}`}
+                  className="inline-flex items-center gap-2 text-sm text-fg3 no-underline hover:underline"
                 >
-                  {tmpl.label}
+                  <Pill variant="success">Sent</Pill>
+                  {nextDinnerLabel}
                 </Link>
-                <p className="mt-0.5 text-sm text-fg3">
-                  {tmpl.description}
-                </p>
+              ) : (
+                <Link
+                  href={`/admin/emails/monday-before/${mondayBeforeEmail.id}`}
+                  className="inline-flex items-center gap-2 text-sm text-accent-hover no-underline hover:underline"
+                >
+                  <Pill variant="warn">Draft</Pill>
+                  Continue draft &mdash; {nextDinnerLabel}
+                </Link>
+              )}
+            </div>
+          </div>
 
-                <div className="mt-2">
-                  {!dinner ? (
-                    <span className="text-xs text-fg3 italic">
-                      {tmpl.targetDinnerQuery === "next"
-                        ? "No upcoming dinner"
-                        : "No past dinner"}
-                    </span>
-                  ) : !instance ? (
-                    <CreateInstanceButton
-                      templateSlug={tmpl.slug}
-                      dinnerId={dinner.id}
-                      dinnerLabel={dinnerLabel!}
-                    />
-                  ) : instance.status === "sent" ? (
-                    <Link
-                      href={`/admin/emails/instances/${instance.id}`}
-                      className="inline-flex items-center gap-2 text-sm text-fg3 no-underline hover:underline"
-                    >
-                      <Pill variant="success">Sent</Pill>
-                      {dinnerLabel}
-                    </Link>
-                  ) : (
-                    <Link
-                      href={`/admin/emails/instances/${instance.id}`}
-                      className="inline-flex items-center gap-2 text-sm text-accent-hover no-underline hover:underline"
-                    >
-                      <Pill variant="warn">Draft</Pill>
-                      Edit &mdash; {dinnerLabel}
-                    </Link>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {/* Monday After (still uses generic email_instances) */}
+          <div>
+            <Link
+              href="/admin/emails/monday-after"
+              className="text-sm font-medium text-accent-hover no-underline hover:underline"
+            >
+              Monday After
+            </Link>
+            <p className="mt-0.5 text-sm text-fg3">
+              Recap email, sent the Monday after a dinner
+            </p>
+            <div className="mt-2">
+              {!lastDinner ? (
+                <span className="text-xs text-fg3 italic">No past dinner</span>
+              ) : !mondayAfterInstance ? (
+                <CreateInstanceButton
+                  templateSlug="monday-after"
+                  dinnerId={lastDinner.id}
+                  dinnerLabel={lastDinnerLabel!}
+                />
+              ) : mondayAfterInstance.status === "sent" ? (
+                <Link
+                  href={`/admin/emails/instances/${mondayAfterInstance.id}`}
+                  className="inline-flex items-center gap-2 text-sm text-fg3 no-underline hover:underline"
+                >
+                  <Pill variant="success">Sent</Pill>
+                  {lastDinnerLabel}
+                </Link>
+              ) : (
+                <Link
+                  href={`/admin/emails/instances/${mondayAfterInstance.id}`}
+                  className="inline-flex items-center gap-2 text-sm text-accent-hover no-underline hover:underline"
+                >
+                  <Pill variant="warn">Draft</Pill>
+                  Edit &mdash; {lastDinnerLabel}
+                </Link>
+              )}
+            </div>
+          </div>
+
         </div>
       </section>
     </div>

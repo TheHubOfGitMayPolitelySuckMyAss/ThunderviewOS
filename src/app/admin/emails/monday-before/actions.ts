@@ -2,27 +2,26 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
-import { formatDateFriendly, getTodayMT } from "@/lib/format";
+import { EMAIL_FROM } from "@/lib/email";
+import { formatDateFriendly, formatName } from "@/lib/format";
+import { renderMondayBeforeEmail } from "@/lib/email-templates/monday-before";
+import { generateUnsubscribeToken } from "@/lib/unsubscribe";
 import { Resend } from "resend";
+import sharp from "sharp";
+import crypto from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-export async function sendTestEmail(
-  slug: string,
-  subject: string,
-  body: string
-): Promise<{ success: boolean; error?: string }> {
-  void slug;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+// ============================================================
+// Auth helper
+// ============================================================
 
-  if (!user) return { success: false, error: "Not authenticated" };
+async function getAuthMember() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
   const admin = createAdminClient();
-
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select("email, members!inner(id, first_name, last_name)")
@@ -31,88 +30,568 @@ export async function sendTestEmail(
     .limit(1)
     .single();
 
-  if (!memberEmail) return { success: false, error: "Member not found" };
+  if (!memberEmail) return null;
+  const member = memberEmail.members as unknown as { id: string; first_name: string; last_name: string };
+  return { email: memberEmail.email, ...member };
+}
 
-  const member = memberEmail.members as unknown as {
-    id: string;
-    first_name: string;
-    last_name: string;
-  };
+// ============================================================
+// Macro template actions
+// ============================================================
 
-  // Monday Before targets the next upcoming dinner
-  const todayMT = getTodayMT();
-  const { data: nextDinner } = await admin
-    .from("dinners")
-    .select("date, venue, address")
-    .gte("date", todayMT)
-    .order("date", { ascending: true })
+export async function loadMacro() {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("monday_before_macro")
+    .select("*")
     .limit(1)
     .single();
+  return data;
+}
 
-  if (!nextDinner) return { success: false, error: "No upcoming dinner found for test data" };
+export async function saveMacro(
+  fields: { subject: string; preheader: string; headline: string; custom_text: string; partnership_boilerplate: string }
+): Promise<{ success: boolean; error?: string; updatedAt?: string; updatedByName?: string }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
 
-  const vars = {
-    firstName: member.first_name,
-    dinnerDate: formatDateFriendly(nextDinner.date),
-    venue: nextDinner.venue,
-    address: nextDinner.address,
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("monday_before_macro")
+    .update({ ...fields, updated_by: member.id })
+    .eq("singleton", true);
+
+  if (error) return { success: false, error: error.message };
+  return {
+    success: true,
+    updatedAt: new Date().toISOString(),
+    updatedByName: formatName(member.first_name, member.last_name),
   };
+}
 
-  const renderedSubject = renderTemplateVars(subject, vars);
-  const renderedBody = renderTemplateVars(body, vars);
-  const html = bodyToHtml(renderedBody);
+// ============================================================
+// Draft CRUD
+// ============================================================
 
-  const { error } = await resend.emails.send({
-    from: EMAIL_FROM,
-    to: memberEmail.email,
-    subject: renderedSubject,
-    html,
-  });
+export async function createDraft(dinnerId: string): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  // Load macro to seed
+  const macro = await loadMacro();
+  if (!macro) return { success: false, error: "Macro template not found" };
+
+  const { data, error } = await admin
+    .from("monday_before_emails")
+    .insert({
+      dinner_id: dinnerId,
+      subject: macro.subject,
+      preheader: macro.preheader,
+      headline: macro.headline,
+      custom_text: macro.custom_text,
+      partnership_boilerplate: macro.partnership_boilerplate,
+      signoff_member_id: member.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") return { success: false, error: "A draft already exists for this dinner" };
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, emailId: data.id };
+}
+
+export async function saveDraft(
+  emailId: string,
+  fields: {
+    subject: string;
+    preheader: string;
+    headline: string;
+    custom_text: string;
+    partnership_boilerplate: string;
+    signoff_member_id: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("monday_before_emails")
+    .update({ ...fields, test_sent_after_last_edit: false })
+    .eq("id", emailId)
+    .eq("status", "draft");
 
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
-export async function saveTemplate(
-  slug: string,
-  subject: string,
-  body: string
-): Promise<{ success: boolean; error?: string; updatedAt?: string; updatedByName?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+// ============================================================
+// Image pipeline
+// ============================================================
 
-  if (!user) return { success: false, error: "Not authenticated" };
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+const QUALITY_STEPS = [85, 75, 65, 55, 45, 40];
+const MAX_SIZE = 500 * 1024; // 500KB
+const TARGET_WIDTH = 800;
+
+export async function uploadEmailImage(
+  emailId: string,
+  groupNumber: number,
+  formData: FormData
+): Promise<{ success: boolean; error?: string; image?: { id: string; public_url: string } }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+
+  const file = formData.get("file") as File | null;
+  if (!file) return { success: false, error: "No file provided" };
+
+  if (!ACCEPTED_TYPES.includes(file.type) && !file.name.toLowerCase().endsWith(".heic")) {
+    return { success: false, error: "Only JPEG, PNG, WebP, and HEIC images are accepted" };
+  }
+
+  const originalBytes = await file.arrayBuffer();
+  const originalSize = originalBytes.byteLength;
+
+  // Resize to 800px wide, free aspect ratio
+  let pipeline = sharp(Buffer.from(originalBytes))
+    .rotate() // auto-orient from EXIF
+    .resize({ width: TARGET_WIDTH, withoutEnlargement: true });
+
+  // Iterative compression
+  let outputBuffer: Buffer | null = null;
+  for (const quality of QUALITY_STEPS) {
+    const buf = await pipeline.clone().jpeg({ quality, mozjpeg: true }).toBuffer();
+    if (buf.byteLength <= MAX_SIZE) {
+      outputBuffer = buf;
+      break;
+    }
+    // Last attempt
+    if (quality === QUALITY_STEPS[QUALITY_STEPS.length - 1] && buf.byteLength > MAX_SIZE) {
+      return {
+        success: false,
+        error: `Image too large even at minimum quality. Original: ${(originalSize / 1024).toFixed(0)}KB, compressed: ${(buf.byteLength / 1024).toFixed(0)}KB. Please use a smaller image (target: under 500KB after compression).`,
+      };
+    }
+  }
+
+  if (!outputBuffer) return { success: false, error: "Compression failed" };
+
+  // Upload to Supabase Storage
+  const uuid = crypto.randomUUID();
+  const storagePath = `${emailId}/${groupNumber}/${uuid}.jpg`;
+  const admin = createAdminClient();
+
+  const { error: uploadError } = await admin.storage
+    .from("email-images")
+    .upload(storagePath, outputBuffer, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+
+  if (uploadError) return { success: false, error: uploadError.message };
+
+  const { data: urlData } = admin.storage.from("email-images").getPublicUrl(storagePath);
+  const publicUrl = urlData.publicUrl;
+
+  // Get next display_order
+  const { data: maxRow } = await admin
+    .from("monday_before_email_images")
+    .select("display_order")
+    .eq("email_id", emailId)
+    .eq("group_number", groupNumber)
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextOrder = maxRow ? maxRow.display_order + 1 : 0;
+
+  const { data: imageRow, error: insertError } = await admin
+    .from("monday_before_email_images")
+    .insert({
+      email_id: emailId,
+      group_number: groupNumber,
+      display_order: nextOrder,
+      storage_path: storagePath,
+      public_url: publicUrl,
+    })
+    .select("id, public_url")
+    .single();
+
+  if (insertError) return { success: false, error: insertError.message };
+
+  // Flip test_sent_after_last_edit
+  await admin
+    .from("monday_before_emails")
+    .update({ test_sent_after_last_edit: false })
+    .eq("id", emailId)
+    .eq("status", "draft");
+
+  return { success: true, image: { id: imageRow.id, public_url: imageRow.public_url } };
+}
+
+export async function deleteEmailImage(
+  imageId: string,
+  emailId: string
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
 
   const admin = createAdminClient();
 
-  const { data: memberEmail } = await admin
+  // Get image details
+  const { data: image } = await admin
+    .from("monday_before_email_images")
+    .select("*")
+    .eq("id", imageId)
+    .single();
+
+  if (!image) return { success: false, error: "Image not found" };
+
+  // Delete from storage
+  await admin.storage.from("email-images").remove([image.storage_path]);
+
+  // Delete row
+  const { error } = await admin
+    .from("monday_before_email_images")
+    .delete()
+    .eq("id", imageId);
+
+  if (error) return { success: false, error: error.message };
+
+  // Re-pack display_order
+  const { data: remaining } = await admin
+    .from("monday_before_email_images")
+    .select("id")
+    .eq("email_id", image.email_id)
+    .eq("group_number", image.group_number)
+    .order("display_order", { ascending: true });
+
+  if (remaining) {
+    for (let i = 0; i < remaining.length; i++) {
+      await admin
+        .from("monday_before_email_images")
+        .update({ display_order: i })
+        .eq("id", remaining[i].id);
+    }
+  }
+
+  // Flip test_sent_after_last_edit
+  await admin
+    .from("monday_before_emails")
+    .update({ test_sent_after_last_edit: false })
+    .eq("id", emailId)
+    .eq("status", "draft");
+
+  return { success: true };
+}
+
+export async function reorderEmailImages(
+  emailId: string,
+  groupNumber: number,
+  orderedIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  // Update display_order for each image
+  for (let i = 0; i < orderedIds.length; i++) {
+    await admin
+      .from("monday_before_email_images")
+      .update({ display_order: i })
+      .eq("id", orderedIds[i]);
+  }
+
+  // Flip test_sent_after_last_edit
+  await admin
+    .from("monday_before_emails")
+    .update({ test_sent_after_last_edit: false })
+    .eq("id", emailId)
+    .eq("status", "draft");
+
+  return { success: true };
+}
+
+// ============================================================
+// Test send
+// ============================================================
+
+export async function sendTestEmail(
+  emailId: string
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  // Load email + dinner + images + signoff member
+  const { data: email } = await admin
+    .from("monday_before_emails")
+    .select("*, dinners!inner(date, venue, address)")
+    .eq("id", emailId)
+    .single();
+
+  if (!email) return { success: false, error: "Email not found" };
+  if (email.status === "sent") return { success: false, error: "Cannot test a sent email" };
+
+  const dinner = email.dinners as unknown as { date: string; venue: string; address: string };
+
+  const { data: images } = await admin
+    .from("monday_before_email_images")
+    .select("*")
+    .eq("email_id", emailId)
+    .order("group_number", { ascending: true })
+    .order("display_order", { ascending: true });
+
+  // Get signoff name
+  let signoffName = member.first_name;
+  if (email.signoff_member_id) {
+    const { data: signoff } = await admin
+      .from("members")
+      .select("first_name")
+      .eq("id", email.signoff_member_id)
+      .single();
+    if (signoff) signoffName = signoff.first_name;
+  }
+
+  const html = renderMondayBeforeEmail({
+    subject: email.subject,
+    preheader: email.preheader,
+    headline: email.headline,
+    customText: email.custom_text,
+    partnershipBoilerplate: email.partnership_boilerplate,
+    signoffName,
+    dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
+    images: (images ?? []).map((img: { group_number: number; public_url: string; display_order: number }) => ({
+      groupNumber: img.group_number,
+      publicUrl: img.public_url,
+      displayOrder: img.display_order,
+    })),
+    recipientFirstName: member.first_name,
+    unsubscribeUrl: "#test-unsubscribe",
+  });
+
+  const { error } = await resend.emails.send({
+    from: EMAIL_FROM,
+    to: member.email,
+    subject: email.subject,
+    html,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  // Mark test sent
+  await admin
+    .from("monday_before_emails")
+    .update({ test_sent_at: new Date().toISOString(), test_sent_after_last_edit: true })
+    .eq("id", emailId)
+    .eq("status", "draft");
+
+  return { success: true };
+}
+
+// ============================================================
+// Bulk send
+// ============================================================
+
+const BATCH_SIZE = 100;
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+
+export async function sendToAll(
+  emailId: string
+): Promise<{ success: boolean; error?: string; sent?: number }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  // Load email + dinner
+  const { data: email } = await admin
+    .from("monday_before_emails")
+    .select("*, dinners!inner(date, venue, address)")
+    .eq("id", emailId)
+    .single();
+
+  if (!email) return { success: false, error: "Email not found" };
+  if (email.status === "sent") return { success: false, error: "Already sent" };
+  if (!email.test_sent_after_last_edit) return { success: false, error: "Must send a test email first" };
+
+  const dinner = email.dinners as unknown as { date: string; venue: string; address: string };
+
+  // Load images
+  const { data: images } = await admin
+    .from("monday_before_email_images")
+    .select("*")
+    .eq("email_id", emailId)
+    .order("group_number", { ascending: true })
+    .order("display_order", { ascending: true });
+
+  // Get signoff name
+  let signoffName = member.first_name;
+  if (email.signoff_member_id) {
+    const { data: signoff } = await admin
+      .from("members")
+      .select("first_name")
+      .eq("id", email.signoff_member_id)
+      .single();
+    if (signoff) signoffName = signoff.first_name;
+  }
+
+  // Query recipients (paginated)
+  type RecipientRow = {
+    id: string;
+    first_name: string;
+    member_emails: { email: string }[];
+  };
+
+  const allRecipients: RecipientRow[] = [];
+  let from = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    const { data } = await admin
+      .from("members")
+      .select("id, first_name, member_emails!inner(email)")
+      .eq("marketing_opted_in", true)
+      .eq("kicked_out", false)
+      .eq("member_emails.is_primary", true)
+      .eq("member_emails.email_status", "active")
+      .range(from, from + PAGE_SIZE - 1);
+
+    const rows = (data ?? []) as unknown as RecipientRow[];
+    allRecipients.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  if (allRecipients.length === 0) {
+    return { success: false, error: "No eligible recipients" };
+  }
+
+  // Snapshot audience
+  const audienceSnapshot = allRecipients.map((r) => ({
+    member_id: r.id,
+    first_name: r.first_name,
+    email: r.member_emails[0].email,
+  }));
+
+  const imageData = (images ?? []).map((img: { group_number: number; public_url: string; display_order: number }) => ({
+    groupNumber: img.group_number,
+    publicUrl: img.public_url,
+    displayOrder: img.display_order,
+  }));
+
+  // Build per-recipient emails
+  const emailPayloads = allRecipients.map((r) => {
+    const unsubToken = generateUnsubscribeToken(r.id);
+    const unsubUrl = `${SITE_URL}/api/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
+
+    const html = renderMondayBeforeEmail({
+      subject: email.subject,
+      preheader: email.preheader,
+      headline: email.headline,
+      customText: email.custom_text,
+      partnershipBoilerplate: email.partnership_boilerplate,
+      signoffName,
+      dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
+      images: imageData,
+      recipientFirstName: r.first_name,
+      unsubscribeUrl: unsubUrl,
+    });
+
+    return {
+      from: EMAIL_FROM,
+      to: r.member_emails[0].email,
+      subject: email.subject,
+      html,
+      headers: {
+        "List-Unsubscribe": `<${unsubUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    };
+  });
+
+  // Send in batches
+  let sent = 0;
+  for (let i = 0; i < emailPayloads.length; i += BATCH_SIZE) {
+    const chunk = emailPayloads.slice(i, i + BATCH_SIZE);
+    try {
+      await resend.batch.send(chunk);
+      sent += chunk.length;
+    } catch (err) {
+      console.error(`Batch send error (chunk ${i / BATCH_SIZE + 1}):`, err);
+    }
+  }
+
+  // Update email status
+  await admin
+    .from("monday_before_emails")
+    .update({
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      sent_by: member.id,
+      audience_snapshot: audienceSnapshot,
+    })
+    .eq("id", emailId)
+    .eq("status", "draft");
+
+  return { success: true, sent };
+}
+
+// ============================================================
+// Helpers for the index page
+// ============================================================
+
+export async function getRecipientCount(): Promise<number> {
+  const admin = createAdminClient();
+  const { count } = await admin
+    .from("members")
+    .select("id", { count: "exact", head: true })
+    .eq("marketing_opted_in", true)
+    .eq("kicked_out", false);
+  return count ?? 0;
+}
+
+export async function getTeamMembers(): Promise<{ id: string; name: string }[]> {
+  const admin = createAdminClient();
+
+  // Admin + team members
+  const { data: adminEmail } = await admin
     .from("member_emails")
-    .select("members!inner(id, first_name, last_name)")
-    .eq("email", user.email!)
+    .select("members!inner(id, first_name, last_name, is_team, kicked_out)")
+    .eq("email", "eric@marcoullier.com")
     .eq("is_primary", true)
     .limit(1)
     .single();
 
-  if (!memberEmail) return { success: false, error: "Member not found" };
+  const { data: teamMembers } = await admin
+    .from("members")
+    .select("id, first_name, last_name")
+    .eq("is_team", true)
+    .eq("kicked_out", false);
 
-  const member = memberEmail.members as unknown as {
-    id: string;
-    first_name: string;
-    last_name: string;
-  };
+  const result: { id: string; name: string }[] = [];
+  const seen = new Set<string>();
 
-  const { error } = await admin
-    .from("email_templates")
-    .update({ subject, body, updated_by: member.id })
-    .eq("slug", slug);
+  // Add admin first
+  if (adminEmail) {
+    const m = adminEmail.members as unknown as { id: string; first_name: string; last_name: string };
+    result.push({ id: m.id, name: formatName(m.first_name, m.last_name) });
+    seen.add(m.id);
+  }
 
-  if (error) return { success: false, error: error.message };
+  // Add team members
+  for (const m of teamMembers ?? []) {
+    if (!seen.has(m.id)) {
+      result.push({ id: m.id, name: formatName(m.first_name, m.last_name) });
+      seen.add(m.id);
+    }
+  }
 
-  return {
-    success: true,
-    updatedAt: new Date().toISOString(),
-    updatedByName: `${member.first_name} ${member.last_name}`,
-  };
+  return result;
 }
