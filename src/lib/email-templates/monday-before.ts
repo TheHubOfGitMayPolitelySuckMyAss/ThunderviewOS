@@ -86,9 +86,10 @@ export function renderMondayBeforeEmail(props: MondayBeforeEmailProps): string {
 <!--[if !mso]><!-->
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <!--<![endif]-->
-${preheader ? `<span style="display:none;font-size:1px;color:#FBF7F0;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preheader}</span>` : ""}
+
 </head>
 <body style="margin:0;padding:0;background-color:#EDE3D1;font-family:Inter,-apple-system,BlinkMacSystemFont,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+${preheader ? `<div style="display:none;font-size:1px;color:#FBF7F0;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preheader}${"&zwnj; &nbsp; ".repeat(30)}</div>` : ""}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#EDE3D1;">
 <tr><td align="center" style="padding:32px 16px;">
 
