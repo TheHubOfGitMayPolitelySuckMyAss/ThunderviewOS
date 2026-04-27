@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { formatTimestamp } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import Field from "@/components/field";
 import { Eyebrow } from "@/components/ui/typography";
 import ImageGroup from "@/components/email-image-group";
@@ -30,11 +29,9 @@ interface DraftEditorProps {
   initialOurMission: string;
   initialIntrosAsksHeader: string;
   initialPartnershipBoilerplate: string;
-  initialSignoffMemberId: string | null;
   testSentAfterLastEdit: boolean;
   dinner: { date: string; venue: string; address: string };
   initialImages: ImageData[];
-  teamMembers: { id: string; name: string }[];
   recipientCount: number;
   attendeeCount: number;
   sentAt: string | null;
@@ -60,8 +57,8 @@ export default function DraftEditor({
   initialSubject, initialPreheader, initialHeadline, initialOpeningText,
   initialRecapText, initialTeamShoutouts, initialOurMission,
   initialIntrosAsksHeader, initialPartnershipBoilerplate,
-  initialSignoffMemberId, testSentAfterLastEdit: initialTestSent,
-  dinner, initialImages, teamMembers, recipientCount, attendeeCount,
+  testSentAfterLastEdit: initialTestSent,
+  dinner, initialImages, recipientCount, attendeeCount,
   sentAt, sentByName, audienceCount,
 }: DraftEditorProps) {
   const [status, setStatus] = useState(initialStatus);
@@ -74,7 +71,6 @@ export default function DraftEditor({
   const [ourMission, setOurMission] = useState(initialOurMission);
   const [introsAsksHeader, setIntrosAsksHeader] = useState(initialIntrosAsksHeader);
   const [partnershipBoilerplate, setPartnershipBoilerplate] = useState(initialPartnershipBoilerplate);
-  const [signoffMemberId, setSignoffMemberId] = useState(initialSignoffMemberId || teamMembers[0]?.id || "");
   const [testSentAfterLastEdit, setTestSentAfterLastEdit] = useState(initialTestSent);
   const [hasEdited, setHasEdited] = useState(false);
   const [images, setImages] = useState<ImageData[]>(initialImages);
@@ -143,7 +139,6 @@ export default function DraftEditor({
       opening_text: openingText, recap_text: recapText,
       team_shoutouts: teamShoutouts, our_mission: ourMission,
       intros_asks_header: introsAsksHeader, partnership_boilerplate: partnershipBoilerplate,
-      signoff_member_id: signoffMemberId,
     };
   }
 
@@ -196,12 +191,6 @@ export default function DraftEditor({
       <Field label="Preheader" help="Preview text shown in inbox before opening" className="mb-4">
         <Input type="text" value={preheader} onChange={(e) => { setPreheader(e.target.value); markEdited(); }} disabled={isSent} />
       </Field>
-      <Field label="Sign-off" className="mb-6">
-        <Select value={signoffMemberId} onChange={(e) => { setSignoffMemberId(e.target.value); markEdited(); }} disabled={isSent}>
-          {teamMembers.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
-        </Select>
-      </Field>
-
       <div className="border-t border-border-subtle my-6" />
 
       <Eyebrow className="mb-3">Image Group 1</Eyebrow>

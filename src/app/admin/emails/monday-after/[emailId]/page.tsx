@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import { getDinnerAttendees } from "@/lib/email-intros-asks";
 import DraftEditor from "./draft-editor";
-import { getRecipientCount, getTeamMembers } from "../actions";
+import { getRecipientCount } from "../actions";
 
 export default async function MondayAfterDraftPage({
   params,
@@ -31,7 +31,6 @@ export default async function MondayAfterDraftPage({
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  const teamMembers = await getTeamMembers();
   const recipientCount = await getRecipientCount();
 
   // Fetch attendees for intros/asks preview
@@ -68,13 +67,11 @@ export default async function MondayAfterDraftPage({
         initialOurMission={email.our_mission}
         initialIntrosAsksHeader={email.intros_asks_header}
         initialPartnershipBoilerplate={email.partnership_boilerplate}
-        initialSignoffMemberId={email.signoff_member_id}
         testSentAfterLastEdit={email.test_sent_after_last_edit}
         dinner={{ date: dinner.date, venue: dinner.venue, address: dinner.address }}
         initialImages={(images ?? []).map((img: { id: string; group_number: number; display_order: number; public_url: string }) => ({
           id: img.id, groupNumber: img.group_number, displayOrder: img.display_order, publicUrl: img.public_url,
         }))}
-        teamMembers={teamMembers}
         recipientCount={recipientCount}
         attendeeCount={attendees.length}
         sentAt={email.sent_at}

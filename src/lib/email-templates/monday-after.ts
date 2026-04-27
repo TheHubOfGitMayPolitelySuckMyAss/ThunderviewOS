@@ -17,7 +17,6 @@ interface MondayAfterEmailProps {
   ourMission: string;
   introsAsksHeader: string;
   partnershipBoilerplate: string;
-  signoffName: string;
   dinner: { date: string; venue: string; address: string };
   images: { groupNumber: number; publicUrl: string; displayOrder: number }[];
   introsAsksHtml: string;
@@ -84,7 +83,6 @@ export function renderMondayAfterEmail(props: MondayAfterEmailProps): string {
     ourMission,
     introsAsksHeader,
     partnershipBoilerplate,
-    signoffName,
     dinner,
     images,
     introsAsksHtml,
@@ -142,11 +140,8 @@ ${inlineLinks(openingText)}
 <!-- Image group 2 -->
 ${imageSectionIfContent(images, 2)}
 
-<!-- Recap text with signoff -->
-<tr><td style="padding:24px 36px 0;font-size:15px;line-height:1.6;color:#2B241C;">
-${inlineLinks(recapText)}
-<div style="font-family:Fraunces,Georgia,'Times New Roman',serif;font-style:italic;font-size:18px;color:#4A3F34;margin-top:16px;">${signoffName}!</div>
-</td></tr>
+<!-- Recap text -->
+${sectionIfContent(recapText)}
 
 <!-- Image group 3 -->
 ${imageSectionIfContent(images, 3)}

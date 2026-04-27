@@ -101,7 +101,6 @@ export async function createDraft(dinnerId: string): Promise<{ success: boolean;
       our_mission: macro.our_mission,
       intros_asks_header: macro.intros_asks_header,
       partnership_boilerplate: macro.partnership_boilerplate,
-      signoff_member_id: member.id,
     })
     .select("id")
     .single();
@@ -119,7 +118,6 @@ export async function saveDraft(
     subject: string; preheader: string; headline: string; opening_text: string;
     recap_text: string; team_shoutouts: string; our_mission: string;
     intros_asks_header: string; partnership_boilerplate: string;
-    signoff_member_id: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   const member = await getAuthMember();
@@ -302,12 +300,6 @@ export async function sendTestEmail(emailId: string): Promise<{ success: boolean
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  let signoffName = member.first_name;
-  if (email.signoff_member_id) {
-    const { data: signoff } = await admin.from("members").select("first_name").eq("id", email.signoff_member_id).single();
-    if (signoff) signoffName = signoff.first_name;
-  }
-
   const attendees = await getDinnerAttendees(dinner.id, admin);
   const introsAsksHtml = buildAttendeeHtml(attendees);
 
@@ -321,7 +313,6 @@ export async function sendTestEmail(emailId: string): Promise<{ success: boolean
     ourMission: email.our_mission,
     introsAsksHeader: email.intros_asks_header,
     partnershipBoilerplate: email.partnership_boilerplate,
-    signoffName,
     dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
     images: (images ?? []).map((img: { group_number: number; public_url: string; display_order: number }) => ({
       groupNumber: img.group_number, publicUrl: img.public_url, displayOrder: img.display_order,
@@ -372,12 +363,6 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  let signoffName = member.first_name;
-  if (email.signoff_member_id) {
-    const { data: signoff } = await admin.from("members").select("first_name").eq("id", email.signoff_member_id).single();
-    if (signoff) signoffName = signoff.first_name;
-  }
-
   const attendees = await getDinnerAttendees(dinner.id, admin);
   const introsAsksHtml = buildAttendeeHtml(attendees);
 
@@ -425,7 +410,6 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
       ourMission: email.our_mission,
       introsAsksHeader: email.intros_asks_header,
       partnershipBoilerplate: email.partnership_boilerplate,
-      signoffName,
       dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
       images: imageData,
       introsAsksHtml,
