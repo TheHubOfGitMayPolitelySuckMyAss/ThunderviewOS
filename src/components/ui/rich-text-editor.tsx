@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import { Bold, Italic, Underline as UnderlineIcon, Link as LinkIcon } from "lucide-react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface RichTextEditorProps {
   value: string;
@@ -50,6 +50,8 @@ export default function RichTextEditor({
   disabled = false,
   rows = 8,
 }: RichTextEditorProps) {
+  const mountedRef = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -75,7 +77,15 @@ export default function RichTextEditor({
     content: value,
     editable: !disabled,
     onUpdate: ({ editor: e }) => {
+      // Skip the initial mount fire to prevent false "edited" state
+      if (!mountedRef.current) {
+        mountedRef.current = true;
+        return;
+      }
       onChange(e.getHTML());
+    },
+    onCreate: () => {
+      mountedRef.current = true;
     },
   });
 
