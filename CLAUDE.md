@@ -66,7 +66,14 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
 - `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default) or `'bounced'`.
-- `email_templates` — editable email templates. `slug` (unique, e.g. `'approval'`), `subject`, `body` (with `[member.fieldname]` variable placeholders), `updated_at` (trigger-managed), `updated_by` (FK to members). RLS: admin/team read + update.
+- `email_templates` — editable email templates for transactional emails. `slug` (unique, e.g. `'approval'`), `subject`, `body` (with `[member.fieldname]` variable placeholders), `updated_at` (trigger-managed), `updated_by` (FK to members). RLS: admin/team read + update. Also stores generic `monday-before` and `monday-after` slug rows from the earlier generic `email_instances` system (superseded by dedicated tables below — these rows are unused but harmless).
+- `email_instances` — generic per-dinner email instances (draft/test_sent/sent lifecycle). Superseded by dedicated `monday_before_emails` and `monday_after_emails` tables. Table remains but is unused — will be cleaned up in a future session.
+- `monday_before_macro` — singleton row (enforced via `UNIQUE CHECK (singleton = TRUE)`) storing default template content for Monday Before emails. Fields: `subject`, `preheader`, `headline`, `custom_text`, `partnership_boilerplate`. Editable at `/admin/emails/monday-before`. Changes seed future drafts but don't affect existing ones. RLS: admin/team read + update.
+- `monday_before_emails` — per-dinner Monday Before email drafts. `dinner_id` UNIQUE (one draft per dinner). Status lifecycle: `draft` → `sent`. Fields: all macro fields + `signoff_member_id` (unused — kept in DB, removed from UI), `test_sent_at`, `test_sent_after_last_edit` (flips FALSE on any text/image edit, TRUE on test send — gates the Send button), `sent_at`, `sent_by`, `audience_snapshot` (JSONB, frozen recipient list at send time). Sent-lock trigger (`lock_sent_monday_before_email`) blocks all UPDATEs when `status = 'sent'`. RLS: admin/team read + insert + update.
+- `monday_before_email_images` — image attachments for Monday Before emails. `email_id` FK, `group_number` (CHECK IN 1, 5 — two image groups), `display_order`, `storage_path`, `public_url`. Unique index on `(email_id, group_number, display_order)`. Sent-lock trigger blocks writes when parent email is sent. Stored in `email-images` bucket at `monday-before/{email_id}/{group}/{uuid}.jpg`.
+- `monday_after_macro` — singleton row storing default template content for Monday After emails. Fields: `subject`, `preheader`, `headline`, `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`, `partnership_boilerplate`. Same pattern as `monday_before_macro`.
+- `monday_after_emails` — per-dinner Monday After email drafts. Same structure as `monday_before_emails` with additional fields: `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`. Target dinner = most recent past dinner. Same sent-lock trigger pattern.
+- `monday_after_email_images` — image attachments for Monday After emails. Same as `monday_before_email_images` but `group_number` CHECK IN (1, 2, 3, 4, 5) — five image groups. Stored at `monday-after/{email_id}/{group}/{uuid}.jpg`.
 
 ## Auth flow
 
@@ -92,6 +99,7 @@ src/
 │   ├── page-header.tsx                # Shared page header: eyebrow/title/lede/actions with locked rhythm. size="default" (tv-h1, 64px gap) or "compact" (tv-h3, 24px gap). Portal pages don't use this yet — see "Known gap" section
 │   ├── field.tsx                       # Shared form field wrapper: label/required/help/error/children. flex-col with gap-label-input (8px). Error and help mutually exclusive
 │   ├── form-section.tsx               # Eyebrow-labeled field group inside a Card. Props: eyebrow, divider (adds hairline rule). Uses .tv-form-section CSS
+│   ├── email-image-group.tsx          # Shared drag-and-drop image group (@dnd-kit/sortable): sortable list with drag handles, delete buttons, file upload. Used by Monday Before and Monday After draft editors
 │   └── ui/                            # Design system primitives (compose these, don't inline)
 │       ├── index.ts                   # Barrel export
 │       ├── button.tsx                 # Primary/secondary/ghost, sm/md/lg, asChild prop for wrapping Links
@@ -103,7 +111,8 @@ src/
 │       ├── select.tsx                 # Custom chevron, same treatment
 │       ├── label.tsx                  # 13px medium, optional required asterisk
 │       ├── field-help.tsx             # Hint text, error variant
-│       └── typography.tsx             # Eyebrow, H1–H4, Lede, Body, Small — thin wrappers around .tv-* classes
+│       ├── typography.tsx             # Eyebrow, H1–H4, Lede, Body, Small — thin wrappers around .tv-* classes
+│       └── rich-text-editor.tsx       # Tiptap-based rich text editor (B/I/U/Link toolbar). Dynamically imported (SSR disabled). Used by marketing email editors
 ├── lib/supabase/
 │   ├── client.ts                       # Browser client (createBrowserClient)
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
@@ -121,6 +130,7 @@ src/
 │   ├── gallery/page.tsx                # Placeholder (public-nav + H1) — Gallery link removed from public-nav for launch
 │   ├── login/page.tsx                  # Magic link sign-in: server wrapper with PublicNav, reads ?redirect param
 │   ├── login/login-form.tsx            # Client component: email input, send magic link, stores redirect in auth_redirect cookie
+│   ├── unsubscribe/page.tsx            # Unsubscribe confirmation page: success/invalid/error states. Public page with PublicNav
 │   ├── apply/
 │   │   ├── page.tsx                    # Public application form (server wrapper: fetches dinners + schedule)
 │   │   ├── application-form.tsx        # Client component: form fields, validation, submit
@@ -141,9 +151,9 @@ src/
 │   │   ├── sign-out-button.tsx         # Client component: sign-out button (unused — sign-out now in TopNav dropdown)
 │   │   ├── profile/
 │   │   │   ├── page.tsx                # Profile editor: context-aware back link and save (from dropdown → /portal + toast; from Edit Profile → /portal/community + redirect to member page)
-│   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, toast. Photo upload/remove uses standalone portalUpdateProfilePic (decoupled from saveProfile)
+│   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, marketing opt-in toggle, toast. Photo upload/remove uses standalone portalUpdateProfilePic (decoupled from saveProfile)
 │   │   │   ├── crop-modal.tsx          # Client component: react-easy-crop square crop modal (dynamically imported, SSR disabled)
-│   │   │   └── actions.ts             # Server actions: saveProfile (member fields + email swap/insert + timestamps, no photo handling), portalUpdateProfilePic (standalone photo upload/remove via sharp)
+│   │   │   └── actions.ts             # Server actions: saveProfile (member fields + email swap/insert + timestamps, no photo handling), portalUpdateProfilePic (standalone photo upload/remove via sharp), toggleMarketing (immediate-save marketing opt-in/out)
 │   │   ├── community/
 │   │   │   ├── page.tsx                # Community directory: fetchAll paginated, filtered (has_community_access + not kicked_out)
 │   │   │   └── community-table.tsx     # Client component: searchable, sortable table (Name/Company/Role), rows link to /portal/members/[id]
@@ -165,6 +175,8 @@ src/
 │   ├── api/cron/fulfill-tickets/
 │   │   └── route.ts                    # Vercel Cron: 27 days before each dinner, flips purchased→fulfilled + sends fulfillment email
 │   ├── api/cron/morning-of/              # REMOVED — morning-of email is now manually triggered from /admin/emails/morning-of
+│   ├── api/unsubscribe/
+│   │   └── route.ts                    # GET/POST: HMAC-signed one-click unsubscribe handler. Verifies token, sets marketing_opted_in = false, redirects to /unsubscribe confirmation page
 │   ├── api/webhooks/stripe/
 │   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
 │   ├── dev/
@@ -195,8 +207,10 @@ src/
 │       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
 │       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
 │       ├── emails/
-│       │   ├── page.tsx                # Email template nav: Marketing (Monday Before, Monday After) + Transactional (Approval, Re-application, Rejection, Fulfillment, Morning Of)
-│       │   ├── template-editor.tsx     # Shared client component: subject/body editing, Send Test Email, Save Changes (used by all template pages)
+│       │   ├── page.tsx                # Email index: Transactional (top) + Marketing (bottom). Marketing entries have smart buttons: Create draft / Continue draft / View sent
+│       │   ├── template-editor.tsx     # Shared client component: subject/body editing, Send Test Email, Save Changes (used by transactional template pages)
+│       │   ├── create-monday-before-button.tsx  # Client component: creates Monday Before draft from macro, redirects to editor
+│       │   ├── create-monday-after-button.tsx   # Client component: creates Monday After draft from macro, redirects to editor
 │       │   ├── approval/
 │       │   │   ├── page.tsx            # Server wrapper: fetches approval template
 │       │   │   ├── template-editor.tsx # Thin wrapper passing actions + variables to shared editor
@@ -213,10 +227,28 @@ src/
 │       │   │   ├── page.tsx            # Server wrapper: fetches fulfillment template
 │       │   │   ├── template-editor.tsx # Thin wrapper
 │       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname], [dinner.date/venue/address] from next dinner), saveTemplate
-│       │   └── morning-of/
-│       │       ├── page.tsx            # Server wrapper: fetches template + next dinner attendees
-│       │       ├── morning-of-editor.tsx # Client component: template editor + attendee preview cards + Preview Full Email button
-│       │       └── actions.ts          # Server actions: sendTestEmail, sendPreviewEmail (saved template + live attendees), saveTemplate
+│       │   ├── morning-of/
+│       │   │   ├── page.tsx            # Server wrapper: fetches template + next dinner attendees
+│       │   │   ├── morning-of-editor.tsx # Client component: template editor + attendee preview cards + Preview Full Email button
+│       │   │   └── actions.ts          # Server actions: sendTestEmail, sendPreviewEmail (saved template + live attendees), saveTemplate. Uses shared getDinnerAttendees + buildAttendeeHtml
+│       │   ├── monday-before/
+│       │   │   ├── page.tsx            # Macro editor: 5 structured fields (subject, preheader, headline, custom_text, partnership_boilerplate)
+│       │   │   ├── macro-editor.tsx    # Client component: rich text fields + save. Seeds future drafts
+│       │   │   ├── actions.ts          # Server actions: loadMacro, saveMacro, createDraft, saveDraft, uploadEmailImage, deleteEmailImage, reorderEmailImages, sendTestEmail, sendToAll, getRecipientCount, getTeamMembers
+│       │   │   └── [emailId]/
+│       │   │       ├── page.tsx        # Server wrapper: fetches draft + dinner + images + recipient count
+│       │   │       └── draft-editor.tsx # Client component: all sections, 2 image groups (@dnd-kit), rich text (Tiptap), save/test/send workflow with confirmation modal
+│       │   ├── monday-after/
+│       │   │   ├── page.tsx            # Macro editor: 9 structured fields (subject, preheader, headline, opening_text, recap_text, team_shoutouts, our_mission, intros_asks_header, partnership_boilerplate)
+│       │   │   ├── macro-editor.tsx    # Client component: rich text fields + save
+│       │   │   ├── actions.ts          # Server actions: same pattern as monday-before, plus intros/asks rendering via shared helper
+│       │   │   └── [emailId]/
+│       │   │       ├── page.tsx        # Server wrapper: fetches draft + dinner + images + attendees for intros/asks preview
+│       │   │       └── draft-editor.tsx # Client component: all sections, 5 image groups, intros/asks preview, save/test/send workflow
+│       │   └── instances/[id]/         # Generic email instance editor (used by email_instances table — legacy, may be removed)
+│       │       ├── page.tsx
+│       │       ├── instance-editor.tsx
+│       │       └── actions.ts
 │       ├── members/
 │       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
 │       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
@@ -227,8 +259,14 @@ src/
 │       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate, profile pic upload (Upload Photo/Change Photo buttons + Remove Photo link, same layout as portal profile)
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management, adminUploadProfilePic
 ├── lib/
-│   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
+│   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), renderTemplateVars() (shared variable substitution), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
 │   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification). All use bodyToHtml() for branded shell
+│   ├── email-image-pipeline.ts        # Shared image compression: validateImageType() + compressEmailImage() — 800px width, JPEG, iterative quality (85→40), ≤500KB, EXIF stripped. Used by Monday Before and Monday After upload actions
+│   ├── email-intros-asks.ts           # Shared Intros & Asks rendering: getDinnerAttendees(dinnerId) fetches fulfilled attendees (not kicked, has community access, deduplicated, sorted content-first) + buildAttendeeHtml() renders inline-styled HTML. Shared between Morning Of and Monday After
+│   ├── email-templates/
+│   │   ├── monday-before.ts           # Monday Before email HTML renderer: 7-section layout (images, headline, custom text, CTA+dinner details, images, partnership, CAN-SPAM footer)
+│   │   └── monday-after.ts            # Monday After email HTML renderer: extended layout (images×5, headline, opening, CTA, recap, shoutouts, mission, intros/asks, partnership, CAN-SPAM footer)
+│   ├── unsubscribe.ts                 # HMAC-signed unsubscribe token generation + verification. Uses UNSUBSCRIBE_SECRET env var
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatDinnerShort, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
 │   ├── ensure-auth-user.ts            # ensureAuthUser(email) — creates auth.users row via admin API if not exists. Called on member approval/add
 │   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
@@ -268,7 +306,10 @@ supabase/
 │   ├── 20260421100000_fix_has_community_access_on_approval.sql  # Backfill has_community_access = true for 161 existing members
 │   ├── 20260424000000_add_current_give.sql                     # Add current_give TEXT to members
 │   ├── 20260424100000_morning_of_sent_by.sql                   # Add morning_of_sent_by UUID FK to dinners (tracks who sent morning-of email)
-│   └── 20260424000001_dinner_details_and_speakers.sql          # Add title/description TEXT NULL to dinners; dinner_speakers join table with RLS
+│   ├── 20260424000001_dinner_details_and_speakers.sql          # Add title/description TEXT NULL to dinners; dinner_speakers join table with RLS
+│   ├── 20260426000000_email_instances.sql                     # Generic email_instances table (superseded by dedicated monday_before/after tables — kept for cleanup)
+│   ├── 20260426100000_monday_before_emails.sql                # monday_before_macro + monday_before_emails + monday_before_email_images + sent-lock triggers + RLS
+│   └── 20260426200000_monday_after_emails.sql                 # monday_after_macro + monday_after_emails + monday_after_email_images + sent-lock triggers + RLS
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -288,6 +329,7 @@ Required in `.env.local` (see `.env.local.example` at repo root):
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe sandbox publishable key (`pk_test_...`). Currently unused client-side (Checkout is redirect-based, not embedded).
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret. For local dev: comes from `stripe listen` output. For production: from the registered webhook endpoint (`we_1TOKwXBZUujGbd3L93xKwlDl`).
 - `RESEND_API_KEY` — Resend API key for transactional and marketing emails. Set in Vercel (Production + Preview scopes) and `.env.local`.
+- `UNSUBSCRIBE_SECRET` — HMAC key for signing unsubscribe tokens in marketing emails. Set in Vercel Production scope. Generate with `openssl rand -hex 32`. Without this, a hardcoded default is used (functional but insecure — anyone who reads the source can forge tokens).
 
 Production values are set in Vercel dashboard (Production + Development scopes). **Note:** Stripe sandbox keys are in both Production and Development scopes — no live keys yet. A future sprint will swap Production to live-mode keys.
 
@@ -444,6 +486,20 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
 
 `<PageHeader>` has two sizes: `default` (tv-h1 + 64px gap) and `compact` (tv-h3 + 24px gap). Portal pages need tv-h1 heading + ~32px gap — neither size fits. Portal pages currently use inline `<H1>` + `<Lede>` with manual `mb-6` instead of PageHeader. **Next step**: add `size="portal"` (tv-h1 heading + 32px gap) and migrate portal pages back to PageHeader.
 
+## What's done (Marketing emails — Sprint 17)
+
+- **Monday Before email system**: dedicated tables (`monday_before_macro`, `monday_before_emails`, `monday_before_email_images`) with full draft→sent lifecycle. Macro editor at `/admin/emails/monday-before` seeds new drafts with 5 structured fields. Per-dinner draft editor at `/admin/emails/monday-before/[emailId]` with subject, preheader, headline, custom text (rich text), 2 sortable image groups, partnership boilerplate, CTA+dinner preview, CAN-SPAM footer. Save Draft / Send Test / Send To All workflow with test-gate (`test_sent_after_last_edit` must be true). Bulk send via Resend `batch.send()` (100/chunk) to all `marketing_opted_in = true` AND `kicked_out = false` members. Sent-lock DB triggers block all writes after send. Audience snapshot frozen as JSONB at send time.
+- **Monday After email system**: same architecture as Monday Before with 9 text fields (subject, preheader, headline, opening_text, recap_text, team_shoutouts, our_mission, intros_asks_header, partnership_boilerplate) and 5 image groups. Includes auto-generated Intros & Asks section from dinner's fulfilled attendees (shared renderer with Morning Of). Target dinner = most recent past dinner.
+- **Rich text editor** (`src/components/ui/rich-text-editor.tsx`): Tiptap-based with B/I/U/Link toolbar. Outputs clean HTML (`<strong>`, `<em>`, `<u>`, `<a>`). Dynamically imported (SSR disabled). Used by `custom_text` and `partnership_boilerplate` fields in Monday Before, all text fields in Monday After macro/draft editors.
+- **Image upload pipeline** (`src/lib/email-image-pipeline.ts`): shared Sharp compression — 800px width, JPEG, iterative quality reduction (85→75→65→55→45→40), stops at first quality ≤500KB. Rejects with descriptive error if quality 40 still exceeds limit. EXIF stripped. Accepts JPEG/PNG/WebP/HEIC.
+- **Drag-and-drop image reordering** (`src/components/email-image-group.tsx`): @dnd-kit/sortable with optimistic local reorder (no snap-back during async server call). Full-size image previews with grip handles and delete buttons.
+- **Intros & Asks rendering extracted** (`src/lib/email-intros-asks.ts`): `getDinnerAttendees()` and `buildAttendeeHtml()` now shared between Morning Of and Monday After. Morning Of refactored to use the shared helper (identical behavior, no formatting changes).
+- **Unsubscribe system**: HMAC-signed tokens per recipient (`src/lib/unsubscribe.ts`), one-click handler at `/api/unsubscribe` (GET+POST for RFC 8058 `List-Unsubscribe-Post`), confirmation page at `/unsubscribe` with success/invalid/error states. Marketing emails include `List-Unsubscribe` and `List-Unsubscribe-Post` headers. CAN-SPAM footer with physical address ("Thunderview CEO Dinners / 2462 S Acoma St / Denver, CO 80223 / USA"). `UNSUBSCRIBE_SECRET` env var set in Vercel production.
+- **Portal marketing opt-in toggle** on `/portal/profile`: "Email preferences" section with checkbox "Receive marketing emails (Dinner Details, Dinner Wrapup)". Immediate-save via `toggleMarketing` action. Helper text explains transactional emails are unaffected. Members can re-subscribe after clicking email unsubscribe link.
+- **Emails index page** reordered: Transactional section first (top), Marketing section second (bottom). Each marketing template shows smart button based on instance state: "Create draft for [date]" / "Continue draft — [date]" / "Sent [date]".
+- **Storage bucket**: `email-images` (public-read) for marketing email images. Paths: `monday-before/{email_id}/{group}/{uuid}.jpg` and `monday-after/{email_id}/{group}/{uuid}.jpg`.
+- **New dependencies**: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`, `@tiptap/extension-underline` (rich text editor), `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (drag-and-drop image reordering).
+
 ### Remaining hardening opportunities
 
 - **Shared `<DataTable>` component**: admin tables (dinners, tickets, applications, members) and the portal community table all share identical th/td class patterns. A single component would enforce table-cell-padding-x, sticky headers, sort arrows, and row-click behavior.
@@ -460,7 +516,7 @@ Don't build these without an explicit prompt:
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
 - ~~Email sending (Resend wiring)~~ Done (Phase 5). All transactional emails wired: approval (on approve), re-application (on approve existing / link), rejection (on reject), fulfillment (on Stripe webhook auto-fulfill + comp ticket), morning-of (manually triggered from `/admin/emails/morning-of` — cron removed). Templates editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Refund confirmations handled natively by Stripe.
 - ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
-- Bulk email templates — future sprint
+- ~~Bulk email templates~~ Done (Sprint 17) — Monday Before and Monday After with dedicated tables, image pipeline, rich text, unsubscribe system
 - Streak API integration — Phase 7
 - CoachingOS sync — Phase 10+
 - LinkedIn URL matching for automatic duplicate detection across applications and members
@@ -479,6 +535,7 @@ Don't build these without an explicit prompt:
 - ~~Add `--container-portal: 980px` token~~ Done — `--tv-container-portal: 980px` and `--tv-container-narrow: 640px` added, all portal pages migrated
 - Add `size="portal"` to PageHeader (tv-h1 + 32px gap) and migrate portal pages to use it
 - ~~Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in~~ Decided — keeping Stripe's built-in receipt
+- Dead code cleanup: remove generic `email_instances` table, `create-instance-button.tsx`, `instances/[id]/` route (superseded by dedicated Monday Before/After tables)
 - Fulfillment email hero photo: per-template image support if wanted
 - ~~Page-by-page detail polish pass~~ Done — marketing pages (about, faq, team) built, Card component migration, section spacing fix
 - ~~Marketing pages: /about, /faq, /team~~ Done — all three built with real content, dynamic data, design system primitives
@@ -512,4 +569,8 @@ Don't build these without an explicit prompt:
 - **Stripe sandbox does not auto-send receipts.** Even with `receipt_email` set on the Checkout Session and the dashboard toggle enabled, sandbox mode silently skips receipt emails. Integration is correct — auto-send will be validated at Phase 8 live cutover. Do not debug further.
 - **Members need an `auth.users` row to log in.** `shouldCreateUser: false` on the OTP call means Supabase won't auto-create auth users. Every member-creation flow (approve, add, link) must call `ensureAuthUser(email)` from `src/lib/ensure-auth-user.ts`. If a member reports they can't log in, check `auth.users` first — the member_emails row alone is not enough. Discovered 2026-04-26 when 632 imported members had no auth rows.
 - **Photo upload is decoupled from profile save.** Portal profile uses `portalUpdateProfilePic` (standalone action that only touches `profile_pic_url`). Admin uses `adminUploadProfilePic`. Neither passes other member fields through. `saveProfile` does not handle photos. This prevents silent data loss when a new field is added but not included in the photo handler's FormData.
+- **Marketing email tables are separate from `email_templates`/`email_instances`.** The generic `email_instances` table was built first but replaced by dedicated `monday_before_*` and `monday_after_*` tables that support structured fields, image groups, and richer lifecycle tracking. The generic tables remain in the DB but are unused. Don't build new marketing templates on `email_instances` — follow the Monday Before/After pattern with dedicated tables.
+- **Image compression pipeline has a hard 500KB ceiling.** The iterative quality reduction (85→40) stops at the first quality level that fits. If quality 40 still exceeds 500KB, the upload is rejected with an error showing original and compressed sizes. This is intentional — email clients have image size limits and large images degrade deliverability.
+- **Sent-lock triggers are strict.** Once `status = 'sent'`, the DB trigger rejects ALL UPDATEs on `monday_before_emails` / `monday_after_emails` and their image tables. The send action's final UPDATE (status + sent_at + sent_by + audience_snapshot) succeeds because `OLD.status` is still `'draft'` at that point. Don't try to update sent emails — they're immutable by design.
+- **RichTextEditor suppresses initial onChange.** Tiptap fires `onUpdate` on mount, which would falsely set the parent form's `hasEdited` state. The component uses a `mountedRef` to skip the first callback. If the editor seems to not trigger changes, check this mechanism.
 - **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
