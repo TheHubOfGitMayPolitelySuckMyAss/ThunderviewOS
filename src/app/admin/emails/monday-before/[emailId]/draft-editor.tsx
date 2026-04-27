@@ -38,6 +38,7 @@ interface DraftEditorProps {
   dinner: { date: string; venue: string; address: string };
   initialImages: ImageData[];
   recipientCount: number;
+  testingMode: boolean;
   sentAt: string | null;
   sentByName: string | null;
   audienceCount: number | null;
@@ -65,6 +66,7 @@ export default function DraftEditor({
   dinner,
   initialImages,
   recipientCount,
+  testingMode,
   sentAt,
   sentByName,
   audienceCount,
@@ -226,6 +228,13 @@ export default function DraftEditor({
 
   return (
     <div className="max-w-2xl">
+      {/* Testing mode banner */}
+      {testingMode && !isSent && (
+        <div className="rounded-md bg-[rgba(192,150,42,0.1)] border border-[rgba(192,150,42,0.3)] px-4 py-3 text-sm text-fg2 mb-6">
+          <strong className="text-fg1">Testing mode</strong> — &ldquo;Send To All&rdquo; will only send to admin and team members ({recipientCount} recipients). Set <code className="text-xs bg-bg-elevated px-1 py-0.5 rounded">NEXT_PUBLIC_EMAIL_MODE=live</code> in Vercel to send to all members.
+        </div>
+      )}
+
       {/* Sent banner */}
       {isSent && sentAt && (
         <div className="rounded-md bg-[rgba(91,106,59,0.08)] px-4 py-3 text-sm text-success mb-6">

@@ -7,6 +7,7 @@ import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { renderMondayAfterEmail } from "@/lib/email-templates/monday-after";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe";
 import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
+import { getMarketingRecipients, getMarketingRecipientCount, isTestingMode } from "@/lib/email-mode";
 import { getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
 import { Resend } from "resend";
 import crypto from "crypto";
@@ -370,25 +371,8 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
     groupNumber: img.group_number, publicUrl: img.public_url, displayOrder: img.display_order,
   }));
 
-  // Query recipients (paginated)
-  type RecipientRow = { id: string; first_name: string; member_emails: { email: string }[] };
-  const allRecipients: RecipientRow[] = [];
-  let from = 0;
-  const PAGE_SIZE = 1000;
-  while (true) {
-    const { data } = await admin
-      .from("members")
-      .select("id, first_name, member_emails!inner(email)")
-      .eq("marketing_opted_in", true)
-      .eq("kicked_out", false)
-      .eq("member_emails.is_primary", true)
-      .eq("member_emails.email_status", "active")
-      .range(from, from + PAGE_SIZE - 1);
-    const rows = (data ?? []) as unknown as RecipientRow[];
-    allRecipients.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
+  // Query recipients (scoped by EMAIL_MODE: testing = team only, live = all opted-in)
+  const allRecipients = await getMarketingRecipients();
 
   if (allRecipients.length === 0) return { success: false, error: "No eligible recipients" };
 
@@ -443,15 +427,8 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
 // Helpers
 // ============================================================
 
-export async function getRecipientCount(): Promise<number> {
-  const admin = createAdminClient();
-  const { count } = await admin
-    .from("members")
-    .select("id", { count: "exact", head: true })
-    .eq("marketing_opted_in", true)
-    .eq("kicked_out", false);
-  return count ?? 0;
-}
+export { getMarketingRecipientCount as getRecipientCount };
+export { isTestingMode };
 
 export async function getTeamMembers(): Promise<{ id: string; name: string }[]> {
   const admin = createAdminClient();

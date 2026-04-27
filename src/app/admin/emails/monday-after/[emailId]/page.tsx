@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import { getDinnerAttendees } from "@/lib/email-intros-asks";
 import DraftEditor from "./draft-editor";
-import { getRecipientCount } from "../actions";
+import { getRecipientCount, isTestingMode } from "../actions";
 
 export default async function MondayAfterDraftPage({
   params,
@@ -73,6 +73,7 @@ export default async function MondayAfterDraftPage({
           id: img.id, groupNumber: img.group_number, displayOrder: img.display_order, publicUrl: img.public_url,
         }))}
         recipientCount={recipientCount}
+        testingMode={isTestingMode()}
         attendeeCount={attendees.length}
         sentAt={email.sent_at}
         sentByName={sentByName}

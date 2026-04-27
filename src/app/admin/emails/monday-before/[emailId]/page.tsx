@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import DraftEditor from "./draft-editor";
-import { getRecipientCount } from "../actions";
+import { getRecipientCount, isTestingMode } from "../actions";
 
 export default async function MondayBeforeDraftPage({
   params,
@@ -76,6 +76,7 @@ export default async function MondayBeforeDraftPage({
           publicUrl: img.public_url,
         }))}
         recipientCount={recipientCount}
+        testingMode={isTestingMode()}
         sentAt={email.sent_at}
         sentByName={sentByName}
         audienceCount={email.audience_snapshot ? (email.audience_snapshot as unknown[]).length : null}
