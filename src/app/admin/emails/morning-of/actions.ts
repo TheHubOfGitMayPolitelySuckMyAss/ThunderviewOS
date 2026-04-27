@@ -2,22 +2,13 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
+import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-function renderTemplate(
-  text: string,
-  vars: { firstName: string; dinnerDate: string; venue: string; address: string }
-): string {
-  return text
-    .replace(/\[member\.firstname\]/g, vars.firstName)
-    .replace(/\[dinner\.date\]/g, vars.dinnerDate)
-    .replace(/\[dinner\.venue\]/g, vars.venue)
-    .replace(/\[dinner\.address\]/g, vars.address);
-}
+const renderTemplate = renderTemplateVars;
 
 type Attendee = {
   first_name: string;

@@ -62,6 +62,21 @@ Thunderview CEO Dinners &middot; Denver, CO
 }
 
 /**
+ * Replaces standard marketing/dinner template variables in subject or body text.
+ * Used by marketing macro templates, email instances, and morning-of emails.
+ */
+export function renderTemplateVars(
+  text: string,
+  vars: { firstName: string; dinnerDate: string; venue: string; address: string }
+): string {
+  return text
+    .replace(/\[member\.firstname\]/g, vars.firstName)
+    .replace(/\[dinner\.date\]/g, vars.dinnerDate)
+    .replace(/\[dinner\.venue\]/g, vars.venue)
+    .replace(/\[dinner\.address\]/g, vars.address);
+}
+
+/**
  * Generates an inline-styled CTA button for use in email template body text.
  * Use in admin template bodies like: paste this HTML string where you want
  * the button to appear.

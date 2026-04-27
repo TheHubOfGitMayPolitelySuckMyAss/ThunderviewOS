@@ -8,8 +8,6 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-const renderTemplate = renderTemplateVars;
-
 export async function sendTestEmail(
   slug: string,
   subject: string,
@@ -41,7 +39,7 @@ export async function sendTestEmail(
     last_name: string;
   };
 
-  // Get next upcoming dinner for test data
+  // Monday Before targets the next upcoming dinner
   const todayMT = getTodayMT();
   const { data: nextDinner } = await admin
     .from("dinners")
@@ -60,8 +58,8 @@ export async function sendTestEmail(
     address: nextDinner.address,
   };
 
-  const renderedSubject = renderTemplate(subject, vars);
-  const renderedBody = renderTemplate(body, vars);
+  const renderedSubject = renderTemplateVars(subject, vars);
+  const renderedBody = renderTemplateVars(body, vars);
   const html = bodyToHtml(renderedBody);
 
   const { error } = await resend.emails.send({

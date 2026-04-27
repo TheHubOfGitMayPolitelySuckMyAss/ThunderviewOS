@@ -8,8 +8,6 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-const renderTemplate = renderTemplateVars;
-
 export async function sendTestEmail(
   slug: string,
   subject: string,
@@ -41,27 +39,27 @@ export async function sendTestEmail(
     last_name: string;
   };
 
-  // Get next upcoming dinner for test data
+  // Monday After targets the most recent past dinner
   const todayMT = getTodayMT();
-  const { data: nextDinner } = await admin
+  const { data: lastDinner } = await admin
     .from("dinners")
     .select("date, venue, address")
-    .gte("date", todayMT)
-    .order("date", { ascending: true })
+    .lt("date", todayMT)
+    .order("date", { ascending: false })
     .limit(1)
     .single();
 
-  if (!nextDinner) return { success: false, error: "No upcoming dinner found for test data" };
+  if (!lastDinner) return { success: false, error: "No past dinner found for test data" };
 
   const vars = {
     firstName: member.first_name,
-    dinnerDate: formatDateFriendly(nextDinner.date),
-    venue: nextDinner.venue,
-    address: nextDinner.address,
+    dinnerDate: formatDateFriendly(lastDinner.date),
+    venue: lastDinner.venue,
+    address: lastDinner.address,
   };
 
-  const renderedSubject = renderTemplate(subject, vars);
-  const renderedBody = renderTemplate(body, vars);
+  const renderedSubject = renderTemplateVars(subject, vars);
+  const renderedBody = renderTemplateVars(body, vars);
   const html = bodyToHtml(renderedBody);
 
   const { error } = await resend.emails.send({
