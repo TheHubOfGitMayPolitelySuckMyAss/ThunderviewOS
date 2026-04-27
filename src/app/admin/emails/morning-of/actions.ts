@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { type Attendee, getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
+import { isTestingMode } from "@/lib/email-mode";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -129,14 +130,14 @@ export async function sendToAllAttendees(
   const { data: tickets } = await admin
     .from("tickets")
     .select(
-      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, member_emails(email, is_primary))"
+      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, is_team, member_emails(email, is_primary))"
     )
     .eq("dinner_id", dinner.id)
     .eq("fulfillment_status", "fulfilled");
 
   type TicketRow = {
     member_id: string;
-    members: Attendee & { id: string; member_emails: { email: string; is_primary: boolean }[] };
+    members: Attendee & { id: string; is_team: boolean; member_emails: { email: string; is_primary: boolean }[] };
   };
 
   const rows = (tickets ?? []) as unknown as TicketRow[];
@@ -168,9 +169,20 @@ export async function sendToAllAttendees(
   // Import sendMorningOfEmail dynamically to avoid circular deps
   const { sendMorningOfEmail } = await import("@/lib/email-send");
 
+  // In testing mode, only send to admin + team members (attendee list in
+  // the email body is still the full list for realistic preview)
+  const testing = isTestingMode();
+  const ADMIN_EMAIL = "eric@marcoullier.com";
+
   let sent = 0;
   for (const attendee of attendees) {
     if (!attendee.primary_email) continue;
+    if (testing) {
+      const row = rows.find((r) => r.members.id === (attendee as unknown as { id: string }).id);
+      const isAdmin = attendee.primary_email === ADMIN_EMAIL;
+      const isTeam = row?.members.is_team === true;
+      if (!isAdmin && !isTeam) continue;
+    }
     await sendMorningOfEmail(
       attendee.primary_email,
       attendee.first_name,

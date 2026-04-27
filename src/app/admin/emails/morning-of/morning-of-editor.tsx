@@ -42,6 +42,7 @@ interface MorningOfEditorProps {
   dinnerId: string | null;
   morningOfSentAt: string | null;
   morningOfSentByName: string | null;
+  testingMode: boolean;
 }
 
 export default function MorningOfEditor({
@@ -55,6 +56,7 @@ export default function MorningOfEditor({
   dinnerId,
   morningOfSentAt,
   morningOfSentByName,
+  testingMode,
 }: MorningOfEditorProps) {
   const [showModal, setShowModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -114,6 +116,11 @@ export default function MorningOfEditor({
 
       {/* Attendee preview section */}
       <div className="mt-7 max-w-2xl">
+        {testingMode && !sentAt && (
+          <div className="rounded-md bg-[rgba(192,150,42,0.1)] border border-[rgba(192,150,42,0.3)] px-4 py-3 text-sm text-fg2 mb-6">
+            <strong className="text-fg1">Testing mode</strong> — &ldquo;Send To Attendees&rdquo; will only send to admin and team members. Set <code className="text-xs bg-bg-elevated px-1 py-0.5 rounded">NEXT_PUBLIC_EMAIL_MODE=live</code> in Vercel to send to all attendees.
+          </div>
+        )}
         <h3 className="mb-1 text-lg font-semibold text-fg1">
           Attendee Intros &amp; Asks{" "}
           <span className="text-sm font-normal text-fg3">(auto-generated)</span>
