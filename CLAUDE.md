@@ -330,6 +330,7 @@ Required in `.env.local` (see `.env.local.example` at repo root):
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret. For local dev: comes from `stripe listen` output. For production: from the registered webhook endpoint (`we_1TOKwXBZUujGbd3L93xKwlDl`).
 - `RESEND_API_KEY` — Resend API key for transactional and marketing emails. Set in Vercel (Production + Preview scopes) and `.env.local`.
 - `UNSUBSCRIBE_SECRET` — HMAC key for signing unsubscribe tokens in marketing emails. Set in Vercel Production scope. Generate with `openssl rand -hex 32`. Without this, a hardcoded default is used (functional but insecure — anyone who reads the source can forge tokens).
+- `NEXT_PUBLIC_EMAIL_MODE` — Controls marketing email recipient scope. `"testing"` (default) = Send To All only reaches admin + team members. `"live"` = Send To All reaches all marketing-opted-in members. Set in Vercel Production scope. **Flip to `live` before launch.**
 
 Production values are set in Vercel dashboard (Production + Development scopes). **Note:** Stripe sandbox keys are in both Production and Development scopes — no live keys yet. A future sprint will swap Production to live-mode keys.
 
@@ -498,6 +499,7 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
 - **Portal marketing opt-in toggle** on `/portal/profile`: "Email preferences" section with checkbox "Receive marketing emails (Dinner Details, Dinner Wrapup)". Immediate-save via `toggleMarketing` action. Helper text explains transactional emails are unaffected. Members can re-subscribe after clicking email unsubscribe link.
 - **Emails index page** reordered: Transactional section first (top), Marketing section second (bottom). Each marketing template shows smart button based on instance state: "Create draft for [date]" / "Continue draft — [date]" / "Sent [date]".
 - **Storage bucket**: `email-images` (public-read) for marketing email images. Paths: `monday-before/{email_id}/{group}/{uuid}.jpg` and `monday-after/{email_id}/{group}/{uuid}.jpg`.
+- **Email testing mode** (`src/lib/email-mode.ts`): `NEXT_PUBLIC_EMAIL_MODE` env var. When `"testing"` (default), `getMarketingRecipients()` returns only admin + team members. When `"live"`, returns all `marketing_opted_in = true` members. Both draft editors show a yellow banner when in testing mode. Shared by Monday Before and Monday After via `getMarketingRecipients()` and `getMarketingRecipientCount()`.
 - **New dependencies**: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`, `@tiptap/extension-underline` (rich text editor), `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (drag-and-drop image reordering).
 
 ### Remaining hardening opportunities
@@ -550,6 +552,7 @@ Don't build these without an explicit prompt:
 - [x] Confirm From address is a Thunderview domain (`team@thunderviewceodinners.com` via Resend custom SMTP)
 - [x] Confirm injected unsubscribe footer is gone (custom SMTP eliminates it)
 - [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
+- [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production env vars (currently sends marketing emails to admin+team only)
 
 ## Known issues / gotchas
 
