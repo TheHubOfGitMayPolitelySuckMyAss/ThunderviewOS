@@ -35,7 +35,7 @@ export default async function HomePage() {
               Monthly dinners for Colorado startup CEOs.
             </H1>
             <Body className="!text-[19px] !leading-[1.55] max-w-[620px] mb-8">
-              Every attendee is vetted. No service providers, no job-seekers. CEOs are peers, not products. One long table, one evening a month.
+              Every attendee is vetted. No service providers, no job-seekers. CEOs are peers, not products. One room, 40 CEOs, one evening a month.
             </Body>
 
             <div className="flex gap-3 mb-7">
@@ -94,26 +94,26 @@ export default async function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
             <Card>
               <span className="block font-display italic text-[36px] text-accent font-medium leading-none mb-4">01</span>
-              <H3 className="mb-2.5">Every person is vetted</H3>
+              <H3 className="mb-2.5">A room that gets it</H3>
               <p className="text-[14.5px] leading-[1.55] text-fg2 m-0">
                 {/* TODO(eric): confirm copy */}
-                You&rsquo;ll know who&rsquo;s in the room before you walk in. No service providers trolling for customers, no job-seekers. CEOs only.
+                Every attendee is vetted. No service providers, no job-seekers. CEOs are peers, not products. One room, 40 CEOs, one evening a month.
               </p>
             </Card>
             <Card>
               <span className="block font-display italic text-[36px] text-accent font-medium leading-none mb-4">02</span>
-              <H3 className="mb-2.5">Real problems, real answers</H3>
+              <H3 className="mb-2.5">Structured to connect</H3>
               <p className="text-[14.5px] leading-[1.55] text-fg2 m-0">
                 {/* TODO(eric): confirm copy */}
-                Someone in the room has already solved your weird problem. Your job is to find them and ask.
+                Not a mixer. Before each dinner, everyone gets the full list of attendees and their asks. Introductions are built in. There&rsquo;s always a speaker. The right conversations happen by design.
               </p>
             </Card>
             <Card variant="feature">
               <span className="block font-display italic text-[36px] text-accent font-medium leading-none mb-4">03</span>
-              <H3 className="mb-2.5">One table, once a month</H3>
+              <H3 className="mb-2.5">More than a dinner</H3>
               <p className="text-[14.5px] leading-[1.55] text-fg2 m-0">
                 {/* TODO(eric): confirm copy */}
-                First Thursday of the month, same venue, 40 people. No panels, no sponsors. Just dinner.
+                Between events, members keep showing up — making intros, answering questions, helping each other. You&rsquo;re not attending an event. You&rsquo;re joining a community.
               </p>
             </Card>
           </div>
@@ -126,11 +126,11 @@ export default async function HomePage() {
           <div className="bg-bg-elevated rounded-xl p-7 md:px-8 text-center shadow-glow border border-transparent">
             <p className="font-display italic font-normal text-[32px] leading-[1.3] text-fg1 max-w-[780px] mx-auto mb-6" style={{ textWrap: "balance" }}>
               {/* TODO(eric): confirm copy — real quote from a member */}
-              &ldquo;The whole point of the dinner is that someone in the room has already solved your weird problem. Your job is to find them.&rdquo;
+              &ldquo;We start companies because we can&rsquo;t help ourselves. The smart founders find a room full of people who are just as crazy and want to help.&rdquo;
             </p>
             <p className="text-[13px] text-fg3 tracking-[0.1em] uppercase">
               {/* TODO(eric): confirm copy */}
-              &mdash; Eric Marcoullier, Founder
+              &mdash; Eric Marcoullier, Founding Director
             </p>
           </div>
         </div>
