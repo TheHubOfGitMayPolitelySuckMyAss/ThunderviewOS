@@ -1,31 +1,29 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatName } from "@/lib/format";
-import MondayAfterEditor from "./template-editor";
+import MacroEditor from "./macro-editor";
 
-export default async function MondayAfterTemplatePage() {
+export default async function MondayAfterMacroPage() {
   const admin = createAdminClient();
 
-  const { data: template } = await admin
-    .from("email_templates")
+  const { data: macro } = await admin
+    .from("monday_after_macro")
     .select("*")
-    .eq("slug", "monday-after")
+    .limit(1)
     .single();
 
-  if (!template) {
-    return <p className="text-ember-600">Template not found in database.</p>;
+  if (!macro) {
+    return <p className="text-ember-600">Macro template not found in database.</p>;
   }
 
   let updatedByName: string | null = null;
-  if (template.updated_by) {
+  if (macro.updated_by) {
     const { data: updater } = await admin
       .from("members")
       .select("first_name, last_name")
-      .eq("id", template.updated_by)
+      .eq("id", macro.updated_by)
       .single();
-    if (updater) {
-      updatedByName = formatName(updater.first_name, updater.last_name);
-    }
+    if (updater) updatedByName = formatName(updater.first_name, updater.last_name);
   }
 
   return (
@@ -37,18 +35,24 @@ export default async function MondayAfterTemplatePage() {
         &larr; Emails
       </Link>
 
-      <h2 className="tv-h2 !text-[36px] mb-6">
+      <h2 className="tv-h2 !text-[36px] mb-2">
         Monday After Template
       </h2>
       <p className="text-sm text-fg3 mb-6">
-        This is the default template for Monday After emails. Changes here will be used as the starting point when creating new email instances.
+        Default content for new Monday After email drafts. Changes here will seed future drafts — they won&rsquo;t affect existing ones.
       </p>
 
-      <MondayAfterEditor
-        slug="monday-after"
-        initialSubject={template.subject}
-        initialBody={template.body}
-        lastUpdatedAt={template.updated_by ? template.updated_at : null}
+      <MacroEditor
+        initialSubject={macro.subject}
+        initialPreheader={macro.preheader}
+        initialHeadline={macro.headline}
+        initialOpeningText={macro.opening_text}
+        initialRecapText={macro.recap_text}
+        initialTeamShoutouts={macro.team_shoutouts}
+        initialOurMission={macro.our_mission}
+        initialIntrosAsksHeader={macro.intros_asks_header}
+        initialPartnershipBoilerplate={macro.partnership_boilerplate}
+        lastUpdatedAt={macro.updated_by ? macro.updated_at : null}
         lastUpdatedByName={updatedByName}
       />
     </div>

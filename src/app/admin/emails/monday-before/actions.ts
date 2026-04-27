@@ -6,8 +6,8 @@ import { EMAIL_FROM } from "@/lib/email";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import { renderMondayBeforeEmail } from "@/lib/email-templates/monday-before";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe";
+import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
 import { Resend } from "resend";
-import sharp from "sharp";
 import crypto from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -133,11 +133,6 @@ export async function saveDraft(
 // Image pipeline
 // ============================================================
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
-const QUALITY_STEPS = [85, 75, 65, 55, 45, 40];
-const MAX_SIZE = 500 * 1024; // 500KB
-const TARGET_WIDTH = 800;
-
 export async function uploadEmailImage(
   emailId: string,
   groupNumber: number,
@@ -149,40 +144,18 @@ export async function uploadEmailImage(
   const file = formData.get("file") as File | null;
   if (!file) return { success: false, error: "No file provided" };
 
-  if (!ACCEPTED_TYPES.includes(file.type) && !file.name.toLowerCase().endsWith(".heic")) {
-    return { success: false, error: "Only JPEG, PNG, WebP, and HEIC images are accepted" };
-  }
+  const typeError = validateImageType(file);
+  if (typeError) return { success: false, error: typeError };
 
   const originalBytes = await file.arrayBuffer();
-  const originalSize = originalBytes.byteLength;
+  const result = await compressEmailImage(originalBytes);
+  if ("error" in result) return { success: false, error: result.error };
 
-  // Resize to 800px wide, free aspect ratio
-  let pipeline = sharp(Buffer.from(originalBytes))
-    .rotate() // auto-orient from EXIF
-    .resize({ width: TARGET_WIDTH, withoutEnlargement: true });
-
-  // Iterative compression
-  let outputBuffer: Buffer | null = null;
-  for (const quality of QUALITY_STEPS) {
-    const buf = await pipeline.clone().jpeg({ quality, mozjpeg: true }).toBuffer();
-    if (buf.byteLength <= MAX_SIZE) {
-      outputBuffer = buf;
-      break;
-    }
-    // Last attempt
-    if (quality === QUALITY_STEPS[QUALITY_STEPS.length - 1] && buf.byteLength > MAX_SIZE) {
-      return {
-        success: false,
-        error: `Image too large even at minimum quality. Original: ${(originalSize / 1024).toFixed(0)}KB, compressed: ${(buf.byteLength / 1024).toFixed(0)}KB. Please use a smaller image (target: under 500KB after compression).`,
-      };
-    }
-  }
-
-  if (!outputBuffer) return { success: false, error: "Compression failed" };
+  const outputBuffer = result.buffer;
 
   // Upload to Supabase Storage
   const uuid = crypto.randomUUID();
-  const storagePath = `${emailId}/${groupNumber}/${uuid}.jpg`;
+  const storagePath = `monday-before/${emailId}/${groupNumber}/${uuid}.jpg`;
   const admin = createAdminClient();
 
   const { error: uploadError } = await admin.storage

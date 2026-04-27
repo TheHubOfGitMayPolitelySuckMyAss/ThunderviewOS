@@ -4,8 +4,8 @@ import { Pill } from "@/components/ui/pill";
 import PageHeader from "@/components/page-header";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateFriendly, getTodayMT } from "@/lib/format";
-import CreateInstanceButton from "./create-instance-button";
 import CreateMondayBeforeButton from "./create-monday-before-button";
+import CreateMondayAfterButton from "./create-monday-after-button";
 
 const transactionalEmails = [
   {
@@ -70,16 +70,15 @@ export default async function EmailsPage() {
     mondayBeforeEmail = data;
   }
 
-  // Monday After: still uses generic email_instances (for now)
-  let mondayAfterInstance: { id: string; status: string } | null = null;
+  // Monday After: check monday_after_emails for the last dinner
+  let mondayAfterEmail: { id: string; status: string } | null = null;
   if (lastDinner) {
     const { data } = await admin
-      .from("email_instances")
+      .from("monday_after_emails")
       .select("id, status")
-      .eq("template_slug", "monday-after")
       .eq("dinner_id", lastDinner.id)
       .single();
-    mondayAfterInstance = data;
+    mondayAfterEmail = data;
   }
 
   const nextDinnerLabel = nextDinner ? formatDateFriendly(nextDinner.date) : null;
@@ -153,7 +152,7 @@ export default async function EmailsPage() {
             </div>
           </div>
 
-          {/* Monday After (still uses generic email_instances) */}
+          {/* Monday After */}
           <div>
             <Link
               href="/admin/emails/monday-after"
@@ -167,15 +166,14 @@ export default async function EmailsPage() {
             <div className="mt-2">
               {!lastDinner ? (
                 <span className="text-xs text-fg3 italic">No past dinner</span>
-              ) : !mondayAfterInstance ? (
-                <CreateInstanceButton
-                  templateSlug="monday-after"
+              ) : !mondayAfterEmail ? (
+                <CreateMondayAfterButton
                   dinnerId={lastDinner.id}
                   dinnerLabel={lastDinnerLabel!}
                 />
-              ) : mondayAfterInstance.status === "sent" ? (
+              ) : mondayAfterEmail.status === "sent" ? (
                 <Link
-                  href={`/admin/emails/instances/${mondayAfterInstance.id}`}
+                  href={`/admin/emails/monday-after/${mondayAfterEmail.id}`}
                   className="inline-flex items-center gap-2 text-sm text-fg3 no-underline hover:underline"
                 >
                   <Pill variant="success">Sent</Pill>
@@ -183,11 +181,11 @@ export default async function EmailsPage() {
                 </Link>
               ) : (
                 <Link
-                  href={`/admin/emails/instances/${mondayAfterInstance.id}`}
+                  href={`/admin/emails/monday-after/${mondayAfterEmail.id}`}
                   className="inline-flex items-center gap-2 text-sm text-accent-hover no-underline hover:underline"
                 >
                   <Pill variant="warn">Draft</Pill>
-                  Edit &mdash; {lastDinnerLabel}
+                  Continue draft &mdash; {lastDinnerLabel}
                 </Link>
               )}
             </div>

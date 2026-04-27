@@ -15,7 +15,7 @@ import {
   deleteEmailImage,
   reorderEmailImages,
 } from "../actions";
-import ImageGroup from "./image-group";
+import ImageGroup from "@/components/email-image-group";
 
 const RichTextEditor = dynamic(() => import("@/components/ui/rich-text-editor"), { ssr: false });
 
