@@ -34,6 +34,13 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Simple redirects
+  if (request.nextUrl.pathname === "/tickets") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/portal/tickets";
+    return NextResponse.redirect(url);
+  }
+
   // Protect /admin routes
   if (request.nextUrl.pathname.startsWith("/admin")) {
     if (!user) {
