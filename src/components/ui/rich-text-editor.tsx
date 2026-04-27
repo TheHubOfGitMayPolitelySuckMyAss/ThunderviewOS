@@ -4,7 +4,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
-import { Bold, Italic, Underline as UnderlineIcon, Link as LinkIcon } from "lucide-react";
+import { Bold, Italic, Underline as UnderlineIcon, Link as LinkIcon, List, ListOrdered } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
 interface RichTextEditorProps {
@@ -55,15 +55,12 @@ export default function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Disable features we don't need — keep only bold, italic, paragraph, hardBreak
+        // Disable features we don't need
         heading: false,
         blockquote: false,
-        bulletList: false,
-        orderedList: false,
         codeBlock: false,
         code: false,
         horizontalRule: false,
-        listItem: false,
       }),
       Underline,
       Link.configure({
@@ -158,13 +155,28 @@ export default function RichTextEditor({
           >
             <LinkIcon size={16} />
           </ToolbarButton>
+          <div className="w-px h-5 bg-border mx-1" />
+          <ToolbarButton
+            active={editor.isActive("bulletList")}
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            title="Bullet list"
+          >
+            <List size={16} />
+          </ToolbarButton>
+          <ToolbarButton
+            active={editor.isActive("orderedList")}
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            title="Numbered list"
+          >
+            <ListOrdered size={16} />
+          </ToolbarButton>
         </div>
       )}
 
       {/* Editor content */}
       <EditorContent
         editor={editor}
-        className="prose-sm px-3 py-2 text-fg1 [&_.tiptap]:outline-none [&_.tiptap]:min-h-[var(--min-h)] [&_.tiptap_p]:my-1.5 [&_.tiptap_a]:text-accent-hover [&_.tiptap_a]:underline"
+        className="prose-sm px-3 py-2 text-fg1 [&_.tiptap]:outline-none [&_.tiptap]:min-h-[var(--min-h)] [&_.tiptap_p]:my-1.5 [&_.tiptap_a]:text-accent-hover [&_.tiptap_a]:underline [&_.tiptap_ul]:list-disc [&_.tiptap_ul]:pl-5 [&_.tiptap_ul]:my-1.5 [&_.tiptap_ol]:list-decimal [&_.tiptap_ol]:pl-5 [&_.tiptap_ol]:my-1.5 [&_.tiptap_li]:my-0.5"
         style={{ "--min-h": `${minHeight}px` } as React.CSSProperties}
       />
     </div>
