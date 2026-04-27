@@ -11,6 +11,7 @@ import sharp from "sharp";
 import crypto from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
 
 // ============================================================
 // Auth helper
@@ -360,7 +361,7 @@ export async function sendTestEmail(
       displayOrder: img.display_order,
     })),
     recipientFirstName: member.first_name,
-    unsubscribeUrl: "#test-unsubscribe",
+    unsubscribeUrl: `${SITE_URL}/api/unsubscribe?token=${encodeURIComponent(generateUnsubscribeToken(member.id))}`,
   });
 
   const { error } = await resend.emails.send({
@@ -387,7 +388,6 @@ export async function sendTestEmail(
 // ============================================================
 
 const BATCH_SIZE = 100;
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
 
 export async function sendToAll(
   emailId: string
