@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getTodayMT, formatDinnerDisplay } from "@/lib/format";
 import PublicNav from "@/components/public-nav";
 import { Button } from "@/components/ui/button";
 import { Eyebrow, H1, H2, H3, Body, Small } from "@/components/ui/typography";
@@ -21,6 +23,19 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   const isAuthenticated = !!user;
+
+  const admin = createAdminClient();
+  const { data: nextDinner } = await admin
+    .from("dinners")
+    .select("date")
+    .gte("date", getTodayMT())
+    .order("date", { ascending: true })
+    .limit(1)
+    .single();
+
+  const nextDinnerLabel = nextDinner
+    ? `Next Dinner: ${formatDinnerDisplay(nextDinner.date)}`
+    : "Next Dinner: First Thursday of the month.";
 
   return (
     <div className="tv-surface min-h-screen">
@@ -120,22 +135,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ---- Quote ---- */}
-      <section className="border-t border-border-subtle">
-        <div className="max-w-[1120px] mx-auto tv-page-gutter py-section">
-          <div className="bg-bg-elevated rounded-xl p-7 md:px-8 text-center shadow-glow border border-transparent">
-            <p className="font-display italic font-normal text-[32px] leading-[1.3] text-fg1 max-w-[780px] mx-auto mb-6" style={{ textWrap: "balance" }}>
-              {/* TODO(eric): confirm copy — real quote from a member */}
-              &ldquo;We start companies because we can&rsquo;t help ourselves. The smart founders find a room full of people who are just as crazy and want to help.&rdquo;
-            </p>
-            <p className="text-[13px] text-fg3 tracking-[0.1em] uppercase">
-              {/* TODO(eric): confirm copy */}
-              &mdash; Eric Marcoullier, Founding Director
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* ---- Photo gallery ---- */}
       <section className="border-t border-border-subtle">
         <div className="max-w-[1120px] mx-auto tv-page-gutter py-section">
@@ -163,11 +162,24 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ---- Quote ---- */}
+      <section className="border-t border-border-subtle">
+        <div className="max-w-[1120px] mx-auto tv-page-gutter py-section">
+          <div className="bg-bg-elevated rounded-xl p-7 md:px-8 text-center shadow-glow border border-transparent">
+            <p className="font-display italic font-normal text-[32px] leading-[1.3] text-fg1 max-w-[780px] mx-auto mb-6" style={{ textWrap: "balance" }}>
+              &ldquo;We start companies because we can&rsquo;t help ourselves. The smart founders find a room full of people who are just as crazy and want to help.&rdquo;
+            </p>
+            <p className="text-[13px] text-fg3 tracking-[0.1em] uppercase">
+              &mdash; Eric Marcoullier, Founding Director
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ---- Bottom CTA ---- */}
       <section className="border-t border-border-subtle">
         <div className="max-w-[1120px] mx-auto tv-page-gutter py-section text-center">
-          {/* TODO(eric): confirm copy — pull next dinner date from DB? */}
-          <H2 className="mx-auto mb-7">Next dinner: first Thursday of the month.</H2>
+          <H2 className="mx-auto mb-7">{nextDinnerLabel}</H2>
           {isAuthenticated ? (
             <Button size="lg" asChild>
               <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
