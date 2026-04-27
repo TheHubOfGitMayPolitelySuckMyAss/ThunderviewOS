@@ -87,7 +87,7 @@ src/
 ├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect with ?redirect= param preservation (Next.js 16 "proxy", replaces middleware.ts)
 ├── components/
 │   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links (Tickets, Community, Monthly Recap, Admin for team), avatar dropdown (hover + click). Links absolutely centered on viewport
-│   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team/Gallery), Apply + Sign In (or Portal when authenticated). Server component with auth check
+│   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team), Apply + Sign In (or Portal when authenticated). Gallery link removed for launch. Server component with auth check
 │   ├── member-avatar.tsx              # Reusable avatar: shows profile pic if set, clay-500 initials circle if not. Props: member (first_name, last_name, profile_pic_url), size (sm/md/lg)
 │   ├── page-header.tsx                # Shared page header: eyebrow/title/lede/actions with locked rhythm. size="default" (tv-h1, 64px gap) or "compact" (tv-h3, 24px gap). Portal pages don't use this yet — see "Known gap" section
 │   ├── field.tsx                       # Shared form field wrapper: label/required/help/error/children. flex-col with gap-label-input (8px). Error and help mutually exclusive
@@ -111,12 +111,14 @@ src/
 ├── app/
 │   ├── _components/
 │   │   └── this-months-dinner.tsx     # Server component: next upcoming dinner section (title, date/venue, description, speakers, Apply CTA). Returns null if no future dinner. Used on marketing home
-│   ├── page.tsx                        # Marketing home: hero + stats + This Month's Dinner + three-reason grid + quote + gallery + CTA. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
+│   ├── page.tsx                        # Marketing home: hero + stats + This Month's Dinner + three-reason grid + gallery + quote + CTA. Bottom CTA shows real next dinner date from DB. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
 │   ├── layout.tsx                      # Root layout (Inter + Fraunces + JetBrains Mono via next/font/google, Tailwind)
-│   ├── about/page.tsx                  # Placeholder (public-nav + H1)
-│   ├── faq/page.tsx                    # Placeholder (public-nav + H1)
-│   ├── team/page.tsx                   # Placeholder (public-nav + H1)
-│   ├── gallery/page.tsx                # Placeholder (public-nav + H1)
+│   ├── about/page.tsx                  # About page: hero (two-col with photo) + What Thunderview Is (720px prose) + Dinner Format (schedule timeline + venue, bg-elevated) + Upcoming Dinners (date-chip list with Next/Off states from DB) + Our Commitment (clay-bullet list, bg-elevated) + CTA
+│   ├── faq/
+│   │   ├── page.tsx                    # FAQ page: server wrapper with PublicNav
+│   │   └── faq-list.tsx               # Client component: 10 FAQ items in collapsible Card accordions with chevron toggle
+│   ├── team/page.tsx                   # Team page: Eric (Founding Director), Danny (Director), Megan (Director) — stacked Cards with square photos + bios
+│   ├── gallery/page.tsx                # Placeholder (public-nav + H1) — Gallery link removed from public-nav for launch
 │   ├── login/page.tsx                  # Magic link sign-in: server wrapper with PublicNav, reads ?redirect param
 │   ├── login/login-form.tsx            # Client component: email input, send magic link, stores redirect in auth_redirect cookie
 │   ├── apply/
@@ -147,7 +149,7 @@ src/
 │   │   │   └── community-table.tsx     # Client component: searchable, sortable table (Name/Company/Role), rows link to /portal/members/[id]
 │   │   ├── members/
 │   │   │   └── [id]/page.tsx           # Read-only member profile: details + intro/ask. 404 if kicked_out or no community access. Self-view shows Edit Profile button (links to /portal/profile?from=member&id=X)
-│   │   ├── recap/page.tsx              # Last month's recap: fulfilled attendees of most recent past dinner with intro/ask cards
+│   │   ├── recap/page.tsx              # Last month's recap: fulfilled attendees of most recent past dinner in Card components with intro/ask
 │   │   └── tickets/
 │   │       ├── page.tsx                # Ticket selection: dinner dropdown + buy buttons (server component)
 │   │       ├── ticket-purchase.tsx     # Client component: dinner dropdown (hideable via hideSelector prop), guest-aware buy buttons, calls purchaseTicket action
@@ -233,7 +235,7 @@ src/
 │   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
 public/
 ├── brand/
-│   ├── photos/                         # 12 candid dinner photos (webp) — used on marketing home + recap
+│   ├── photos/                         # 12 candid dinner photos (webp) + 3 team headshots (eric.webp, danny.webp, megan.webp) — used on marketing home, about, team, recap
 │   └── logo/
 │       ├── wordmark.svg               # SVG wordmark (needs CSS classes to render text — use text logo in nav instead)
 │       └── monogram.svg               # SVG monogram mark
@@ -478,7 +480,9 @@ Don't build these without an explicit prompt:
 - Add `size="portal"` to PageHeader (tv-h1 + 32px gap) and migrate portal pages to use it
 - ~~Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in~~ Decided — keeping Stripe's built-in receipt
 - Fulfillment email hero photo: per-template image support if wanted
-- Page-by-page detail polish pass (next session)
+- ~~Page-by-page detail polish pass~~ Done — marketing pages (about, faq, team) built, Card component migration, section spacing fix
+- ~~Marketing pages: /about, /faq, /team~~ Done — all three built with real content, dynamic data, design system primitives
+- ~~Gallery link~~ Removed from public-nav for launch (placeholder page still exists)
 
 ## Pre-launch checklist (before real users hit this)
 
