@@ -463,7 +463,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
                 }}
                 className="h-4 w-4 rounded accent-clay-500"
               />
-              Receive marketing emails (Monday Before, Monday After)
+              Receive marketing emails (Dinner Details, Dinner Wrapup)
             </label>
             <p className="text-xs text-fg3 mt-1.5">
               Transactional emails (ticket confirmations, dinner details) are always sent regardless of this setting.
