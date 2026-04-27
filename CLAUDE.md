@@ -361,6 +361,13 @@ These are configured in the Supabase dashboard, not in the codebase:
 - **Email templates:** Customized via Management API. See "Email template requirements" below.
 - **Magic link rate limits:** Default — 1 request per 60 seconds per email.
 
+### Storage buckets
+
+Configured in the Supabase dashboard, not in the codebase:
+
+- **`profile-pics`** — Member profile pictures. Public-read, authenticated-write. RLS: members can only upload at their own `member_id` path. Path structure: `{member_id}.webp` (upsert overwrites). Written by: portal profile editor (session client via RLS), admin member detail (service-role client via `createAdminClient()`). Read by: `<MemberAvatar>` component via public URL stored in `members.profile_pic_url` (includes `?v={timestamp}` cache-bust).
+- **`email-images`** — Marketing email images (Monday Before, Monday After). Public-read. Path structure: `monday-before/{email_id}/{group}/{uuid}.jpg` and `monday-after/{email_id}/{group}/{uuid}.jpg`. Written by: admin email draft editors (service-role client). Read by: email HTML rendering via public URL stored in `monday_before_email_images.public_url` / `monday_after_email_images.public_url`.
+
 ### Email template requirements
 
 Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` as the link target — NOT the default `{{ .ConfirmationURL }}`. The default generates a URL that verifies at Supabase's endpoint and redirects to the bare site root, which never establishes a session. The PKCE flow (used by `@supabase/ssr`) requires the token_hash format hitting our `/auth/confirm` route.
@@ -570,6 +577,9 @@ Don't build these without an explicit prompt:
 - [x] Confirm injected unsubscribe footer is gone (custom SMTP eliminates it)
 - [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
 - [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production env vars (currently sends marketing emails to admin+team only)
+- [ ] Build Resend webhook endpoint at `/api/webhooks/resend/route.ts` — receives bounce events, flips `member_emails.email_status` to `'bounced'` for the matching email address
+- [ ] Register webhook in Resend dashboard (manual — point at `https://thunderview-os.vercel.app/api/webhooks/resend`)
+- [ ] Implement Resend webhook signature verification using the signing secret. **Order of operations matters:** register webhook first → copy signing secret from Resend dashboard → add as `RESEND_WEBHOOK_SECRET` in Vercel Production scope → deploy. Out of order means the endpoint either rejects everything or accepts spoofed payloads
 
 ## Known issues / gotchas
 
