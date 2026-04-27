@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { saveProfile, portalUpdateProfilePic } from "./actions";
+import { saveProfile, portalUpdateProfilePic, toggleMarketing } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +50,7 @@ type ProfileFormProps = {
     contactPreference: string | null;
     primaryEmail: string;
     profilePicUrl: string | null;
+    marketingOptedIn: boolean;
   };
 };
 
@@ -74,6 +75,8 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     member.contactPreference ?? "linkedin"
   );
   const [primaryEmail, setPrimaryEmail] = useState(member.primaryEmail);
+  const [marketingOptedIn, setMarketingOptedIn] = useState(member.marketingOptedIn);
+  const [togglingMarketing, setTogglingMarketing] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState(member.profilePicUrl);
   const [picPreview, setPicPreview] = useState<string | null>(null);
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
@@ -434,6 +437,37 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
               ))}
             </Select>
           </Field>
+          </FormSection>
+
+          <FormSection eyebrow="Email preferences" divider>
+            <label className="inline-flex items-center gap-2.5 cursor-pointer text-[14px] text-fg2">
+              <input
+                type="checkbox"
+                checked={marketingOptedIn}
+                disabled={togglingMarketing}
+                onChange={async (e) => {
+                  const newVal = e.target.checked;
+                  setTogglingMarketing(true);
+                  setMarketingOptedIn(newVal);
+                  const result = await toggleMarketing(newVal);
+                  setTogglingMarketing(false);
+                  if (!result.success) {
+                    setMarketingOptedIn(!newVal);
+                    showToast(result.error || "Failed to update", "error");
+                  } else {
+                    showToast(
+                      newVal ? "Subscribed to marketing emails" : "Unsubscribed from marketing emails",
+                      "success"
+                    );
+                  }
+                }}
+                className="h-4 w-4 rounded accent-clay-500"
+              />
+              Receive marketing emails (Monday Before, Monday After)
+            </label>
+            <p className="text-xs text-fg3 mt-1.5">
+              Transactional emails (ticket confirmations, dinner details) are always sent regardless of this setting.
+            </p>
           </FormSection>
 
           <div className="mt-6">

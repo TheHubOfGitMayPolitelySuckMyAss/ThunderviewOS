@@ -280,3 +280,34 @@ export async function saveProfile(formData: FormData) {
 
   return { success: true, noChanges: false };
 }
+
+export async function toggleMarketing(
+  value: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const admin = createAdminClient();
+
+  const { data: memberEmail } = await admin
+    .from("member_emails")
+    .select("members!inner(id)")
+    .eq("email", user.email!)
+    .limit(1)
+    .single();
+
+  const member = memberEmail?.members as unknown as { id: string } | null;
+  if (!member) return { success: false, error: "Member not found" };
+
+  const { error } = await admin
+    .from("members")
+    .update({ marketing_opted_in: value })
+    .eq("id", member.id);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
