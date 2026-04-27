@@ -77,9 +77,8 @@ function SortableImage({
       <img
         src={image.publicUrl}
         alt=""
-        className="h-16 w-24 object-cover rounded flex-shrink-0"
+        className="flex-1 min-w-0 rounded object-cover"
       />
-      <div className="flex-1 min-w-0" />
       {!disabled && (
         <button
           type="button"
@@ -107,6 +106,12 @@ export default function ImageGroup({
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
+  // Use local order for display if set (optimistic reorder), otherwise prop order
+  const displayImages = localOrder
+    ? localOrder.map((id) => images.find((i) => i.id === id)).filter(Boolean) as ImageData[]
+    : images;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -152,19 +157,21 @@ export default function ImageGroup({
     reordered.splice(oldIndex, 1);
     reordered.splice(newIndex, 0, active.id as string);
 
+    // Optimistically update local order before server call
+    setLocalOrder(reordered);
     onReorder(reordered);
   }
 
   return (
     <div className="mb-2">
-      {images.length === 0 && !disabled && (
+      {displayImages.length === 0 && !disabled && (
         <p className="text-sm text-fg3 italic mb-2">No images yet</p>
       )}
 
-      {images.length > 0 && (
+      {displayImages.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={images.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-            {images.map((image) => (
+          <SortableContext items={displayImages.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+            {displayImages.map((image) => (
               <SortableImage
                 key={image.id}
                 image={image}

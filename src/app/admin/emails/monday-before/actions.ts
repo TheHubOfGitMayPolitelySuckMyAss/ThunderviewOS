@@ -92,7 +92,6 @@ export async function createDraft(dinnerId: string): Promise<{ success: boolean;
       headline: macro.headline,
       custom_text: macro.custom_text,
       partnership_boilerplate: macro.partnership_boilerplate,
-      signoff_member_id: member.id,
     })
     .select("id")
     .single();
@@ -113,7 +112,6 @@ export async function saveDraft(
     headline: string;
     custom_text: string;
     partnership_boilerplate: string;
-    signoff_member_id: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   const member = await getAuthMember();
@@ -330,7 +328,7 @@ export async function sendTestEmail(
 
   const admin = createAdminClient();
 
-  // Load email + dinner + images + signoff member
+  // Load email + dinner + images
   const { data: email } = await admin
     .from("monday_before_emails")
     .select("*, dinners!inner(date, venue, address)")
@@ -349,24 +347,12 @@ export async function sendTestEmail(
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  // Get signoff name
-  let signoffName = member.first_name;
-  if (email.signoff_member_id) {
-    const { data: signoff } = await admin
-      .from("members")
-      .select("first_name")
-      .eq("id", email.signoff_member_id)
-      .single();
-    if (signoff) signoffName = signoff.first_name;
-  }
-
   const html = renderMondayBeforeEmail({
     subject: email.subject,
     preheader: email.preheader,
     headline: email.headline,
     customText: email.custom_text,
     partnershipBoilerplate: email.partnership_boilerplate,
-    signoffName,
     dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
     images: (images ?? []).map((img: { group_number: number; public_url: string; display_order: number }) => ({
       groupNumber: img.group_number,
@@ -432,17 +418,6 @@ export async function sendToAll(
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  // Get signoff name
-  let signoffName = member.first_name;
-  if (email.signoff_member_id) {
-    const { data: signoff } = await admin
-      .from("members")
-      .select("first_name")
-      .eq("id", email.signoff_member_id)
-      .single();
-    if (signoff) signoffName = signoff.first_name;
-  }
-
   // Query recipients (paginated)
   type RecipientRow = {
     id: string;
@@ -497,7 +472,6 @@ export async function sendToAll(
       headline: email.headline,
       customText: email.custom_text,
       partnershipBoilerplate: email.partnership_boilerplate,
-      signoffName,
       dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
       images: imageData,
       recipientFirstName: r.first_name,

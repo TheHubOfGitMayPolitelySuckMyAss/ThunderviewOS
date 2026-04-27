@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import DraftEditor from "./draft-editor";
-import { getTeamMembers, getRecipientCount } from "../actions";
+import { getRecipientCount } from "../actions";
 
 export default async function MondayBeforeDraftPage({
   params,
@@ -31,8 +31,6 @@ export default async function MondayBeforeDraftPage({
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  // Get team members for sign-off dropdown
-  const teamMembers = await getTeamMembers();
   const recipientCount = await getRecipientCount();
 
   // Get sender name if sent
@@ -69,7 +67,6 @@ export default async function MondayBeforeDraftPage({
         initialHeadline={email.headline}
         initialCustomText={email.custom_text}
         initialPartnershipBoilerplate={email.partnership_boilerplate}
-        initialSignoffMemberId={email.signoff_member_id}
         testSentAfterLastEdit={email.test_sent_after_last_edit}
         dinner={{ date: dinner.date, venue: dinner.venue, address: dinner.address }}
         initialImages={(images ?? []).map((img: { id: string; group_number: number; display_order: number; public_url: string }) => ({
@@ -78,7 +75,6 @@ export default async function MondayBeforeDraftPage({
           displayOrder: img.display_order,
           publicUrl: img.public_url,
         }))}
-        teamMembers={teamMembers}
         recipientCount={recipientCount}
         sentAt={email.sent_at}
         sentByName={sentByName}

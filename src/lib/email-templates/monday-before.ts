@@ -13,7 +13,6 @@ interface MondayBeforeEmailProps {
   headline: string;
   customText: string;
   partnershipBoilerplate: string;
-  signoffName: string;
   dinner: { date: string; venue: string; address: string };
   images: { groupNumber: number; publicUrl: string; displayOrder: number }[];
   recipientFirstName: string;
@@ -64,7 +63,6 @@ export function renderMondayBeforeEmail(props: MondayBeforeEmailProps): string {
     headline,
     customText,
     partnershipBoilerplate,
-    signoffName,
     dinner,
     images,
     recipientFirstName,
@@ -139,11 +137,6 @@ ${group5Images}
 ${partnershipRendered ? `<tr><td style="padding:24px 36px 0;font-size:14px;line-height:1.6;color:#75695B;">
 ${partnershipRendered}
 </td></tr>` : ""}
-
-<!-- Sign-off -->
-<tr><td style="padding:24px 36px 0;font-size:15px;color:#2B241C;">
-<div style="font-family:Fraunces,Georgia,'Times New Roman',serif;font-style:italic;font-size:18px;color:#4A3F34;">${signoffName}!</div>
-</td></tr>
 
 <!-- Footer: CAN-SPAM -->
 <tr><td style="padding:28px 36px 22px;border-top:1px solid #EDE3D1;background-color:#F5EEE1;font-size:11px;color:#A09688;line-height:1.55;text-align:center;margin-top:24px;">

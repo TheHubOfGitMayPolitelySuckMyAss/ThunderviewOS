@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { formatTimestamp } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import Field from "@/components/field";
 import { Eyebrow } from "@/components/ui/typography";
 import {
@@ -35,11 +34,9 @@ interface DraftEditorProps {
   initialHeadline: string;
   initialCustomText: string;
   initialPartnershipBoilerplate: string;
-  initialSignoffMemberId: string | null;
   testSentAfterLastEdit: boolean;
   dinner: { date: string; venue: string; address: string };
   initialImages: ImageData[];
-  teamMembers: { id: string; name: string }[];
   recipientCount: number;
   sentAt: string | null;
   sentByName: string | null;
@@ -64,11 +61,9 @@ export default function DraftEditor({
   initialHeadline,
   initialCustomText,
   initialPartnershipBoilerplate,
-  initialSignoffMemberId,
   testSentAfterLastEdit: initialTestSent,
   dinner,
   initialImages,
-  teamMembers,
   recipientCount,
   sentAt,
   sentByName,
@@ -80,7 +75,6 @@ export default function DraftEditor({
   const [headline, setHeadline] = useState(initialHeadline);
   const [customText, setCustomText] = useState(initialCustomText);
   const [partnershipBoilerplate, setPartnershipBoilerplate] = useState(initialPartnershipBoilerplate);
-  const [signoffMemberId, setSignoffMemberId] = useState(initialSignoffMemberId || teamMembers[0]?.id || "");
   const [testSentAfterLastEdit, setTestSentAfterLastEdit] = useState(initialTestSent);
   const [hasEdited, setHasEdited] = useState(false);
   const [images, setImages] = useState<ImageData[]>(initialImages);
@@ -171,7 +165,6 @@ export default function DraftEditor({
         headline,
         custom_text: customText,
         partnership_boilerplate: partnershipBoilerplate,
-        signoff_member_id: signoffMemberId,
       });
       if (result.success) {
         setHasEdited(false);
@@ -193,7 +186,6 @@ export default function DraftEditor({
         headline,
         custom_text: customText,
         partnership_boilerplate: partnershipBoilerplate,
-        signoff_member_id: signoffMemberId,
       });
       const result = await sendTestEmail(emailId);
       if (result.success) {
@@ -251,15 +243,6 @@ export default function DraftEditor({
         <Input type="text" value={preheader} onChange={(e) => { setPreheader(e.target.value); markEdited(); }} disabled={isSent} />
       </Field>
 
-      {/* Sign-off */}
-      <Field label="Sign-off" className="mb-6">
-        <Select value={signoffMemberId} onChange={(e) => { setSignoffMemberId(e.target.value); markEdited(); }} disabled={isSent}>
-          {teamMembers.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
-        </Select>
-      </Field>
-
       {/* Divider */}
       <div className="border-t border-border-subtle my-6" />
 
@@ -291,7 +274,6 @@ export default function DraftEditor({
 
       {/* Static preview: CTA + dinner details */}
       <div className="rounded-lg border border-border bg-bg-elevated p-4 mb-6">
-        <Eyebrow className="mb-2 text-fg3">Preview — auto-generated from dinner</Eyebrow>
         <div className="text-center">
           <span className="inline-block bg-accent text-cream-50 font-semibold text-sm px-5 py-2.5 rounded-lg">
             Buy A Ticket
@@ -323,7 +305,6 @@ export default function DraftEditor({
 
       {/* Static preview: CAN-SPAM */}
       <div className="rounded-lg border border-border bg-bg-elevated p-4 mb-6">
-        <Eyebrow className="mb-2 text-fg3">Preview — CAN-SPAM footer</Eyebrow>
         <p className="text-xs text-fg3 text-center leading-relaxed">
           Thunderview CEO Dinners / 2462 S Acoma St / Denver, CO 80223 / USA<br />
           <span className="underline">Unsubscribe from marketing emails</span>
