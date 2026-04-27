@@ -75,6 +75,21 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 - `monday_after_emails` — per-dinner Monday After email drafts. Same structure as `monday_before_emails` with additional fields: `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`. Target dinner = most recent past dinner. Same sent-lock trigger pattern.
 - `monday_after_email_images` — image attachments for Monday After emails. Same as `monday_before_email_images` but `group_number` CHECK IN (1, 2, 3, 4, 5) — five image groups. Stored at `monday-after/{email_id}/{group}/{uuid}.jpg`.
 
+## Audit logging
+
+Row-level audit logging via `audit.row_history` table in a separate `audit` schema. Captures before/after JSONB snapshots of every INSERT, UPDATE, DELETE on business-critical tables. Purpose: individual row recovery without restoring the full database from backup.
+
+- **Trigger function:** `audit.log_row_change()` (SECURITY DEFINER, owned by postgres). Captures `TG_OP`, `to_jsonb(OLD)`, `to_jsonb(NEW)`, `auth.uid()` (try/catch for cron contexts), `current_user`. PK resolution is hardcoded: all tables use `id` UUID except `dinner_speakers` (composite `dinner_id` + `member_id`).
+- **Trigger naming:** All audit triggers are named `zzz_audit_row_change` so they fire last among same-timing AFTER triggers (Postgres fires alphabetically). This ensures the audit snapshot captures the final row state after other triggers (e.g. `updated_at`, `marketing_opted_out_at`).
+- **Audited tables (9):** `members`, `applications`, `tickets`, `credits`, `member_emails`, `dinners`, `dinner_speakers`, `email_templates`, `email_instances`.
+- **NOT audited:** `monday_before_*`, `monday_after_*` (lower recovery value, already have sent-lock triggers). `auth.*`, `storage.*` (Supabase-managed).
+- **RLS:** Enabled on `audit.row_history`. SELECT policy for admin/team only via `is_admin_or_team()`. No INSERT/UPDATE/DELETE policies — only the SECURITY DEFINER trigger writes.
+- **Indexes:** Composite on `(table_schema, table_name, changed_at DESC)`, expression on `(table_schema, table_name, (row_pk->>'id'))`, BRIN on `changed_at`.
+- **Limitations:** TRUNCATE and DROP TABLE bypass row-level triggers — no audit entries are created. These catastrophic scenarios require Supabase PITR backups. All normal DML (INSERT/UPDATE/DELETE), including bulk operations, is fully captured and recoverable.
+- **No retention policy.** Table grows forever — fine at our volume. Add cleanup later if needed.
+- **No admin UI.** Audit history is queried via SQL (Claude Code or Supabase dashboard). Admin browse page is a future sprint.
+- **Migration:** `20260426400000_audit_row_history.sql`.
+
 ## Auth flow
 
 1. User enters email at `/login` (may have `?redirect=/portal/profile` from proxy)
@@ -309,7 +324,9 @@ supabase/
 │   ├── 20260424000001_dinner_details_and_speakers.sql          # Add title/description TEXT NULL to dinners; dinner_speakers join table with RLS
 │   ├── 20260426000000_email_instances.sql                     # Generic email_instances table (superseded by dedicated monday_before/after tables — kept for cleanup)
 │   ├── 20260426100000_monday_before_emails.sql                # monday_before_macro + monday_before_emails + monday_before_email_images + sent-lock triggers + RLS
-│   └── 20260426200000_monday_after_emails.sql                 # monday_after_macro + monday_after_emails + monday_after_email_images + sent-lock triggers + RLS
+│   ├── 20260426200000_monday_after_emails.sql                 # monday_after_macro + monday_after_emails + monday_after_email_images + sent-lock triggers + RLS
+│   ├── 20260426300000_fix_swap_primary_email_rpc.sql          # Fix swap_primary_email RPC: clear old primary before setting new to avoid unique index violation
+│   └── 20260426400000_audit_row_history.sql                   # audit schema + row_history table + log_row_change() trigger on 9 business tables + RLS
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
