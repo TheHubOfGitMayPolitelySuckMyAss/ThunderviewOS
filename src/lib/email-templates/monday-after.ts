@@ -63,6 +63,10 @@ function sectionIfContent(html: string, padding = "24px 36px 0"): string {
   return `<tr><td style="padding:${padding};font-size:15px;line-height:1.6;color:#2B241C;">${inlineLinks(html)}</td></tr>`;
 }
 
+function sectionHeading(title: string): string {
+  return `<tr><td style="padding:28px 36px 0;"><h2 style="font-family:Fraunces,Georgia,'Times New Roman',serif;font-weight:600;font-size:22px;line-height:1.3;color:#2B241C;margin:0;">${title}</h2></td></tr>`;
+}
+
 function imageSectionIfContent(images: MondayAfterEmailProps["images"], groupNumber: number): string {
   const rendered = renderImages(images, groupNumber);
   if (!rendered) return "";
@@ -148,16 +152,19 @@ ${sectionIfContent(recapText)}
 ${imageSectionIfContent(images, 3)}
 
 <!-- Team Shoutouts -->
-${sectionIfContent(teamShoutouts)}
+${teamShoutouts && teamShoutouts !== "<p></p>" ? sectionHeading("Team Shoutouts") : ""}
+${sectionIfContent(teamShoutouts, "8px 36px 0")}
 
 <!-- Our Mission -->
-${sectionIfContent(ourMission)}
+${ourMission && ourMission !== "<p></p>" ? sectionHeading("Our Mission") : ""}
+${sectionIfContent(ourMission, "8px 36px 0")}
 
 <!-- Image group 4 -->
 ${imageSectionIfContent(images, 4)}
 
-<!-- Intros & Asks header -->
-${sectionIfContent(introsAsksHeader)}
+<!-- Intros & Asks -->
+${introsAsksHeader && introsAsksHeader !== "<p></p>" ? sectionHeading("Intros &amp; Asks") : ""}
+${sectionIfContent(introsAsksHeader, "8px 36px 0")}
 
 <!-- Intros & Asks auto-generated list -->
 ${introsAsksHtml ? `<tr><td style="padding:16px 36px 0;">
