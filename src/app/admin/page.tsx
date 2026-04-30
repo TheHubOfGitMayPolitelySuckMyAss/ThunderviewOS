@@ -77,6 +77,15 @@ export default async function DashboardPage() {
     .not("marketing_opted_out_at", "is", null)
     .order("marketing_opted_out_at", { ascending: false });
 
+  // Email issues (bounces + complaints in last 30 days)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: emailEvents } = await supabase
+    .from("email_events")
+    .select("id, event_type, recipient_email, member_id, occurred_at, members(id, first_name, last_name)")
+    .in("event_type", ["bounced", "complained"])
+    .gte("occurred_at", thirtyDaysAgo)
+    .order("occurred_at", { ascending: false });
+
   return (
     <div className="tv-container-admin">
       <PageHeader
@@ -136,6 +145,19 @@ export default async function DashboardPage() {
             name: formatName(m.first_name, m.last_name),
             marketingOptedOutAt: m.marketing_opted_out_at,
           }))
+        }
+        emailIssues={
+          (emailEvents || []).map((e) => {
+            const m = e.members as unknown as { id: string; first_name: string; last_name: string } | null;
+            return {
+              id: e.id,
+              eventType: e.event_type as "bounced" | "complained",
+              recipientEmail: e.recipient_email,
+              memberId: m?.id ?? null,
+              memberName: m ? formatName(m.first_name, m.last_name) : null,
+              occurredAt: e.occurred_at,
+            };
+          })
         }
       />
     </div>

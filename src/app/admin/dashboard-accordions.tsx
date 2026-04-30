@@ -19,6 +19,15 @@ type OptOut = {
   marketingOptedOutAt: string;
 };
 
+type EmailIssue = {
+  id: string;
+  eventType: "bounced" | "complained";
+  recipientEmail: string;
+  memberId: string | null;
+  memberName: string | null;
+  occurredAt: string;
+};
+
 function Accordion({
   title,
   count,
@@ -64,9 +73,11 @@ function Accordion({
 export default function DashboardAccordions({
   pendingApps,
   optOuts,
+  emailIssues,
 }: {
   pendingApps: PendingApp[];
   optOuts: OptOut[];
+  emailIssues: EmailIssue[];
 }) {
   // Find oldest pending app age
   const oldestDays = pendingApps.length > 0
@@ -153,6 +164,57 @@ export default function DashboardAccordions({
                   </td>
                   <td className="px-3.5 py-3 text-[14px] text-fg2">
                     {formatDate(m.marketingOptedOutAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Accordion>
+
+      {/* Email issues */}
+      <Accordion
+        title="Email issues"
+        count={emailIssues.length}
+        pillVariant={emailIssues.length > 0 ? "warn" : "neutral"}
+        pillLabel={`${emailIssues.length}`}
+        defaultOpen={emailIssues.length > 0}
+        meta="last 30 days"
+      >
+        {emailIssues.length === 0 ? (
+          <p className="py-4 text-sm text-fg4">No email issues in the last 30 days.</p>
+        ) : (
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Date</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Member / Email</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {emailIssues.map((e) => (
+                <tr key={e.id} className="group relative border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated">
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {formatDate(e.occurredAt, { month: "short", day: "numeric" })}
+                  </td>
+                  <td className="px-3.5 py-3 text-[14px] text-fg1">
+                    {e.memberId && e.memberName ? (
+                      <Link
+                        href={`/admin/members/${e.memberId}`}
+                        className="no-underline text-fg1 font-medium hover:underline"
+                      >
+                        {e.memberName}
+                      </Link>
+                    ) : null}
+                    <span className={e.memberName ? " text-fg3 text-[13px] ml-1.5" : " font-medium"}>
+                      {e.recipientEmail}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-3">
+                    <Pill variant={e.eventType === "complained" ? "danger" : "warn"} dot>
+                      {e.eventType === "complained" ? "Complained" : "Bounced"}
+                    </Pill>
                   </td>
                 </tr>
               ))}

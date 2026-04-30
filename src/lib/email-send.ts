@@ -278,3 +278,67 @@ export async function sendMorningOfEmail(
     console.error("[email] Failed to send morning-of email to", memberEmail, err);
   }
 }
+
+/**
+ * Notify admin of a spam complaint from Resend webhook.
+ */
+export async function sendComplaintNotification(opts: {
+  recipientEmail: string;
+  memberName: string | null;
+  resendEmailId: string;
+  occurredAt: string;
+  subject: string | null;
+}): Promise<void> {
+  try {
+    const bodyText = [
+      `A spam complaint was received for ${opts.recipientEmail}${opts.memberName ? ` (${opts.memberName})` : ""}.`,
+      ``,
+      `The member has been automatically opted out of marketing emails.`,
+      ``,
+      `Resend email ID: ${opts.resendEmailId}`,
+      `Subject: ${opts.subject ?? "(unknown)"}`,
+      `Occurred: ${opts.occurredAt}`,
+    ].join("\n");
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ["eric@marcoullier.com"],
+      subject: `Spam complaint: ${opts.recipientEmail}`,
+      html: bodyToHtml(bodyText),
+    });
+  } catch (err) {
+    console.error("[email] Failed to send complaint notification:", err);
+  }
+}
+
+/**
+ * Notify admin of an email send failure from Resend webhook.
+ */
+export async function sendSendFailureNotification(opts: {
+  recipientEmail: string;
+  memberName: string | null;
+  resendEmailId: string;
+  occurredAt: string;
+  subject: string | null;
+  errorReason: string | null;
+}): Promise<void> {
+  try {
+    const bodyText = [
+      `An email send failure was reported for ${opts.recipientEmail}${opts.memberName ? ` (${opts.memberName})` : ""}.`,
+      ``,
+      `Resend email ID: ${opts.resendEmailId}`,
+      `Subject: ${opts.subject ?? "(unknown)"}`,
+      `Occurred: ${opts.occurredAt}`,
+      opts.errorReason ? `Error: ${opts.errorReason}` : null,
+    ].filter(Boolean).join("\n");
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ["eric@marcoullier.com"],
+      subject: `Email send failure: ${opts.recipientEmail}`,
+      html: bodyToHtml(bodyText),
+    });
+  } catch (err) {
+    console.error("[email] Failed to send failure notification:", err);
+  }
+}
