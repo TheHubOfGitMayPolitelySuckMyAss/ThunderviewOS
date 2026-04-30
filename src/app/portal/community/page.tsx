@@ -83,6 +83,19 @@ export default async function CommunityPage() {
       ? eligibleMembers[Math.floor(Math.random() * eligibleMembers.length)]
       : null;
 
+  // Fetch featured member's primary email for contact section
+  let featuredEmail: string | null = null;
+  if (featured) {
+    const { data: fEmail } = await admin
+      .from("member_emails")
+      .select("email")
+      .eq("member_id", featured.id)
+      .eq("is_primary", true)
+      .limit(1)
+      .single();
+    featuredEmail = fEmail?.email ?? null;
+  }
+
   // Full member list for the table
   const members = await fetchAll((from, to) =>
     admin
@@ -166,7 +179,14 @@ export default async function CommunityPage() {
 
             <Eyebrow>Contact</Eyebrow>
             <p className="text-[14.5px] mt-1">
-              {featured.linkedin_profile && (
+              {featured.contact_preference === "email" && featuredEmail ? (
+                <a
+                  href={`mailto:${featuredEmail}`}
+                  className="text-accent-hover underline decoration-border"
+                >
+                  {featuredEmail}
+                </a>
+              ) : featured.linkedin_profile ? (
                 <a
                   href={
                     featured.linkedin_profile.startsWith("http")
@@ -179,24 +199,7 @@ export default async function CommunityPage() {
                 >
                   LinkedIn
                 </a>
-              )}
-              {featured.linkedin_profile && featured.company_website && (
-                <span className="text-fg4 mx-1.5">&middot;</span>
-              )}
-              {featured.company_website && (
-                <a
-                  href={
-                    featured.company_website.startsWith("http")
-                      ? featured.company_website
-                      : `https://${featured.company_website}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-accent-hover underline decoration-border"
-                >
-                  {featured.company_website.replace(/^https?:\/\//, "")}
-                </a>
-              )}
+              ) : null}
             </p>
           </Card>
         </div>
