@@ -34,14 +34,6 @@ export default function FeedbackButton({
     }
   }, [open]);
 
-  // Auto-close after success
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setOpen(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
-
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const canSubmit = message.trim().length > 0 && (isAuthenticated || (name.trim().length > 0 && emailValid));
 
@@ -80,8 +72,8 @@ export default function FeedbackButton({
 
       {/* Modal overlay */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-bg border border-border rounded-xl shadow-lg w-[460px] max-h-[90vh] overflow-y-auto p-6 mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setOpen(false)}>
+          <div className="bg-bg border border-border rounded-xl shadow-lg w-[460px] max-h-[90vh] overflow-y-auto p-6 mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <h2 className="font-display font-medium text-[22px] text-fg1 leading-tight" style={{ fontVariationSettings: '"opsz" 72' }}>
                 We&rsquo;re excited to hear from you
