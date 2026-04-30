@@ -123,8 +123,17 @@ export async function sendRejectionEmail(applicationId: string): Promise<void> {
 
 /**
  * Send fulfillment email (dinner details) to a member.
+ *
+ * By default, errors are logged and swallowed (existing behavior for Stripe
+ * webhook and comp ticket callers). Pass throwOnError: true to let failures
+ * propagate — used by the fulfill-tickets cron so it can leave the ticket
+ * as 'purchased' and retry on the next run.
  */
-export async function sendFulfillmentEmail(memberId: string, dinnerId: string): Promise<void> {
+export async function sendFulfillmentEmail(
+  memberId: string,
+  dinnerId: string,
+  options?: { throwOnError?: boolean }
+): Promise<void> {
   try {
     const admin = createAdminClient();
 
@@ -136,7 +145,12 @@ export async function sendFulfillmentEmail(memberId: string, dinnerId: string): 
       .limit(1)
       .single();
 
-    if (!memberEmail) return;
+    if (!memberEmail) {
+      const msg = `No primary email for member ${memberId}`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
 
     const member = memberEmail.members as unknown as { first_name: string };
 
@@ -146,10 +160,20 @@ export async function sendFulfillmentEmail(memberId: string, dinnerId: string): 
       .eq("id", dinnerId)
       .single();
 
-    if (!dinner) return;
+    if (!dinner) {
+      const msg = `Dinner ${dinnerId} not found`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
 
     const template = await getTemplate("fulfillment");
-    if (!template) return;
+    if (!template) {
+      const msg = "Fulfillment email template not found";
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
 
     const render = (text: string) =>
       text
@@ -158,13 +182,18 @@ export async function sendFulfillmentEmail(memberId: string, dinnerId: string): 
         .replace(/\[dinner\.venue\]/g, dinner.venue)
         .replace(/\[dinner\.address\]/g, dinner.address);
 
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: memberEmail.email,
       subject: render(template.subject),
       html: bodyToHtml(render(template.body)),
     });
+
+    if (error) {
+      throw new Error(`Resend error: ${error.message}`);
+    }
   } catch (err) {
+    if (options?.throwOnError) throw err;
     console.error("[email] Failed to send fulfillment email:", err);
   }
 }
