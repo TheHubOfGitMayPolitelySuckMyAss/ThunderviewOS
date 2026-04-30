@@ -9,6 +9,7 @@ import { generateUnsubscribeToken } from "@/lib/unsubscribe";
 import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
 import { getMarketingRecipients, getMarketingRecipientCount, isTestingMode } from "@/lib/email-mode";
 import { getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
+import { logSystemEvent } from "@/lib/system-events";
 import { Resend } from "resend";
 import crypto from "crypto";
 
@@ -419,6 +420,19 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
     .update({ status: "sent", sent_at: new Date().toISOString(), sent_by: member.id, audience_snapshot: audienceSnapshot })
     .eq("id", emailId)
     .eq("status", "draft");
+
+  await logSystemEvent({
+    event_type: "email.bulk_sent",
+    actor_id: member.id,
+    summary: `Sent Monday After email to ${sent} recipients`,
+    metadata: {
+      kind: "monday_after",
+      email_id: emailId,
+      dinner_id: dinner.id,
+      dinner_date: dinner.date,
+      recipient_count: sent,
+    },
+  });
 
   return { success: true, sent };
 }

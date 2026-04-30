@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
+import { logSystemEvent } from "@/lib/system-events";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -67,6 +68,15 @@ export async function sendFeedbackNotification(opts: FeedbackEmailOpts): Promise
       replyTo: opts.submitterEmail,
       subject,
       html: fullHtml,
+    });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent feedback notification (${opts.type}) from ${opts.submitterName}`,
+      metadata: {
+        template: "feedback-notification",
+        recipient: "eric@marcoullier.com",
+        kind: opts.type.toLowerCase(),
+      },
     });
   } catch (err) {
     console.error("[email] Failed to send feedback notification:", err);

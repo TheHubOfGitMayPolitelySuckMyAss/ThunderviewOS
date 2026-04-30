@@ -3,10 +3,30 @@ import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTargetDinner } from "@/lib/ticket-assignment";
 import { sendFulfillmentEmail } from "@/lib/email-send";
+import { logSystemEvent } from "@/lib/system-events";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(request: NextRequest) {
+  try {
+    return await handleStripeWebhook(request);
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:stripe",
+      summary: `Stripe webhook threw: ${error.message}`,
+      metadata: {
+        context: "webhook.stripe",
+        message: error.message,
+        stack: error.stack ?? null,
+      },
+    });
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
+  }
+}
+
+async function handleStripeWebhook(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
 
@@ -32,6 +52,16 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  await logSystemEvent({
+    event_type: "webhook.stripe",
+    actor_label: "webhook:stripe",
+    summary: `Stripe webhook received: ${event.type}`,
+    metadata: {
+      event_type: event.type,
+      stripe_event_id: event.id,
+    },
+  });
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;

@@ -17,6 +17,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT, firstThursdayOf } from "@/lib/format";
+import { logSystemEvent } from "@/lib/system-events";
 
 export async function GET(request: Request) {
   // Auth check
@@ -27,6 +28,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    return await runGenerateDinner();
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "cron:generate-dinner",
+      summary: `generate-dinner cron threw: ${error.message}`,
+      metadata: {
+        context: "cron.dinner_generation",
+        message: error.message,
+        stack: error.stack ?? null,
+      },
+    });
+    return NextResponse.json({ ran: true, error: error.message }, { status: 500 });
+  }
+}
+
+async function runGenerateDinner() {
   // Today in Mountain Time
   const today = getTodayMT(); // YYYY-MM-DD
   const [yearStr, monthStr, dayStr] = today.split("-");
@@ -43,6 +63,7 @@ export async function GET(request: Request) {
     console.log(
       `[generate-dinner] Not scheduled day. Today=${today}, first Thursday=${firstThurs}, day after=${dayAfterFirstThurs}`
     );
+    // No system event on the daily no-op fire — would generate ~30 events/month of pure noise.
     return NextResponse.json({
       ran: false,
       reason: "not scheduled day",
@@ -64,6 +85,16 @@ export async function GET(request: Request) {
     console.log(
       `[generate-dinner] Skip month. Target=${targetYear}-${String(targetMonth).padStart(2, "0")}`
     );
+    await logSystemEvent({
+      event_type: "cron.dinner_generation",
+      actor_label: "cron:generate-dinner",
+      summary: `generate-dinner ran: skip month ${targetYear}-${String(targetMonth).padStart(2, "0")}`,
+      metadata: {
+        skipped: true,
+        reason: "skip month",
+        target_month: `${targetYear}-${String(targetMonth).padStart(2, "0")}`,
+      },
+    });
     return NextResponse.json({
       ran: true,
       skipped: true,
@@ -85,6 +116,16 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error(`[generate-dinner] Insert error: ${error.message}`);
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "cron:generate-dinner",
+      summary: `generate-dinner insert failed: ${error.message}`,
+      metadata: {
+        context: "cron.dinner_generation",
+        message: error.message,
+        target_date: targetDate,
+      },
+    });
     return NextResponse.json(
       { ran: true, error: error.message },
       { status: 500 }
@@ -92,6 +133,15 @@ export async function GET(request: Request) {
   }
 
   console.log(`[generate-dinner] Inserted dinner: ${targetDate}`);
+  await logSystemEvent({
+    event_type: "cron.dinner_generation",
+    actor_label: "cron:generate-dinner",
+    summary: `generate-dinner ran: inserted ${targetDate}`,
+    metadata: {
+      inserted: data?.date ?? null,
+      target_date: targetDate,
+    },
+  });
   return NextResponse.json({
     ran: true,
     inserted: data?.date ?? null,

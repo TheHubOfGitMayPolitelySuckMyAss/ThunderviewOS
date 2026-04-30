@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
 import { getTargetDinner } from "@/lib/ticket-assignment";
 import { sendFulfillmentEmail } from "@/lib/email-send";
+import { logSystemEvent } from "@/lib/system-events";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -30,12 +31,37 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    return await runFulfillTickets();
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "cron:fulfill-tickets",
+      summary: `fulfill-tickets cron threw: ${error.message}`,
+      metadata: {
+        context: "cron.fulfill_tickets",
+        message: error.message,
+        stack: error.stack ?? null,
+      },
+    });
+    return NextResponse.json({ ran: true, error: error.message }, { status: 500 });
+  }
+}
+
+async function runFulfillTickets() {
   const admin = createAdminClient();
 
   // getTargetDinner uses date >= todayMT, so today's dinner counts as "upcoming"
   const targetDinner = await getTargetDinner("", admin);
 
   if (!targetDinner) {
+    await logSystemEvent({
+      event_type: "cron.fulfill_tickets",
+      actor_label: "cron:fulfill-tickets",
+      summary: "fulfill-tickets ran: no upcoming dinner",
+      metadata: { fulfilled: 0, reason: "no upcoming dinner found" },
+    });
     return NextResponse.json({
       ran: true,
       fulfilled: 0,
@@ -60,6 +86,18 @@ export async function GET(request: Request) {
     console.log(
       `[fulfill-tickets] Target dinner ${targetDinner.date} is ${monthsDiff} months out — skipping (skip-month gate)`
     );
+    await logSystemEvent({
+      event_type: "cron.fulfill_tickets",
+      actor_label: "cron:fulfill-tickets",
+      summary: `fulfill-tickets ran: outside gate (${monthsDiff} months out)`,
+      metadata: {
+        fulfilled: 0,
+        reason: "outside gate",
+        dinner_id: targetDinner.id,
+        dinner_date: targetDinner.date,
+        months_out: monthsDiff,
+      },
+    });
     return NextResponse.json({
       ran: true,
       fulfilled: 0,
@@ -76,6 +114,17 @@ export async function GET(request: Request) {
     .range(0, 999);
 
   if (!tickets || tickets.length === 0) {
+    await logSystemEvent({
+      event_type: "cron.fulfill_tickets",
+      actor_label: "cron:fulfill-tickets",
+      summary: `fulfill-tickets ran: no purchased tickets for ${targetDinner.date}`,
+      metadata: {
+        fulfilled: 0,
+        reason: "no purchased tickets",
+        dinner_id: targetDinner.id,
+        dinner_date: targetDinner.date,
+      },
+    });
     return NextResponse.json({
       ran: true,
       fulfilled: 0,
@@ -129,6 +178,20 @@ export async function GET(request: Request) {
   console.log(
     `[fulfill-tickets] Done for dinner ${targetDinner.date}: fulfilled=${fulfilled} emailFailed=${emailFailed} dbFailed=${dbFailed} total=${tickets.length}`
   );
+
+  await logSystemEvent({
+    event_type: "cron.fulfill_tickets",
+    actor_label: "cron:fulfill-tickets",
+    summary: `fulfill-tickets ran: ${fulfilled} fulfilled for ${targetDinner.date}`,
+    metadata: {
+      fulfilled,
+      email_failed: emailFailed,
+      db_failed: dbFailed,
+      total_tickets: tickets.length,
+      dinner_id: targetDinner.id,
+      dinner_date: targetDinner.date,
+    },
+  });
 
   return NextResponse.json({
     ran: true,

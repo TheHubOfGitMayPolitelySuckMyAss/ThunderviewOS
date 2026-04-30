@@ -13,6 +13,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
+import { logSystemEvent } from "@/lib/system-events";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -22,6 +23,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    return await runPostDinner();
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "cron:post-dinner",
+      summary: `post-dinner cron threw: ${error.message}`,
+      metadata: {
+        context: "cron.post_dinner",
+        message: error.message,
+        stack: error.stack ?? null,
+      },
+    });
+    return NextResponse.json({ ran: true, error: error.message }, { status: 500 });
+  }
+}
+
+async function runPostDinner() {
   // Yesterday in Mountain Time
   const today = getTodayMT();
   const yesterday = new Date(today + "T00:00:00");
@@ -38,6 +58,12 @@ export async function GET(request: Request) {
     .single();
 
   if (!dinner) {
+    await logSystemEvent({
+      event_type: "cron.post_dinner",
+      actor_label: "cron:post-dinner",
+      summary: `post-dinner ran: no dinner ${yesterdayStr}`,
+      metadata: { updated: 0, reason: "no dinner yesterday", yesterday: yesterdayStr },
+    });
     return NextResponse.json({
       ran: true,
       updated: 0,
@@ -56,6 +82,17 @@ export async function GET(request: Request) {
   const memberIds = [...new Set((tickets ?? []).map((t) => t.member_id).filter(Boolean))];
 
   if (memberIds.length === 0) {
+    await logSystemEvent({
+      event_type: "cron.post_dinner",
+      actor_label: "cron:post-dinner",
+      summary: `post-dinner ran: no fulfilled tickets for ${dinner.date}`,
+      metadata: {
+        updated: 0,
+        reason: "no fulfilled tickets",
+        dinner_id: dinner.id,
+        dinner_date: dinner.date,
+      },
+    });
     return NextResponse.json({
       ran: true,
       updated: 0,
@@ -73,10 +110,32 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error(`[post-dinner] Update error: ${error.message}`);
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "cron:post-dinner",
+      summary: `post-dinner update failed: ${error.message}`,
+      metadata: {
+        context: "cron.post_dinner",
+        message: error.message,
+        dinner_id: dinner.id,
+        dinner_date: dinner.date,
+      },
+    });
     return NextResponse.json({ ran: true, error: error.message }, { status: 500 });
   }
 
   console.log(`[post-dinner] Updated ${count} members for dinner ${dinner.date}`);
+  await logSystemEvent({
+    event_type: "cron.post_dinner",
+    actor_label: "cron:post-dinner",
+    summary: `post-dinner ran: updated ${count} members for ${dinner.date}`,
+    metadata: {
+      updated: count,
+      dinner_id: dinner.id,
+      dinner_date: dinner.date,
+      member_count: memberIds.length,
+    },
+  });
   return NextResponse.json({
     ran: true,
     updated: count,

@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { logSystemEvent } from "@/lib/system-events";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -28,9 +30,34 @@ export async function GET(request: Request) {
       }
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data: exchangeData, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      const verifiedEmail = exchangeData?.user?.email ?? null;
+      let memberId: string | null = null;
+      if (verifiedEmail) {
+        try {
+          const admin = createAdminClient();
+          const { data } = await admin
+            .from("member_emails")
+            .select("member_id")
+            .eq("email", verifiedEmail.toLowerCase())
+            .limit(1)
+            .maybeSingle();
+          memberId = data?.member_id ?? null;
+        } catch (err) {
+          console.error("[auth/callback] member lookup failed:", err);
+        }
+      }
+      await logSystemEvent({
+        event_type: "auth.login",
+        actor_id: memberId,
+        actor_label: memberId ? null : verifiedEmail ?? "unknown",
+        subject_member_id: memberId,
+        summary: memberId ? null : `Login by unmatched email ${verifiedEmail ?? "(unknown)"}`,
+        metadata: { email: verifiedEmail, flow: "code_exchange" },
+      });
+
       const redirectCookie = cookieStore.get("auth_redirect")?.value;
       const redirectPath = redirectCookie ? decodeURIComponent(redirectCookie) : "/portal";
       const safePath = redirectPath.startsWith("/") ? redirectPath : "/portal";

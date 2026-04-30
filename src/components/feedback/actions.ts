@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatName } from "@/lib/format";
 import { sendFeedbackNotification } from "@/lib/email-feedback";
+import { logSystemEvent } from "@/lib/system-events";
 
 type FeedbackInput = {
   type: "Bug" | "Feedback";
@@ -87,6 +88,18 @@ export async function submitFeedback(input: FeedbackInput): Promise<{ success: b
     userAgent: input.userAgent,
     viewport: input.viewport,
     timestamp: input.timestamp,
+  });
+
+  await logSystemEvent({
+    event_type: "feedback.submitted",
+    actor_id: memberId,
+    actor_label: memberId ? null : submitterName,
+    summary: `${input.type} from ${submitterName}`,
+    metadata: {
+      kind: input.type.toLowerCase(),
+      role,
+      url: input.url,
+    },
   });
 
   return { success: true };

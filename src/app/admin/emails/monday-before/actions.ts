@@ -8,6 +8,7 @@ import { renderMondayBeforeEmail } from "@/lib/email-templates/monday-before";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe";
 import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
 import { getMarketingRecipients, getMarketingRecipientCount, isTestingMode } from "@/lib/email-mode";
+import { logSystemEvent } from "@/lib/system-events";
 import { Resend } from "resend";
 import crypto from "crypto";
 
@@ -464,6 +465,19 @@ export async function sendToAll(
     })
     .eq("id", emailId)
     .eq("status", "draft");
+
+  await logSystemEvent({
+    event_type: "email.bulk_sent",
+    actor_id: member.id,
+    summary: `Sent Monday Before email to ${sent} recipients`,
+    metadata: {
+      kind: "monday_before",
+      email_id: emailId,
+      dinner_id: email.dinner_id,
+      dinner_date: dinner.date,
+      recipient_count: sent,
+    },
+  });
 
   return { success: true, sent };
 }

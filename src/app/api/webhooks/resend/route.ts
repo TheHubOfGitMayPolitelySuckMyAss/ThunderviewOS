@@ -21,6 +21,7 @@ import {
   sendComplaintNotification,
   sendSendFailureNotification,
 } from "@/lib/email-send";
+import { logSystemEvent } from "@/lib/system-events";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -32,6 +33,25 @@ const EVENT_TYPE_MAP: Record<string, "bounced" | "complained" | "failed"> = {
 };
 
 export async function POST(req: Request) {
+  try {
+    return await handleResendWebhook(req);
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:resend",
+      summary: `Resend webhook threw: ${error.message}`,
+      metadata: {
+        context: "webhook.resend",
+        message: error.message,
+        stack: error.stack ?? null,
+      },
+    });
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
+  }
+}
+
+async function handleResendWebhook(req: Request) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error("[resend-webhook] RESEND_WEBHOOK_SECRET not configured");
@@ -60,6 +80,16 @@ export async function POST(req: Request) {
     console.error("[resend-webhook] Signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
+
+  await logSystemEvent({
+    event_type: "webhook.resend",
+    actor_label: "webhook:resend",
+    summary: `Resend webhook received: ${event.type}`,
+    metadata: {
+      event_type: event.type,
+      to: (event.data?.to as string[] | undefined)?.[0] ?? null,
+    },
+  });
 
   const eventType = EVENT_TYPE_MAP[event.type];
   if (!eventType) {

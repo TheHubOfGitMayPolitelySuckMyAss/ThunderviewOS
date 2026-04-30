@@ -9,6 +9,7 @@ import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
+import { logSystemEvent } from "@/lib/system-events";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -51,6 +52,12 @@ export async function sendApprovalEmail(memberId: string): Promise<void> {
       subject,
       html: bodyToHtml(body),
     });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      subject_member_id: memberId,
+      summary: `Sent approval email to ${memberEmail.email}`,
+      metadata: { template: "approval", recipient: memberEmail.email, member_id: memberId },
+    });
   } catch (err) {
     console.error("[email] Failed to send approval email:", err);
   }
@@ -85,6 +92,12 @@ export async function sendReApplicationEmail(memberId: string): Promise<void> {
       subject,
       html: bodyToHtml(body),
     });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      subject_member_id: memberId,
+      summary: `Sent re-application email to ${memberEmail.email}`,
+      metadata: { template: "re-application", recipient: memberEmail.email, member_id: memberId },
+    });
   } catch (err) {
     console.error("[email] Failed to send re-application email:", err);
   }
@@ -115,6 +128,15 @@ export async function sendRejectionEmail(applicationId: string): Promise<void> {
       to: app.email,
       subject,
       html: bodyToHtml(body),
+    });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent rejection email to ${app.email}`,
+      metadata: {
+        template: "rejection",
+        recipient: app.email,
+        application_id: applicationId,
+      },
     });
   } catch (err) {
     console.error("[email] Failed to send rejection email:", err);
@@ -192,6 +214,17 @@ export async function sendFulfillmentEmail(
     if (error) {
       throw new Error(`Resend error: ${error.message}`);
     }
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      subject_member_id: memberId,
+      summary: `Sent fulfillment email to ${memberEmail.email}`,
+      metadata: {
+        template: "fulfillment",
+        recipient: memberEmail.email,
+        member_id: memberId,
+        dinner_id: dinnerId,
+      },
+    });
   } catch (err) {
     if (options?.throwOnError) throw err;
     console.error("[email] Failed to send fulfillment email:", err);
@@ -238,6 +271,15 @@ export async function sendNewApplicationNotification(application: {
       subject,
       html: bodyToHtml(bodyText, ctaHtml),
     });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent new-application notification for ${application.firstName} ${application.lastName}`,
+      metadata: {
+        template: "admin-new-application",
+        recipient: recipients[0],
+        application_id: application.id,
+      },
+    });
   } catch (err) {
     console.error("[email] Failed to send new application notification:", err);
   }
@@ -274,6 +316,15 @@ export async function sendMorningOfEmail(
       subject: render(template.subject),
       html: fullHtml,
     });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent morning-of email to ${memberEmail}`,
+      metadata: {
+        template: "morning-of",
+        recipient: memberEmail,
+        dinner_date: dinnerDate,
+      },
+    });
   } catch (err) {
     console.error("[email] Failed to send morning-of email to", memberEmail, err);
   }
@@ -306,6 +357,16 @@ export async function sendComplaintNotification(opts: {
       subject: `Spam complaint: ${opts.recipientEmail}`,
       html: bodyToHtml(bodyText),
     });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent spam-complaint notification (${opts.recipientEmail})`,
+      metadata: {
+        template: "admin-complaint-notification",
+        recipient: "eric@marcoullier.com",
+        about_email: opts.recipientEmail,
+        resend_email_id: opts.resendEmailId,
+      },
+    });
   } catch (err) {
     console.error("[email] Failed to send complaint notification:", err);
   }
@@ -337,6 +398,16 @@ export async function sendSendFailureNotification(opts: {
       to: ["eric@marcoullier.com"],
       subject: `Email send failure: ${opts.recipientEmail}`,
       html: bodyToHtml(bodyText),
+    });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent send-failure notification (${opts.recipientEmail})`,
+      metadata: {
+        template: "admin-send-failure-notification",
+        recipient: "eric@marcoullier.com",
+        about_email: opts.recipientEmail,
+        resend_email_id: opts.resendEmailId,
+      },
     });
   } catch (err) {
     console.error("[email] Failed to send failure notification:", err);
