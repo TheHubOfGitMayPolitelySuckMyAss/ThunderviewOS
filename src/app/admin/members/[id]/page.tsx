@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTodayMT } from "@/lib/format";
 import MemberDetail from "./member-detail";
+import MemberHistory from "./member-history";
 
 export default async function MemberDetailPage({
   params,
@@ -130,6 +131,8 @@ export default async function MemberDetailPage({
         unredeemedCredits={unredeemedCredits ?? 0}
         nextDinnerDate={nextDinnerDate}
       />
+
+      <MemberHistory memberId={member.id} />
     </div>
   );
 }
