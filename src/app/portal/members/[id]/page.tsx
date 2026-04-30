@@ -127,14 +127,7 @@ export default async function MemberProfilePage({
 
         <Eyebrow>Contact</Eyebrow>
         <p className="text-[14.5px] mt-1">
-          {member.contact_preference === "email" && primaryEmail ? (
-            <a
-              href={`mailto:${primaryEmail}`}
-              className="text-accent-hover underline decoration-border"
-            >
-              {primaryEmail}
-            </a>
-          ) : member.linkedin_profile ? (
+          {member.linkedin_profile && (
             <a
               href={member.linkedin_profile.startsWith("http") ? member.linkedin_profile : `https://${member.linkedin_profile}`}
               target="_blank"
@@ -143,7 +136,18 @@ export default async function MemberProfilePage({
             >
               LinkedIn
             </a>
-          ) : null}
+          )}
+          {member.contact_preference === "email" && primaryEmail && (
+            <>
+              {member.linkedin_profile && <span className="text-fg4 mx-1.5">&middot;</span>}
+              <a
+                href={`mailto:${primaryEmail}`}
+                className="text-accent-hover underline decoration-border"
+              >
+                {primaryEmail}
+              </a>
+            </>
+          )}
         </p>
       </Card>
     </div>

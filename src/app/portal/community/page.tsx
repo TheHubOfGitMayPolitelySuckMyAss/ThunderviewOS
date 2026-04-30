@@ -179,14 +179,7 @@ export default async function CommunityPage() {
 
             <Eyebrow>Contact</Eyebrow>
             <p className="text-[14.5px] mt-1">
-              {featured.contact_preference === "email" && featuredEmail ? (
-                <a
-                  href={`mailto:${featuredEmail}`}
-                  className="text-accent-hover underline decoration-border"
-                >
-                  {featuredEmail}
-                </a>
-              ) : featured.linkedin_profile ? (
+              {featured.linkedin_profile && (
                 <a
                   href={
                     featured.linkedin_profile.startsWith("http")
@@ -199,7 +192,18 @@ export default async function CommunityPage() {
                 >
                   LinkedIn
                 </a>
-              ) : null}
+              )}
+              {featured.contact_preference === "email" && featuredEmail && (
+                <>
+                  {featured.linkedin_profile && <span className="text-fg4 mx-1.5">&middot;</span>}
+                  <a
+                    href={`mailto:${featuredEmail}`}
+                    className="text-accent-hover underline decoration-border"
+                  >
+                    {featuredEmail}
+                  </a>
+                </>
+              )}
             </p>
           </Card>
         </div>
