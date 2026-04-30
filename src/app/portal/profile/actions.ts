@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import sharp from "sharp";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -21,7 +21,7 @@ export async function portalUpdateProfilePic(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data: memberEmail } = await admin
     .from("member_emails")
@@ -112,7 +112,7 @@ export async function saveProfile(formData: FormData) {
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // Look up member with current values
   const { data: memberEmail } = await admin
@@ -291,7 +291,7 @@ export async function toggleMarketing(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data: memberEmail } = await admin
     .from("member_emails")

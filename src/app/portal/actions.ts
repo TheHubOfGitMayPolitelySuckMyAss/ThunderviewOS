@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 
 export async function savePortalProfile(formData: FormData) {
   const supabase = await createClient();
@@ -11,7 +11,7 @@ export async function savePortalProfile(formData: FormData) {
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // Look up member
   const { data: memberEmail } = await admin
