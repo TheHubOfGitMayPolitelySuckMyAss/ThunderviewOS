@@ -65,7 +65,8 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 - `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (purchased/fulfilled/refunded/credited). Tracks payment source and match confidence. `fulfillment_status = 'fulfilled'` means "dinner-details email has been sent." It does NOT mean "attended." Attendance is not tracked. The only reason fulfilled exists is to gate the fulfillment email. All paid tickets for future-beyond-next dinners stay `purchased` until ~27 days before their dinner, when a cron flips them and sends the email (Phase 5, not yet built). Tickets for the next upcoming dinner auto-fulfill immediately on purchase. The webhook and comp ticket action only flip to fulfilled if `dinner_id` matches `getTargetDinner()`.
 - `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
 - `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
-- `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default) or `'bounced'`.
+- `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default), `'bounced'`, or `'complained'`.
+- `email_events` — Resend webhook events for bounces, complaints, and failures. `event_type` CHECK `'bounced'|'complained'|'failed'`. `resend_email_id` + `event_type` is UNIQUE (idempotency). `member_email_id` and `member_id` nullable FKs — backfilled when recipient matches a `member_emails` row. `raw_payload` JSONB stores the full webhook event. RLS: admin/team SELECT only. On bounce: flips `member_emails.email_status` to `'bounced'`. On complaint: flips to `'complained'` + opts out marketing. On failure: no member state change. Admin notified on complaint and failure. Webhook at `/api/webhooks/resend`, verified via `RESEND_WEBHOOK_SECRET` (svix signature).
 - `email_templates` — editable email templates for transactional emails. `slug` (unique, e.g. `'approval'`), `subject`, `body` (with `[member.fieldname]` variable placeholders), `updated_at` (trigger-managed), `updated_by` (FK to members). RLS: admin/team read + update. Also stores generic `monday-before` and `monday-after` slug rows from the earlier generic `email_instances` system (superseded by dedicated tables below — these rows are unused but harmless).
 - `email_instances` — generic per-dinner email instances (draft/test_sent/sent lifecycle). Superseded by dedicated `monday_before_emails` and `monday_after_emails` tables. Table remains but is unused — will be cleaned up in a future session.
 - `monday_before_macro` — singleton row (enforced via `UNIQUE CHECK (singleton = TRUE)`) storing default template content for Monday Before emails. Fields: `subject`, `preheader`, `headline`, `custom_text`, `partnership_boilerplate`. Editable at `/admin/emails/monday-before`. Changes seed future drafts but don't affect existing ones. RLS: admin/team read + update.
@@ -81,7 +82,7 @@ Row-level audit logging via `audit.row_history` table in a separate `audit` sche
 
 - **Trigger function:** `audit.log_row_change()` (SECURITY DEFINER, owned by postgres). Captures `TG_OP`, `to_jsonb(OLD)`, `to_jsonb(NEW)`, `auth.uid()` (try/catch for cron contexts), `current_user`. PK resolution is hardcoded: all tables use `id` UUID except `dinner_speakers` (composite `dinner_id` + `member_id`).
 - **Trigger naming:** All audit triggers are named `zzz_audit_row_change` so they fire last among same-timing AFTER triggers (Postgres fires alphabetically). This ensures the audit snapshot captures the final row state after other triggers (e.g. `updated_at`, `marketing_opted_out_at`).
-- **Audited tables (9):** `members`, `applications`, `tickets`, `credits`, `member_emails`, `dinners`, `dinner_speakers`, `email_templates`, `email_instances`.
+- **Audited tables (10):** `members`, `applications`, `tickets`, `credits`, `member_emails`, `dinners`, `dinner_speakers`, `email_templates`, `email_instances`, `email_events`.
 - **NOT audited:** `monday_before_*`, `monday_after_*` (lower recovery value, already have sent-lock triggers). `auth.*`, `storage.*` (Supabase-managed).
 - **RLS:** Enabled on `audit.row_history`. SELECT policy for admin/team only via `is_admin_or_team()`. No INSERT/UPDATE/DELETE policies — only the SECURITY DEFINER trigger writes.
 - **Indexes:** Composite on `(table_schema, table_name, changed_at DESC)`, expression on `(table_schema, table_name, (row_pk->>'id'))`, BRIN on `changed_at`.
@@ -115,6 +116,10 @@ src/
 │   ├── field.tsx                       # Shared form field wrapper: label/required/help/error/children. flex-col with gap-label-input (8px). Error and help mutually exclusive
 │   ├── form-section.tsx               # Eyebrow-labeled field group inside a Card. Props: eyebrow, divider (adds hairline rule). Uses .tv-form-section CSS
 │   ├── email-image-group.tsx          # Shared drag-and-drop image group (@dnd-kit/sortable): sortable list with drag handles, delete buttons, file upload. Used by Monday Before and Monday After draft editors
+│   ├── feedback/
+│   │   ├── feedback-wrapper.tsx       # Server component: detects auth state, renders FeedbackButton
+│   │   ├── feedback-button.tsx        # Client component: floating button (fixed bottom-right) + modal with Bug/Feedback toggle, message textarea, honeypot. Anonymous users see name/email fields
+│   │   └── actions.ts                 # Server action: resolves member from session, sends notification email to Eric. No DB storage
 │   └── ui/                            # Design system primitives (compose these, don't inline)
 │       ├── index.ts                   # Barrel export
 │       ├── button.tsx                 # Primary/secondary/ghost, sm/md/lg, asChild prop for wrapping Links
@@ -136,7 +141,7 @@ src/
 │   ├── _components/
 │   │   └── this-months-dinner.tsx     # Server component: next upcoming dinner section (title, date/venue, description, speakers, Apply CTA). Returns null if no future dinner. Used on marketing home
 │   ├── page.tsx                        # Marketing home: hero + stats + This Month's Dinner + three-reason grid + gallery + quote + CTA. Bottom CTA shows real next dinner date from DB. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
-│   ├── layout.tsx                      # Root layout (Inter + Fraunces + JetBrains Mono via next/font/google, Tailwind)
+│   ├── layout.tsx                      # Root layout (Inter + Fraunces + JetBrains Mono via next/font/google, Tailwind). Includes FeedbackWrapper (floating button on every page)
 │   ├── about/page.tsx                  # About page: hero (two-col with photo) + What Thunderview Is (720px prose) + Dinner Format (schedule timeline + venue, bg-elevated) + Upcoming Dinners (date-chip list with Next/Off states from DB) + Our Commitment (clay-bullet list, bg-elevated) + CTA
 │   ├── faq/
 │   │   ├── page.tsx                    # FAQ page: server wrapper with PublicNav
@@ -188,12 +193,14 @@ src/
 │   ├── api/cron/post-dinner/
 │   │   └── route.ts                    # Vercel Cron: day after each dinner, sets last_dinner_attended for all fulfilled attendees
 │   ├── api/cron/fulfill-tickets/
-│   │   └── route.ts                    # Vercel Cron: 27 days before each dinner, flips purchased→fulfilled + sends fulfillment email
+│   │   └── route.ts                    # Vercel Cron: daily 14:00 UTC. Uses getTargetDinner() + calendar-month gate. Sends fulfillment email first (throwOnError), then flips ticket to fulfilled. Failed emails leave ticket as purchased for retry
 │   ├── api/cron/morning-of/              # REMOVED — morning-of email is now manually triggered from /admin/emails/morning-of
 │   ├── api/unsubscribe/
 │   │   └── route.ts                    # GET/POST: HMAC-signed one-click unsubscribe handler. Verifies token, sets marketing_opted_in = false, redirects to /unsubscribe confirmation page
 │   ├── api/webhooks/stripe/
 │   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
+│   ├── api/webhooks/resend/
+│   │   └── route.ts                    # Resend webhook: email.bounced/complained/failed → insert email_event, flip member_emails status, notify admin on complaint/failure. Svix signature verification
 │   ├── dev/
 │   │   ├── ui/page.tsx                # Dev-only UI primitive showcase (every component in every state)
 │   │   └── emails/[slug]/page.tsx     # Dev-only email template preview with sample data (approval, re-application, rejection, fulfillment, morning-of, admin-notification)
@@ -275,7 +282,8 @@ src/
 │       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management, adminUploadProfilePic
 ├── lib/
 │   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), renderTemplateVars() (shared variable substitution), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
-│   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification). All use bodyToHtml() for branded shell
+│   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification, complaint notification, send-failure notification). All use bodyToHtml() for branded shell. sendFulfillmentEmail has optional throwOnError param for cron retry logic
+│   ├── email-feedback.ts              # Feedback notification email to Eric. Two-zone layout: top (type pill, from, message) + bottom (debug pre block: member_id, role, timestamp, URL, referrer, UA, viewport). Reply-To = submitter's email
 │   ├── email-image-pipeline.ts        # Shared image compression: validateImageType() + compressEmailImage() — 800px width, JPEG, iterative quality (85→40), ≤500KB, EXIF stripped. Used by Monday Before and Monday After upload actions
 │   ├── email-intros-asks.ts           # Shared Intros & Asks rendering: getDinnerAttendees(dinnerId) fetches fulfilled attendees (not kicked, has community access, deduplicated, sorted content-first) + buildAttendeeHtml() renders inline-styled HTML. Shared between Morning Of and Monday After
 │   ├── email-templates/
@@ -326,7 +334,8 @@ supabase/
 │   ├── 20260426100000_monday_before_emails.sql                # monday_before_macro + monday_before_emails + monday_before_email_images + sent-lock triggers + RLS
 │   ├── 20260426200000_monday_after_emails.sql                 # monday_after_macro + monday_after_emails + monday_after_email_images + sent-lock triggers + RLS
 │   ├── 20260426300000_fix_swap_primary_email_rpc.sql          # Fix swap_primary_email RPC: clear old primary before setting new to avoid unique index violation
-│   └── 20260426400000_audit_row_history.sql                   # audit schema + row_history table + log_row_change() trigger on 9 business tables + RLS
+│   ├── 20260426400000_audit_row_history.sql                   # audit schema + row_history table + log_row_change() trigger on 9 business tables + RLS
+│   └── 20260430000000_email_events.sql                       # email_events table + extend member_emails email_status CHECK for 'complained' + audit trigger
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -346,6 +355,7 @@ Required in `.env.local` (see `.env.local.example` at repo root):
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe sandbox publishable key (`pk_test_...`). Currently unused client-side (Checkout is redirect-based, not embedded).
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret. For local dev: comes from `stripe listen` output. For production: from the registered webhook endpoint (`we_1TOKwXBZUujGbd3L93xKwlDl`).
 - `RESEND_API_KEY` — Resend API key for transactional and marketing emails. Set in Vercel (Production + Preview scopes) and `.env.local`.
+- `RESEND_WEBHOOK_SECRET` — Resend webhook signing secret (svix). Used by `/api/webhooks/resend` to verify bounce/complaint/failure events. Set in Vercel Production scope. Obtained from Resend dashboard after registering the webhook endpoint.
 - `UNSUBSCRIBE_SECRET` — HMAC key for signing unsubscribe tokens in marketing emails. Set in Vercel Production scope. Generate with `openssl rand -hex 32`. Without this, a hardcoded default is used (functional but insecure — anyone who reads the source can forge tokens).
 - `NEXT_PUBLIC_EMAIL_MODE` — Controls marketing email recipient scope. `"testing"` (default) = Send To All only reaches admin + team members. `"live"` = Send To All reaches all marketing-opted-in members. Set in Vercel Production scope. **Flip to `live` before launch.**
 
@@ -526,6 +536,20 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
 - **Email testing mode** (`src/lib/email-mode.ts`): `NEXT_PUBLIC_EMAIL_MODE` env var. When `"testing"` (default), `getMarketingRecipients()` returns only admin + team members. When `"live"`, returns all `marketing_opted_in = true` members. Both draft editors show a yellow banner when in testing mode. Shared by Monday Before and Monday After via `getMarketingRecipients()` and `getMarketingRecipientCount()`.
 - **New dependencies**: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`, `@tiptap/extension-underline` (rich text editor), `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (drag-and-drop image reordering).
 
+## What's done (Sprint 18 — system hardening, email events, portal features)
+
+- **Audit logging** (`audit.row_history`): row-level INSERT/UPDATE/DELETE snapshots on 10 business tables. SECURITY DEFINER trigger, `zzz_audit_` prefix for last-fire ordering. See "Audit logging" section above.
+- **`swap_primary_email` RPC fix**: cleared old primary before setting new to avoid unique index violation (was a single UPDATE that triggered intermediate constraint).
+- **`/tickets` → `/portal/tickets` redirect** in proxy.
+- **"Database error finding user" fix**: GoTrue NULL column issue on `auth.users` rows created via admin API. `ensureAuthUser()` now patches via `updateUserById`. 633 rows backfilled.
+- **Morning Of email scoped by `EMAIL_MODE`**: in testing mode, "Send To Attendees" only delivers to admin + team members (attendee list in email body is still full for realistic preview). Yellow testing-mode banner added.
+- **Fulfill-tickets cron rewrite**: replaced brittle "exactly 27 days from now" date match with `getTargetDinner()` + calendar-month gate (handles Jan/Jul skip months). Email-first ordering: send email → flip status on success; failed emails leave ticket as purchased for next-day retry. DB failures after email logged as CRITICAL. Schedule moved to `0 14 * * *` (14:00 UTC = 8am MDT / 7am MST). Ticket query uses `.range(0, 999)` for 1k cap safety.
+- **Featured Member on `/portal/community`**: random eligible member card at top of page on each server render. Eligibility: intro+ask+give all filled, attended in last 6 months, not team, not kicked out, has community access, not the viewer. Omitted when no one qualifies. Pool capped at 100 (picked via `Math.random()` server-side since PostgREST lacks `ORDER BY RANDOM()`).
+- **Contact section redesign** on member profiles and featured member: LinkedIn always shown (if exists), email shown only when `contact_preference = 'email'`. Website removed (already in company heading). "CEO at" prefix removed from company name.
+- **`contact_preference` rules**: two uses — (1) in emails/recap, determines how the member's name is linked (LinkedIn or mailto); (2) in profiles, gates whether email is shown in the Contact section. LinkedIn is always visible if present.
+- **Email events system**: `email_events` table + Resend webhook at `/api/webhooks/resend` (svix signature verification via `RESEND_WEBHOOK_SECRET`). Handles bounces (flip email_status), complaints (flip email_status + opt out marketing + notify Eric), failures (notify Eric). Idempotent via UNIQUE on `(resend_email_id, event_type)`. `member_emails.email_status` CHECK extended to include `'complained'`. Dashboard "Email Issues" accordion (last 30 days, bounced=warn pill, complained=danger pill). Tested end-to-end with a real bounce.
+- **Feedback button + modal**: floating bottom-right on every page (wired in root layout). Bug/Feedback toggle, message textarea (2000 char max), honeypot spam protection. Anonymous users see name/email fields; authenticated users resolved from session. Notification email to Eric with Reply-To set to submitter. Two-zone email: top (for Eric: type, from, message) + bottom (for Claude Code: debug pre block with member_id, role, timestamp, URL, referrer, UA, viewport).
+
 ### Remaining hardening opportunities
 
 - **Shared `<DataTable>` component**: admin tables (dinners, tickets, applications, members) and the portal community table all share identical th/td class patterns. A single component would enforce table-cell-padding-x, sticky headers, sort arrows, and row-click behavior.
@@ -536,7 +560,7 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
 
 Don't build these without an explicit prompt:
 
-- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — future sprint. ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets` flips purchased→fulfilled 27 days before each dinner and sends fulfillment email.
+- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — future sprint. ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets` uses `getTargetDinner()` + calendar-month gate, email-first ordering, daily at 14:00 UTC.
 - `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
 - ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
 - Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
@@ -553,7 +577,7 @@ Don't build these without an explicit prompt:
 ## Upcoming work
 
 - ~~Transactional emails via Resend~~ Done — all five templates wired to events
-- ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets`
+- ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets` (rewritten Sprint 18: target-dinner + calendar-month gate, email-first)
 - ~~Design system~~ Done — tokens, fonts, primitives, full page restyling, email shell, layout invariants
 - Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
 - Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
@@ -577,9 +601,9 @@ Don't build these without an explicit prompt:
 - [x] Confirm injected unsubscribe footer is gone (custom SMTP eliminates it)
 - [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
 - [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production env vars (currently sends marketing emails to admin+team only)
-- [ ] Build Resend webhook endpoint at `/api/webhooks/resend/route.ts` — receives bounce events, flips `member_emails.email_status` to `'bounced'` for the matching email address
-- [ ] Register webhook in Resend dashboard (manual — point at `https://thunderview-os.vercel.app/api/webhooks/resend`)
-- [ ] Implement Resend webhook signature verification using the signing secret. **Order of operations matters:** register webhook first → copy signing secret from Resend dashboard → add as `RESEND_WEBHOOK_SECRET` in Vercel Production scope → deploy. Out of order means the endpoint either rejects everything or accepts spoofed payloads
+- [x] Build Resend webhook endpoint at `/api/webhooks/resend/route.ts` — handles bounce, complaint, and failure events. Flips `member_emails.email_status`, opts out marketing on complaint, notifies admin on complaint/failure
+- [x] Register webhook in Resend dashboard (pointing at `https://thunderview-os.vercel.app/api/webhooks/resend`, events: email.bounced, email.complained, email.failed)
+- [x] Resend webhook signature verification via `RESEND_WEBHOOK_SECRET` in Vercel Production scope. Tested end-to-end with a real bounce (2026-04-30)
 
 ## Known issues / gotchas
 
@@ -598,6 +622,7 @@ Don't build these without an explicit prompt:
 - **`bodyToHtml()` wraps in a full HTML document.** It's no longer just `\n` → `<br>`. Every caller gets a branded shell. The `appendHtml` parameter lets you inject pre-rendered HTML inside the shell (used by morning-of for attendee list). Don't concatenate HTML after calling `bodyToHtml()` — it would land outside the `</html>` tag.
 - **Stripe sandbox does not auto-send receipts.** Even with `receipt_email` set on the Checkout Session and the dashboard toggle enabled, sandbox mode silently skips receipt emails. Integration is correct — auto-send will be validated at Phase 8 live cutover. Do not debug further.
 - **Members need an `auth.users` row to log in.** `shouldCreateUser: false` on the OTP call means Supabase won't auto-create auth users. Every member-creation flow (approve, add, link) must call `ensureAuthUser(email)` from `src/lib/ensure-auth-user.ts`. If a member reports they can't log in, check `auth.users` first — the member_emails row alone is not enough. Discovered 2026-04-26 when 632 imported members had no auth rows.
+- **`ensureAuthUser` patches GoTrue NULL columns.** Supabase's `admin.createUser()` leaves `email_change` and `email_change_token_new` as NULL, but GoTrue's Go code scans them into non-nullable strings — causing "Database error finding user" on OTP requests. `ensureAuthUser()` now calls `updateUserById` after creation to normalize these fields. Existing 633 rows were backfilled 2026-04-27.
 - **Photo upload is decoupled from profile save.** Portal profile uses `portalUpdateProfilePic` (standalone action that only touches `profile_pic_url`). Admin uses `adminUploadProfilePic`. Neither passes other member fields through. `saveProfile` does not handle photos. This prevents silent data loss when a new field is added but not included in the photo handler's FormData.
 - **Marketing email tables are separate from `email_templates`/`email_instances`.** The generic `email_instances` table was built first but replaced by dedicated `monday_before_*` and `monday_after_*` tables that support structured fields, image groups, and richer lifecycle tracking. The generic tables remain in the DB but are unused. Don't build new marketing templates on `email_instances` — follow the Monday Before/After pattern with dedicated tables.
 - **Image compression pipeline has a hard 500KB ceiling.** The iterative quality reduction (85→40) stops at the first quality level that fits. If quality 40 still exceeds 500KB, the upload is rejected with an error showing original and compressed sizes. This is intentional — email clients have image size limits and large images degrade deliverability.
