@@ -135,7 +135,6 @@ export default async function CommunityPage() {
                 </Link>
                 {featured.company_name && (
                   <p className="text-base text-fg2 mt-1">
-                    CEO at{" "}
                     {featured.company_website ? (
                       <a
                         href={

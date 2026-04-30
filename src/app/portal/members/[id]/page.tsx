@@ -71,7 +71,6 @@ export default async function MemberProfilePage({
           <H1 className="!m-0">{name}</H1>
           {member.company_name && (
             <p className="text-base text-fg2 mt-1">
-              CEO at{" "}
               {member.company_website ? (
                 <a
                   href={member.company_website.startsWith("http") ? member.company_website : `https://${member.company_website}`}
