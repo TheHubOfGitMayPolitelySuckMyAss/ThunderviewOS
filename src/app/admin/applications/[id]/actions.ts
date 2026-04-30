@@ -1,10 +1,12 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendApprovalEmail, sendReApplicationEmail, sendRejectionEmail } from "@/lib/email-send";
 import { ensureAuthUser } from "@/lib/ensure-auth-user";
+import { logSystemEvent } from "@/lib/system-events";
+import { getCurrentActorMemberId } from "@/lib/current-actor";
 
 type ApproveResult = {
   success: boolean;
@@ -18,7 +20,7 @@ type ApproveResult = {
 export async function approveApplication(
   applicationId: string
 ): Promise<ApproveResult> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data, error } = await admin.rpc("approve_application", {
     p_application_id: applicationId,
@@ -60,6 +62,9 @@ export async function approveApplication(
     await sendApprovalEmail(result.member_id);
   }
 
+  // No explicit application.approved log — audit row covers it via the
+  // status pending→approved transition.
+
   return {
     success: true,
     memberId: result.member_id,
@@ -71,7 +76,7 @@ export async function rejectApplication(
   applicationId: string,
   rejectionReason: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { error } = await admin
     .from("applications")
@@ -85,6 +90,9 @@ export async function rejectApplication(
   if (error) return { success: false, error: error.message };
 
   await sendRejectionEmail(applicationId);
+
+  // No explicit application.rejected log — audit row covers it via the
+  // status pending→rejected transition.
 
   return { success: true };
 }
@@ -101,7 +109,7 @@ export async function linkApplicationToMember(
   applicationId: string,
   memberId: string
 ): Promise<LinkResult> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data, error } = await admin.rpc("link_application_to_member", {
     p_application_id: applicationId,
@@ -138,6 +146,16 @@ export async function linkApplicationToMember(
   }
 
   await sendReApplicationEmail(result.member_id);
+
+  await logSystemEvent({
+    event_type: "application.linked",
+    actor_id: await getCurrentActorMemberId(),
+    subject_member_id: result.member_id,
+    summary: `Linked application to ${result.member_name}`,
+    metadata: {
+      application_id: applicationId,
+    },
+  });
 
   return {
     success: true,

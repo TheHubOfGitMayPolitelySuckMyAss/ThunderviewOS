@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendFulfillmentEmail } from "@/lib/email-send";
@@ -10,7 +10,7 @@ export async function updateMemberField(
   field: string,
   value: string | null
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // attendee_stagetypes is a TEXT[] — the single-select admin UI sends one string.
   const writeValue: unknown =
@@ -33,7 +33,7 @@ export async function toggleMemberFlag(
   field: "marketing_opted_in" | "is_team",
   value: boolean
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("members")
     .update({ [field]: value })
@@ -46,26 +46,34 @@ export async function toggleMemberFlag(
 export async function removeMember(
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("members")
     .update({ kicked_out: true, marketing_opted_in: false })
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
+
+  // No explicit member.kicked_out log — audit row covers via the
+  // members UPDATE with kicked_out flip.
+
   return { success: true };
 }
 
 export async function reinstateMember(
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("members")
     .update({ kicked_out: false, marketing_opted_in: true })
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
+
+  // No explicit member.reinstated log — audit row covers via the
+  // members UPDATE with kicked_out flip.
+
   return { success: true };
 }
 
@@ -75,7 +83,7 @@ export async function addMemberEmail(
   memberId: string,
   email: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin.from("member_emails").insert({
     member_id: memberId,
     email: email.toLowerCase(),
@@ -91,7 +99,7 @@ export async function addMemberEmail(
 export async function deleteMemberEmail(
   emailId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("member_emails")
     .delete()
@@ -105,7 +113,7 @@ export async function setPrimaryEmail(
   memberId: string,
   emailId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { error } = await admin.rpc("swap_primary_email", {
     p_member_id: memberId,
@@ -123,7 +131,7 @@ import { getTargetDinner, getTicketInfo } from "@/lib/ticket-assignment";
 export async function applyCredit(
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // Find the oldest unredeemed credit for this member
   const { data: credit } = await admin
@@ -213,7 +221,7 @@ export async function applyCredit(
 export async function compTicket(
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data: member } = await admin
     .from("members")
@@ -277,7 +285,7 @@ export async function adminUploadProfilePic(
   memberId: string,
   formData: FormData
 ): Promise<{ success: boolean; error?: string; profilePicUrl?: string | null }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const sharp = (await import("sharp")).default;
 
   const file = formData.get("profile_pic") as File | null;

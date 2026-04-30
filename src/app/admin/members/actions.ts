@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { ensureAuthUser } from "@/lib/ensure-auth-user";
@@ -61,7 +61,7 @@ export async function addMember(formData: {
   race: string;
   orientation: string;
 }): Promise<{ success: boolean; error?: string; memberId?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const isActiveCEO =
     formData.attendeeStagetype === "Active CEO (Bootstrapping or VC-Backed)";
@@ -88,6 +88,9 @@ export async function addMember(formData: {
 
   // Ensure auth.users row exists so the member can log in
   await ensureAuthUser(formData.email);
+
+  // No explicit member.added log — audit row covers it via the members
+  // INSERT (actor attributed via X-Audit-Actor header on this request).
 
   return { success: true, memberId: data as string };
 }

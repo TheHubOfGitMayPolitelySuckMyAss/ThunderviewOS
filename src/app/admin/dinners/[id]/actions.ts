@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
 
@@ -10,12 +11,12 @@ export async function refundTicket(
   ticketId: string,
   mode: "full" | "guest_only"
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // Fetch ticket with Stripe fields
   const { data: ticket } = await admin
     .from("tickets")
-    .select("id, quantity, amount_paid, payment_source, stripe_payment_intent_id")
+    .select("id, quantity, amount_paid, payment_source, stripe_payment_intent_id, member_id, dinner_id")
     .eq("id", ticketId)
     .single();
 
@@ -87,6 +88,10 @@ export async function refundTicket(
     if (error) return { success: false, error: error.message };
   }
 
+  // No explicit ticket.refunded log — audit covers it via the
+  // tickets UPDATE: full refund flips fulfillment_status to 'refunded';
+  // guest-only refund is detected from the quantity 2→1 + amount_paid drop.
+
   revalidatePath("/admin/dinners");
   return { success: true };
 }
@@ -94,12 +99,12 @@ export async function refundTicket(
 export async function creditTicket(
   ticketId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // Get ticket to find member_id
   const { data: ticket } = await admin
     .from("tickets")
-    .select("member_id")
+    .select("member_id, dinner_id")
     .eq("id", ticketId)
     .single();
 
@@ -122,6 +127,9 @@ export async function creditTicket(
 
   if (creditError) return { success: false, error: creditError.message };
 
+  // No explicit ticket.credited log — audit covers it via the
+  // tickets UPDATE with fulfillment_status flip to 'credited'.
+
   revalidatePath("/admin/dinners");
   return { success: true };
 }
@@ -131,7 +139,7 @@ export async function updateDinnerField(
   field: "venue" | "address" | "title" | "description",
   value: string | null
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("dinners")
     .update({ [field]: value || null })
@@ -173,7 +181,7 @@ export async function addDinnerSpeaker(
   dinnerId: string,
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("dinner_speakers")
     .insert({ dinner_id: dinnerId, member_id: memberId });
@@ -190,7 +198,7 @@ export async function removeDinnerSpeaker(
   dinnerId: string,
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
   const { error } = await admin
     .from("dinner_speakers")
     .delete()

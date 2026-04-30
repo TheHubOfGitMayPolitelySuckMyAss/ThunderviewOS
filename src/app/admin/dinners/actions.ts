@@ -1,13 +1,13 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { revalidatePath } from "next/cache";
 
 export async function toggleGuestsAllowed(
   dinnerId: string,
   newValue: boolean
 ): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { error } = await admin
     .from("dinners")

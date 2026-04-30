@@ -2,10 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { type Attendee, getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
 import { isTestingMode } from "@/lib/email-mode";
+import { logSystemEvent } from "@/lib/system-events";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -98,7 +100,7 @@ export async function sendToAllAttendees(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   // Get sender's member record
   const { data: senderEmail } = await admin
@@ -207,6 +209,18 @@ export async function sendToAllAttendees(
 
   const sentByName = formatName(sender.first_name, sender.last_name);
 
+  await logSystemEvent({
+    event_type: "email.bulk_sent",
+    actor_id: sender.id,
+    summary: `Sent Morning Of email to ${sent} attendees`,
+    metadata: {
+      kind: "morning_of",
+      dinner_id: dinner.id,
+      dinner_date: dinner.date,
+      recipient_count: sent,
+    },
+  });
+
   return { success: true, sent, sentAt, sentByName };
 }
 
@@ -222,7 +236,7 @@ export async function saveTemplate(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data: memberEmail } = await admin
     .from("member_emails")

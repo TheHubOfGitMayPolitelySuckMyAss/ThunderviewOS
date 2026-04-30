@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
 import { Resend } from "resend";
 
@@ -70,7 +71,7 @@ export async function saveTemplate(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClientForCurrentActor();
 
   const { data: memberEmail } = await admin
     .from("member_emails")
