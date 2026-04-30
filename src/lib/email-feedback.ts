@@ -10,9 +10,6 @@ type FeedbackEmailOpts = {
   submitterEmail: string;
   memberId: string | null;
   role: string;
-  memberContext: Record<string, unknown> | null;
-  recentTickets: Record<string, unknown>[];
-  lastApplication: Record<string, unknown> | null;
   pageUrl: string;
   referrer: string | null;
   userAgent: string;
@@ -26,65 +23,50 @@ export async function sendFeedbackNotification(opts: FeedbackEmailOpts): Promise
     const tag = opts.type === "Bug" ? "[Bug]" : "[Feedback]";
     const subject = `${tag} from ${opts.submitterName}`;
 
-    const lines: string[] = [];
+    // Top zone — for Eric (passed as body to bodyToHtml)
+    const typeLabel = opts.type === "Bug"
+      ? '<span style="display:inline-block;background:#F3E3BE;color:#8a6a1f;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;">Bug</span>'
+      : '<span style="display:inline-block;background:#E4E9D4;color:#5B6A3B;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;">Feedback</span>';
 
-    // Message (prominent)
-    lines.push(opts.message);
-    lines.push("");
+    const memberLink = opts.memberId
+      ? ` <a href="${siteUrl}/admin/members/${opts.memberId}" style="color:#9A7A5E;font-size:13px;">(view member)</a>`
+      : "";
 
-    // Submitted by
-    lines.push("--- Submitted by ---");
-    lines.push(`Name: ${opts.submitterName}`);
-    lines.push(`Email: ${opts.submitterEmail}`);
-    if (opts.memberId) {
-      lines.push(`Member: ${siteUrl}/admin/members/${opts.memberId}`);
-    }
-    lines.push(`Role: ${opts.role}`);
-    lines.push("");
+    // Escape message for HTML but preserve newlines (bodyToHtml converts \n to <br>)
+    const escapedMessage = opts.message
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
-    // Page context
-    lines.push("--- Page context ---");
-    lines.push(`URL: ${opts.pageUrl}`);
-    if (opts.referrer) lines.push(`Referrer: ${opts.referrer}`);
-    lines.push(`User agent: ${opts.userAgent}`);
-    lines.push(`Viewport: ${opts.viewport}`);
-    lines.push(`Timestamp: ${opts.timestamp}`);
+    const topHtml =
+      `<p style="margin:0 0 12px;">${typeLabel}</p>` +
+      `<p style="font-size:14px;color:#75695B;margin:0 0 16px;">From: <strong style="color:#2B241C;">${opts.submitterName}</strong> &lt;${opts.submitterEmail}&gt;${memberLink}</p>` +
+      escapedMessage;
 
-    // Member context (only if matched)
-    if (opts.memberContext) {
-      const mc = opts.memberContext;
-      lines.push("");
-      lines.push("--- Member context ---");
-      const stagetypes = mc.stagetypes as string[] | undefined;
-      lines.push(`Types: ${stagetypes?.length ? stagetypes.join(", ") : "(none)"}`);
-      lines.push(`Community access: ${mc.has_community_access}`);
-      lines.push(`Kicked out: ${mc.kicked_out}`);
-      lines.push(`Marketing opted in: ${mc.marketing_opted_in}`);
-      lines.push(`Primary email status: ${mc.primary_email_status}`);
-      lines.push(`Intro updated: ${mc.intro_updated_at ?? "never"}`);
-      lines.push(`Ask updated: ${mc.ask_updated_at ?? "never"}`);
+    // Bottom zone — debug context for Claude Code (passed as appendHtml)
+    const debugLines = [
+      `member_id:   ${opts.memberId ?? "anonymous"}`,
+      `role:        ${opts.role}`,
+      `submitted:   ${opts.timestamp}`,
+      `url:         ${opts.pageUrl}`,
+      `referrer:    ${opts.referrer ?? "none"}`,
+      `user_agent:  ${opts.userAgent}`,
+      `viewport:    ${opts.viewport}`,
+    ].join("\n");
 
-      if (opts.recentTickets.length > 0) {
-        lines.push("");
-        lines.push("Last 3 tickets:");
-        for (const t of opts.recentTickets) {
-          lines.push(`  ${t.dinner_date} — ${t.status} (${t.payment_source}, $${t.amount_paid})`);
-        }
-      }
+    const debugHtml =
+      `<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;">` +
+      `<p style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#9A7A5E;margin:0 0 8px;">Debug context</p>` +
+      `<pre style="font-family:'JetBrains Mono',Menlo,monospace;font-size:12px;color:#75695B;line-height:1.5;margin:0;white-space:pre-wrap;word-break:break-all;">${debugLines}</pre>`;
 
-      if (opts.lastApplication) {
-        const la = opts.lastApplication;
-        lines.push("");
-        lines.push(`Last application: ${la.status} (${la.submitted_on})`);
-      }
-    }
+    const fullHtml = bodyToHtml(topHtml, debugHtml);
 
     await resend.emails.send({
       from: EMAIL_FROM,
       to: ["eric@marcoullier.com"],
       replyTo: opts.submitterEmail,
       subject,
-      html: bodyToHtml(lines.join("\n")),
+      html: fullHtml,
     });
   } catch (err) {
     console.error("[email] Failed to send feedback notification:", err);
