@@ -75,21 +75,48 @@ Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `2026
 - `monday_after_macro` — singleton row storing default template content for Monday After emails. Fields: `subject`, `preheader`, `headline`, `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`, `partnership_boilerplate`. Same pattern as `monday_before_macro`.
 - `monday_after_emails` — per-dinner Monday After email drafts. Same structure as `monday_before_emails` with additional fields: `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`. Target dinner = most recent past dinner. Same sent-lock trigger pattern.
 - `monday_after_email_images` — image attachments for Monday After emails. Same as `monday_before_email_images` but `group_number` CHECK IN (1, 2, 3, 4, 5) — five image groups. Stored at `monday-after/{email_id}/{group}/{uuid}.jpg`.
+- `system_events` — append-only log for events not captured by audit or email_events (auth login, cron runs, transactional/bulk email sends, webhook receipt, feedback, errors). Service-role writes only. Used by the Activity Feed. See "Activity feed" section.
 
 ## Audit logging
 
-Row-level audit logging via `audit.row_history` table in a separate `audit` schema. Captures before/after JSONB snapshots of every INSERT, UPDATE, DELETE on business-critical tables. Purpose: individual row recovery without restoring the full database from backup.
+Row-level audit logging via `audit.row_history` table in a separate `audit` schema. Captures before/after JSONB snapshots of every INSERT, UPDATE, DELETE on business-critical tables. Purpose: individual row recovery without restoring the full database from backup, plus driving the Activity Feed (see "Activity feed" section).
 
-- **Trigger function:** `audit.log_row_change()` (SECURITY DEFINER, owned by postgres). Captures `TG_OP`, `to_jsonb(OLD)`, `to_jsonb(NEW)`, `auth.uid()` (try/catch for cron contexts), `current_user`. PK resolution is hardcoded: all tables use `id` UUID except `dinner_speakers` (composite `dinner_id` + `member_id`).
+- **Trigger function:** `audit.log_row_change()` (SECURITY DEFINER, owned by postgres). Captures `TG_OP`, `to_jsonb(OLD)`, `to_jsonb(NEW)`, `auth.uid()` into `changed_by`, `current_user` into `changed_by_role`, and the `X-Audit-Actor` request header into `actor_member_id`. PK resolution is hardcoded: all tables use `id` UUID except `dinner_speakers` (composite `dinner_id` + `member_id`).
 - **Trigger naming:** All audit triggers are named `zzz_audit_row_change` so they fire last among same-timing AFTER triggers (Postgres fires alphabetically). This ensures the audit snapshot captures the final row state after other triggers (e.g. `updated_at`, `marketing_opted_out_at`).
 - **Audited tables (10):** `members`, `applications`, `tickets`, `credits`, `member_emails`, `dinners`, `dinner_speakers`, `email_templates`, `email_instances`, `email_events`.
-- **NOT audited:** `monday_before_*`, `monday_after_*` (lower recovery value, already have sent-lock triggers). `auth.*`, `storage.*` (Supabase-managed).
+- **NOT audited:** `system_events` (already an append-only event log; auditing it would be duplicate noise). `monday_before_*`, `monday_after_*` (lower recovery value, already have sent-lock triggers). `auth.*`, `storage.*` (Supabase-managed).
+- **`actor_member_id` column** (added Sprint 19): UUID NULL, populated by the trigger reading `current_setting('request.headers', true)::jsonb ->> 'x-audit-actor'`. Server actions that should attribute their writes use `createAdminClientForCurrentActor()` (see `src/lib/supabase/admin-with-actor.ts`), which attaches the header. Pooling-safe because PostgREST sets `request.headers` per-request — the GUC value is gone when the txn ends. Cron and webhook writes intentionally omit the header.
 - **RLS:** Enabled on `audit.row_history`. SELECT policy for admin/team only via `is_admin_or_team()`. No INSERT/UPDATE/DELETE policies — only the SECURITY DEFINER trigger writes.
-- **Indexes:** Composite on `(table_schema, table_name, changed_at DESC)`, expression on `(table_schema, table_name, (row_pk->>'id'))`, BRIN on `changed_at`.
+- **Schema grants:** `USAGE ON SCHEMA audit` and `SELECT ON audit.row_history` granted to `service_role` and `authenticated`. Required because the `activity_feed` view runs `WITH (security_invoker = true)` — without these grants, callers hit "permission denied for table row_history" and the view query fails.
+- **Indexes:** Composite on `(table_schema, table_name, changed_at DESC)`, expression on `(table_schema, table_name, (row_pk->>'id'))`, BRIN on `changed_at`, partial on `changed_by`, partial on `actor_member_id`.
 - **Limitations:** TRUNCATE and DROP TABLE bypass row-level triggers — no audit entries are created. These catastrophic scenarios require Supabase PITR backups. All normal DML (INSERT/UPDATE/DELETE), including bulk operations, is fully captured and recoverable.
 - **No retention policy.** Table grows forever — fine at our volume. Add cleanup later if needed.
-- **No admin UI.** Audit history is queried via SQL (Claude Code or Supabase dashboard). Admin browse page is a future sprint.
-- **Migration:** `20260426400000_audit_row_history.sql`.
+- **Migrations:** `20260426400000_audit_row_history.sql` (initial), `20260430200000_audit_actor_member_id.sql` (actor_member_id column + trigger update), `20260430220000_audit_schema_grants.sql` (service_role/authenticated grants).
+
+## Activity feed
+
+Unified read API over the three event sources (`system_events`, `email_events`, `audit.row_history`) projecting them to a common shape. Backs `/admin/operations` and the Member History section on `/admin/members/[id]`.
+
+- **`public.activity_feed` view**: UNIONs the three sources. Audit rows are translated client-side (event_type derived from old/new diff). The view runs `WITH (security_invoker = true)` and uses `actor_member_id` directly — no `auth.users` join (granting `auth.users` to service_role would expose password hashes). Migrations: `20260430110000_activity_feed_view.sql` (initial, dropped/replaced), `20260430210000_activity_feed_actor_coalesce.sql` (intermediate, dropped/replaced), `20260430230000_activity_feed_drop_auth_users_join.sql` (current).
+- **`public.system_events` table**: append-only log for events not captured by audit or email_events. Columns: `id`, `event_type`, `actor_id`, `actor_label`, `subject_member_id`, `summary`, `metadata` JSONB, `occurred_at`. Service-role writes only (no INSERT/UPDATE/DELETE RLS policies). Migration: `20260430100000_system_events.sql`. Indexed on `occurred_at DESC`, `event_type`, `actor_id`, `subject_member_id`. NOT audited.
+- **Event types in use**:
+  - `auth.login` / `auth.login_failed` (logged by `/auth/confirm` and `/auth/callback`)
+  - `cron.fulfill_tickets`, `cron.post_dinner`, `cron.dinner_generation` (cron handlers)
+  - `webhook.stripe`, `webhook.resend` (webhook receipt)
+  - `email.transactional_sent` (every transactional email send)
+  - `email.bulk_sent` (Monday Before, Monday After, Morning Of Send To All)
+  - `email.bounced` / `email.complained` / `email.failed` (translated from email_events source)
+  - `feedback.submitted`
+  - `application.linked` (existing-member re-application — only system_event for an audit row that's otherwise indistinguishable from a fresh approve)
+  - `error.caught` (caught errors in cron and webhook handlers)
+  - Audit-derived: `member.created`, `member.edited`, `member.kicked_out`, `member.reinstated`, `member.team_added`/`team_removed`, `member.marketing_opted_in`/`opted_out`, `application.submitted`/`approved`/`rejected`/`updated`, `ticket.purchased`/`fulfilled`/`refunded`/`refunded_guest`/`credited`, `credit.created`/`redeemed`, `member_email.added`/`primary_set`/`status_changed`/`deleted`, `dinner.created`/`updated`, `speaker.added`/`removed`, `email_template.updated`.
+- **People feed filter**: `actor_id IS NOT NULL` AND source ≠ `email_events` AND event_type NOT LIKE `cron.%`/`webhook.%`/`error.%` AND event_type ≠ `email.transactional_sent`. System feed: everything.
+- **Helpers** (in `src/lib/`):
+  - `system-events.ts → logSystemEvent({…})`: single-insert via service-role admin client. Failures logged but never thrown.
+  - `activity-feed.ts → getActivityFeed({…})`: query view with filters/pagination, refine audit event_type and render bundled-edit summaries from old/new diff. **Currently swallows query errors and returns empty list — known issue, should propagate.**
+  - `current-actor.ts → getCurrentActorMemberId()`: resolves request's auth user → member.id via `member_emails`.
+  - `supabase/admin-with-actor.ts → createAdminClientForCurrentActor()`: service-role client with `X-Audit-Actor` header.
+- **Bundled-edit rendering**: audit UPDATE rows show "Eric edited Aaron's profile (company, LinkedIn, intro)" — up to 5 fields, then falls back to count "(8 fields)". Self-edits render as "Aaron edited their profile (...)". Trigger-managed noise fields (`updated_at`, `intro_updated_at`, `ask_updated_at`, `marketing_opted_out_at`) skipped from the changed-field list.
 
 ## Auth flow
 
@@ -136,7 +163,8 @@ src/
 ├── lib/supabase/
 │   ├── client.ts                       # Browser client (createBrowserClient)
 │   ├── server.ts                       # Server client (createServerClient with cookieStore)
-│   └── admin.ts                        # Service role client (bypasses RLS)
+│   ├── admin.ts                        # Service role client (bypasses RLS) — use for cron/webhook/no-actor writes
+│   └── admin-with-actor.ts            # createAdminClientForCurrentActor() — service-role client with X-Audit-Actor header. Use for ALL writes to audited tables initiated by a human actor
 ├── app/
 │   ├── _components/
 │   │   └── this-months-dinner.tsx     # Server component: next upcoming dinner section (title, date/venue, description, speakers, Apply CTA). Returns null if no future dinner. Used on marketing home
@@ -228,6 +256,10 @@ src/
 │       ├── tickets/
 │       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
 │       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
+│       ├── operations/
+│       │   ├── page.tsx                # Server wrapper: queries activity_feed via getActivityFeed, fetches distinct event_types for filter
+│       │   ├── operations-client.tsx   # Client component: People/System tabs, event_type multi-select, actor search, date range, paginated table
+│       │   └── actions.ts              # Server action: searchMembersForActor (member search for the actor filter)
 │       ├── emails/
 │       │   ├── page.tsx                # Email index: Transactional (top) + Marketing (bottom). Marketing entries have smart buttons: Create draft / Continue draft / View sent
 │       │   ├── template-editor.tsx     # Shared client component: subject/body editing, Send Test Email, Save Changes (used by transactional template pages)
@@ -277,9 +309,12 @@ src/
 │       │   ├── add-member-modal.tsx    # Add Member form modal (client component)
 │       │   ├── actions.ts             # Server actions: checkEmail, addMember (for Add Member modal)
 │       │   └── [id]/
-│       │       ├── page.tsx            # Server wrapper: fetches member + determines admin role
+│       │       ├── page.tsx            # Server wrapper: fetches member + determines admin role, mounts MemberHistory at bottom
 │       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate, profile pic upload (Upload Photo/Change Photo buttons + Remove Photo link, same layout as portal profile)
-│       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management, adminUploadProfilePic
+│       │       ├── member-history.tsx  # Server component: bottom-of-page Member History section (People feed scoped to actor_id = id OR subject_member_id = id)
+│       │       ├── member-history-client.tsx # Client component: paginated 25/page table with event_type filter, refetches via server action
+│       │       ├── member-history-actions.ts # Server action: fetchMemberHistory (delegates to getActivityFeed with scopedToMemberId)
+│       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management, adminUploadProfilePic, applyCredit, compTicket
 ├── lib/
 │   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), renderTemplateVars() (shared variable substitution), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
 │   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification, complaint notification, send-failure notification). All use bodyToHtml() for branded shell. sendFulfillmentEmail has optional throwOnError param for cron retry logic
@@ -293,7 +328,10 @@ src/
 │   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatDinnerShort, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
 │   ├── ensure-auth-user.ts            # ensureAuthUser(email) — creates auth.users row via admin API if not exists. Called on member approval/add
 │   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
-│   └── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
+│   ├── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
+│   ├── system-events.ts               # logSystemEvent({event_type, actor_id?, actor_label?, subject_member_id?, summary?, metadata?}) — single insert via service-role admin client; failures logged but never thrown
+│   ├── activity-feed.ts               # getActivityFeed({kind, page, pageSize, eventTypes?, actorMemberId?, scopedToMemberId?, fromDate?, toDate?}) + getDistinctEventTypes(kind). Queries public.activity_feed view, refines audit-row event_type from old/new diff, renders bundled-edit summaries. Currently swallows errors → empty list (known issue; should propagate)
+│   └── current-actor.ts               # getCurrentActorMemberId() — resolves session auth user to members.id via member_emails. Used by createAdminClientForCurrentActor and admin actions that explicitly log system events
 public/
 ├── brand/
 │   ├── photos/                         # 12 candid dinner photos (webp) + 3 team headshots (eric.webp, danny.webp, megan.webp) — used on marketing home, about, team, recap
@@ -335,7 +373,13 @@ supabase/
 │   ├── 20260426200000_monday_after_emails.sql                 # monday_after_macro + monday_after_emails + monday_after_email_images + sent-lock triggers + RLS
 │   ├── 20260426300000_fix_swap_primary_email_rpc.sql          # Fix swap_primary_email RPC: clear old primary before setting new to avoid unique index violation
 │   ├── 20260426400000_audit_row_history.sql                   # audit schema + row_history table + log_row_change() trigger on 9 business tables + RLS
-│   └── 20260430000000_email_events.sql                       # email_events table + extend member_emails email_status CHECK for 'complained' + audit trigger
+│   ├── 20260430000000_email_events.sql                       # email_events table + extend member_emails email_status CHECK for 'complained' + audit trigger
+│   ├── 20260430100000_system_events.sql                      # system_events table + indexes + RLS, plus partial index on audit.row_history.changed_by
+│   ├── 20260430110000_activity_feed_view.sql                 # initial activity_feed view (UNIONs system_events + email_events + audit.row_history). NOTE: superseded by 20260430230000
+│   ├── 20260430200000_audit_actor_member_id.sql              # audit.row_history.actor_member_id column + partial index + trigger update to read X-Audit-Actor request header
+│   ├── 20260430210000_activity_feed_actor_coalesce.sql       # view update with COALESCE(actor_member_id, auth.uid resolution). NOTE: superseded by 20260430230000 because the auth.users join failed under security_invoker
+│   ├── 20260430220000_audit_schema_grants.sql                # GRANT USAGE ON SCHEMA audit + SELECT ON audit.row_history TO service_role, authenticated. Required for the activity_feed view to read audit rows under security_invoker
+│   └── 20260430230000_activity_feed_drop_auth_users_join.sql # current activity_feed view: drops auth.users join, uses actor_member_id directly. service_role doesn't have SELECT on auth.users by default and granting it would expose password hashes
 └── seed.sql                                # Original test data (replaced by Phase 2 import)
 tmp/
 ├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
@@ -556,6 +600,30 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
 - **Shared `<SearchToolbar>` component**: admin pages hand-roll search input + filter tabs. A shared component would lock the toolbar layout and spacing.
 - **Admin detail layout component**: member detail, application detail, and dinner detail all use back-link + heading + two-column grid with similar patterns but different enough to resist a single abstraction today.
 
+## What's done (Sprint 19 — Activity feed + audit actor attribution)
+
+- **Activity feed system**: unified read API over three event sources (`system_events`, `email_events`, `audit.row_history`) projected to a common shape via `public.activity_feed` view. See "Activity feed" section above for full reference.
+- **`/admin/operations` page**: People + System tabs (default People). 100 rows/page, paginated. Filters: event_type multi-select, actor member search, optional date range. Sort: occurred_at DESC. Sidebar entry "Activity" under Operations group.
+- **`<MemberHistory>` section** at the bottom of `/admin/members/[id]`: People feed scoped to `actor_id = id OR subject_member_id = id`. 25/page paginated. Optional event_type filter. Initial render via server component; pagination + filter via `fetchMemberHistory` server action.
+- **Audit actor attribution via X-Audit-Actor header**: new `audit.row_history.actor_member_id` column populated by the trigger reading PostgREST's per-request `request.headers` GUC. `createAdminClientForCurrentActor()` (in `src/lib/supabase/admin-with-actor.ts`) attaches the header to every request from a service-role client, sourcing the actor from the session via `getCurrentActorMemberId()`. All admin server actions and portal save actions on audited tables now use this helper. Cron and webhook handlers intentionally use the plain admin client (no actor).
+- **Pooling-safe by design**: `request.headers` is a per-request GUC scoped to the transaction, so values can't leak across pooled connections. This is the correctness-safe alternative to session-level `SET app.actor_id`.
+- **Instrumentation**: `logSystemEvent({…})` calls added at:
+  - `/auth/confirm` and `/auth/callback`: `auth.login` on success (resolves member via verified email) and `auth.login_failed` on failure when the `?email=` query param matches a member_emails row.
+  - All three crons: `cron.fulfill_tickets`, `cron.post_dinner`, `cron.dinner_generation` at end-of-run with summary metadata. Crons wrapped in try/catch → `error.caught` on throws.
+  - Stripe + Resend webhooks: `webhook.stripe`, `webhook.resend` on receipt; both wrapped in try/catch.
+  - Every transactional email send (approval, re-application, rejection, fulfillment, morning-of, admin notifications, complaint, send-failure, feedback): `email.transactional_sent` with `{ template, recipient, member_id }`.
+  - Bulk emails (Monday Before, Monday After, Morning Of Send To All): `email.bulk_sent` with `{ kind, dinner_id, recipient_count }` and actor_id = sending team member.
+  - Feedback submission: `feedback.submitted` with kind (bug/feedback) and role.
+  - Application linked-to-existing-member flow: `application.linked` (kept explicit because the audit signature is indistinguishable from a fresh approve).
+- **Email template URL change** (applied via Supabase Management API): Magic Link and Confirmation templates now use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`. The `&email=` param lets `/auth/confirm` log `auth.login_failed` events with member identification when token verification fails (e.g. expired magic links).
+
+### Known issues / gaps in this sprint
+
+- **Error handling in `getActivityFeed`** silently returns an empty list on query failure. Hid three separate permission-denied errors during this sprint. Should propagate or surface to the UI.
+- **`application.linked` produces dual events** in the People feed: one `application.approved` (audit-derived from status flip) and one `application.linked` (explicit system_event). Distinguishable by event_type label but visually noisy. Acceptable for now.
+- **Field-level admin edits captured by audit only**, not by explicit `logSystemEvent`. Audit attribution works (via the X-Audit-Actor header), so they appear correctly attributed in the feed via the `member.edited` translation in `refineAuditRow`.
+- **No integration test** for the activity_feed view. A single PostgREST round-trip test would have caught the audit-schema-grant + auth.users-grant failures immediately.
+
 ## What's NOT done
 
 Don't build these without an explicit prompt:
@@ -590,6 +658,9 @@ Don't build these without an explicit prompt:
 - ~~Page-by-page detail polish pass~~ Done — marketing pages (about, faq, team) built, Card component migration, section spacing fix
 - ~~Marketing pages: /about, /faq, /team~~ Done — all three built with real content, dynamic data, design system primitives
 - ~~Gallery link~~ Removed from public-nav for launch (placeholder page still exists)
+- ~~Activity feed + Operations page + Member History~~ Done (Sprint 19)
+- Surface query errors from `getActivityFeed` to the UI instead of silently returning empty list (current behavior hides permission/RLS failures)
+- Integration test for the `activity_feed` view (PostgREST round-trip) to catch grant/permission regressions
 
 ## Pre-launch checklist (before real users hit this)
 
@@ -629,3 +700,7 @@ Don't build these without an explicit prompt:
 - **Sent-lock triggers are strict.** Once `status = 'sent'`, the DB trigger rejects ALL UPDATEs on `monday_before_emails` / `monday_after_emails` and their image tables. The send action's final UPDATE (status + sent_at + sent_by + audience_snapshot) succeeds because `OLD.status` is still `'draft'` at that point. Don't try to update sent emails — they're immutable by design.
 - **RichTextEditor suppresses initial onChange.** Tiptap fires `onUpdate` on mount, which would falsely set the parent form's `hasEdited` state. The component uses a `mountedRef` to skip the first callback. If the editor seems to not trigger changes, check this mechanism.
 - **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
+- **Use `createAdminClientForCurrentActor()` for ALL writes to audited tables initiated by a human actor.** The plain `createAdminClient()` doesn't attach the X-Audit-Actor header, so audit rows from human-driven server actions land with `actor_member_id = NULL` and don't show up in the People feed. Cron and webhook handlers should use plain `createAdminClient()` (no actor exists). Discovered Sprint 19 when portal saveProfile and 4 admin-emails saveTemplate actions were missed in the initial wire-up.
+- **Don't grant SELECT on `auth.users` to service_role or authenticated.** Tempting when a query needs to resolve `auth.uid()` to a user record, but `auth.users` contains password hashes and other sensitive fields. Use a SECURITY DEFINER function for the lookup instead, or restructure to avoid the join (the activity_feed view's audit subquery dropped its `auth.users` join for this reason).
+- **`security_invoker = true` views need explicit grants on every underlying table.** The `activity_feed` view uses `security_invoker = true` so callers query through their own RLS. That means service_role and authenticated need USAGE on `audit` schema + SELECT on `audit.row_history`, otherwise the view query throws "permission denied" with no row-level fallback. Granted in `20260430220000_audit_schema_grants.sql`. RLS still gates row visibility for `authenticated` via `is_admin_or_team()`.
+- **`getActivityFeed` swallows errors and returns empty list.** Any query failure (RLS denial, permission error, syntax error) silently produces an empty page. Hid three separate permission bugs during Sprint 19. Until this is fixed, when the feed appears empty unexpectedly, check Vercel runtime logs for `[activity-feed] query failed` and Postgres logs for permission errors.
