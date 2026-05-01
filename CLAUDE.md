@@ -642,6 +642,37 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
 - **Field-level admin edits captured by audit only**, not by explicit `logSystemEvent`. Audit attribution works (via the X-Audit-Actor header), so they appear correctly attributed in the feed via the `member.edited` translation in `refineAuditRow`.
 - **No integration test** for the activity_feed view. A single PostgREST round-trip test would have caught the audit-schema-grant + auth.users-grant failures immediately.
 
+## What's done (Sprint 20 — Streak integration foundations, Prompt A)
+
+Foundation layer for the OS ↔ Streak sync. Library is fully wired but **inert** — no state-change site calls into it yet (that's Prompt B). Nothing changes from a user's perspective after this sprint.
+
+- **Schema additions** (`20260501000000_streak_integration_columns.sql`):
+  - `applications.streak_box_key TEXT NULL` — Streak box key for this application's box. Set on `/apply` submission (Prompt B), copied to `members.streak_box_key` on approval, cleared on rejection.
+  - `members.streak_box_key TEXT NULL` — Streak box key for this member's box. Inherited from application on approval, or set on first push for add/link paths.
+  - `members.excluded_from_dinner_id UUID NULL` — FK to `dinners(id) ON DELETE SET NULL`. Tracks "Not This One" state. Set by inbound Streak webhook (Prompt B), cleared by post-dinner cron (Prompt B), `ON DELETE SET NULL` so dinner deletion silently clears.
+- **Streak API client** (`src/lib/streak/client.ts`): HTTP Basic auth (`API_KEY:` base64), in-process token-bucket pacing at ≤8 req/sec, exponential backoff on 429 (max 3 retries), single retry on 5xx. Every call emits `streak.api_call` to `system_events` with `{method, path, status, duration_ms}`. Functions: `listPipelines`, `getPipeline`, `listPipelineFields`, `createPipelineField`, `listPipelineStages`, `createBox`, `getBox`, `updateBox`, `setBoxField`, `deleteBox`. createBox uses `PUT /pipelines/{key}/boxes`, updateBox uses `POST /boxes/{key}`, setBoxField uses `POST /boxes/{key}/fields/{fieldKey}` with `{value}` body — Streak's own conventions, not REST-canonical.
+- **Stage constants** (`src/lib/streak/stages.ts`): 7-stage enum + display names (`Applied`, `Approved`, `Attended`, `Has Ticket`, `Not This One`, `Bounced`, `Opted Out`). Bootstrap matches stages by exact name — these strings must match the Streak pipeline verbatim.
+- **Stage computation** (`src/lib/streak/compute-stage.ts`): split into pure + DB fetcher to make precedence cheaply testable.
+  - `computeStageForMember(state: MemberStreakState): StreakStage` — pure. Precedence ladder, first match wins: opted_out (marketing_opted_in=false OR kicked_out=true) → bounced (≥1 email AND every email bounced; vacuously-true zero-email case explicitly excluded) → has_ticket → not_this_one → attended → approved.
+  - `computeStageForApplication(app)` — pure. Returns `'applied'` only when `status='pending' AND member_id IS NULL`; else `null` (no standalone Streak box).
+  - `getMemberStreakState(memberId)` — DB fetcher. 4 reads via service-role client. Includes "active exclusion" check that filters stale exclusions (past-dinner) at fetch time.
+- **Bootstrap** (`src/lib/streak/bootstrap.ts`): `ensureStreakReady()` resolves the Thunderview pipeline, all 7 stage keys (throws with the missing list if any are absent — stages are curated in Streak, not auto-created), and the 4 custom fields (`First Name`, `Last Name`, `Company`, `Email` — auto-created if missing). Result cached in module scope; `resetStreakCache()` for tests/scripts.
+- **Push primitives** (`src/lib/streak/push.ts`): all 4 throw on Streak API failure; caller (Prompt B) decides retry/logging.
+  - `pushMemberToStreak(memberId)` — fetches member + state, computes stage, creates box if `streak_box_key` is null (persists key back to row) else updates in place. Sets all 4 fields unconditionally (simpler than diffing).
+  - `pushApplicationToStreak(applicationId)` — same shape, always targets `applied` stage. Pulls name/email/company from the application row directly. Throws if the application isn't in the applied state.
+  - `deleteApplicationBox(applicationId)` / `deleteMemberBox(memberId)` — no-op if `streak_box_key` is null; else delete + null the column.
+- **Verification** (`tmp/streak-precedence-verify.ts`): runnable pure-function exercise covering all 6 member precedence cases (positive + negative for bounced rule, plus precedence-lose cases for not_this_one) and 4 application cases. 14 cases pass; exits non-zero on any mismatch. **No test framework installed** — explicit choice given the project has no test culture; flag in CLAUDE.md is enough.
+- **Bootstrap smoke** (`tmp/streak-bootstrap-smoke.ts`): one-off runnable that calls `ensureStreakReady()` and prints resolved keys. Run with `npx tsx --env-file=.env.local tmp/streak-bootstrap-smoke.ts`. Eric runs once after deploy to verify the 4 custom fields appear in the Streak UI.
+- **`tsx` added as devDep** for running TS scripts under `tmp/` from the local terminal. Cloud-first not violated — these are convenience runners, not a production runtime dependency.
+- **`STREAK_API_KEY`** added to `.env.local`, `.env.local.example`, and Vercel **Production + Preview** scopes (no `gitBranch`, set via REST API per the CLAUDE.md gotcha — CLI's interactive flow can't set "all preview branches" non-interactively).
+
+### Known gaps / not yet wired
+
+- **Library is inert.** No state-change site (approve, reject, link, ticket insert/refund, opt-out toggle, kick, bounce webhook, post-dinner cron) calls `pushMemberToStreak` or `pushApplicationToStreak` yet — that's Prompt B.
+- **No inbound webhook** at `/api/webhooks/streak/*` — Prompt B.
+- **No backfill** of existing 632 members + pending applications — Prompt C.
+- **Auto-promote non-bounced secondary email to primary on bounce** — separate independent open loop.
+
 ## What's NOT done
 
 Don't build these without an explicit prompt:
