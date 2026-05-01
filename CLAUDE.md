@@ -735,6 +735,7 @@ Streak's mail-merge UI pulls recipients from the **Contacts** section on a box, 
 - **Manually deleted boxes are not recreated** by the bulk script — the WHERE filter only touches rows that already have a `streak_box_key`. Same edge case noted in Prompt C.
 - **Replace semantics on `contacts`** means manually-added secondary contacts on a box would be wiped on next push. Today every box has at most one contact (the script-attached one). If multi-contact use ever matters, fetch + merge before write.
 - **Reconciliation/retry queue for failed contact pushes** is not built. Same posture as Prompt B: failures land in `system_events` (`error.caught` from safe-push, or direct from non-safe paths), Eric reviews and re-runs.
+- **Email-change contact cleanup is not needed.** Considered as Prompt E; verified empirically that `POST /v1/boxes/{boxKey}` with `{ contacts: [{ key }] }` REPLACES the contacts array (not additive), so when a member's primary email changes and a push fires, the new contact's key replaces the old one — no stale-contact buildup. Decision documented here so a future reader doesn't redesign around a bug that doesn't manifest.
 
 ## What's NOT done
 
