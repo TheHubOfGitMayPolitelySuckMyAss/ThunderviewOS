@@ -97,6 +97,9 @@ export default function OperationsClient(props: Props) {
         <button onClick={() => toggleTab("system")} className={tabClasses(props.kind === "system")}>
           System
         </button>
+        <button onClick={() => toggleTab("marketing")} className={tabClasses(props.kind === "marketing")}>
+          Marketing
+        </button>
       </div>
 
       {/* Filters */}

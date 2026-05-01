@@ -21,7 +21,12 @@ export default async function OperationsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const kind: FeedKind = sp.tab === "system" ? "system" : "people";
+  const kind: FeedKind =
+    sp.tab === "system"
+      ? "system"
+      : sp.tab === "marketing"
+        ? "marketing"
+        : "people";
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const eventTypes = sp.events ? sp.events.split(",").filter(Boolean) : [];
   const actorMemberId = sp.actor || null;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
 import { Suspense } from "react";
 import FeedbackWrapper from "@/components/feedback/feedback-wrapper";
+import PageViewLogger from "@/components/page-view-logger";
 import "./globals.css";
 
 const inter = Inter({
@@ -37,6 +38,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
+        <Suspense fallback={null}>
+          <PageViewLogger rootLayout />
+        </Suspense>
         <Suspense fallback={null}>
           <FeedbackWrapper />
         </Suspense>
