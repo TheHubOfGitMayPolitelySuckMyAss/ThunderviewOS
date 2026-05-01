@@ -60,7 +60,7 @@ async function runFulfillTickets() {
       event_type: "cron.fulfill_tickets",
       actor_label: "cron:fulfill-tickets",
       summary: "fulfill-tickets ran: no upcoming dinner",
-      metadata: { fulfilled: 0, reason: "no upcoming dinner found" },
+      metadata: { outcome: "no_op", fulfilled: 0, reason: "no upcoming dinner found" },
     });
     return NextResponse.json({
       ran: true,
@@ -91,6 +91,7 @@ async function runFulfillTickets() {
       actor_label: "cron:fulfill-tickets",
       summary: `fulfill-tickets ran: outside gate (${monthsDiff} months out)`,
       metadata: {
+        outcome: "no_op",
         fulfilled: 0,
         reason: "outside gate",
         dinner_id: targetDinner.id,
@@ -119,6 +120,7 @@ async function runFulfillTickets() {
       actor_label: "cron:fulfill-tickets",
       summary: `fulfill-tickets ran: no purchased tickets for ${targetDinner.date}`,
       metadata: {
+        outcome: "no_op",
         fulfilled: 0,
         reason: "no purchased tickets",
         dinner_id: targetDinner.id,
@@ -144,10 +146,25 @@ async function runFulfillTickets() {
       await sendFulfillmentEmail(ticket.member_id, targetDinner.id, { throwOnError: true });
     } catch (err) {
       // Email failed — leave ticket as purchased, will retry on next run
+      const message = err instanceof Error ? err.message : String(err);
       console.error(
         `[fulfill-tickets] Email failed for ticket=${ticket.id} member=${ticket.member_id}:`,
         err
       );
+      await logSystemEvent({
+        event_type: "error.caught",
+        actor_label: "cron:fulfill-tickets",
+        summary: `fulfill-tickets: email send failed for ticket ${ticket.id}`,
+        metadata: {
+          context: "cron.fulfill_tickets",
+          cause: "fulfillment_email_failed",
+          message,
+          ticket_id: ticket.id,
+          member_id: ticket.member_id,
+          dinner_id: targetDinner.id,
+          dinner_date: targetDinner.date,
+        },
+      });
       emailFailed++;
       continue;
     }
@@ -168,6 +185,22 @@ async function runFulfillTickets() {
         `[fulfill-tickets] CRITICAL: Email sent but DB update failed for ticket=${ticket.id} member=${ticket.member_id}:`,
         error.message
       );
+      await logSystemEvent({
+        event_type: "error.caught",
+        actor_label: "cron:fulfill-tickets",
+        summary: `fulfill-tickets: email sent but DB update failed for ticket ${ticket.id}`,
+        metadata: {
+          context: "cron.fulfill_tickets",
+          cause: "ticket_fulfill_update_failed_after_email",
+          severity: "critical",
+          message: error.message,
+          code: error.code ?? null,
+          ticket_id: ticket.id,
+          member_id: ticket.member_id,
+          dinner_id: targetDinner.id,
+          dinner_date: targetDinner.date,
+        },
+      });
       dbFailed++;
       continue;
     }

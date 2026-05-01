@@ -31,6 +31,15 @@ async function handleStripeWebhook(request: NextRequest) {
   const signature = request.headers.get("stripe-signature");
 
   if (!signature) {
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:stripe",
+      summary: "Stripe webhook rejected: missing stripe-signature header",
+      metadata: {
+        context: "webhook.stripe",
+        cause: "missing_signature_header",
+      },
+    });
     return NextResponse.json(
       { error: "Missing stripe-signature header" },
       { status: 400 }
@@ -47,6 +56,16 @@ async function handleStripeWebhook(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Stripe webhook signature verification failed:", message);
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:stripe",
+      summary: `Stripe webhook signature verification failed: ${message}`,
+      metadata: {
+        context: "webhook.stripe",
+        cause: "signature_verification_failed",
+        message,
+      },
+    });
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 400 }
@@ -69,6 +88,18 @@ async function handleStripeWebhook(request: NextRequest) {
 
     if (!metadata?.member_id || !metadata?.dinner_id) {
       console.error("Webhook missing required metadata:", metadata);
+      await logSystemEvent({
+        event_type: "error.caught",
+        actor_label: "webhook:stripe",
+        summary: "Stripe checkout.session.completed missing required metadata",
+        metadata: {
+          context: "webhook.stripe",
+          cause: "malformed_payload",
+          stripe_event_id: event.id,
+          stripe_session_id: session.id,
+          received_metadata: metadata ?? null,
+        },
+      });
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
@@ -112,6 +143,21 @@ async function handleStripeWebhook(request: NextRequest) {
 
     if (insertError) {
       console.error("Failed to insert ticket from webhook:", insertError.message, insertError.details, insertError.code);
+      await logSystemEvent({
+        event_type: "error.caught",
+        actor_label: "webhook:stripe",
+        summary: `Stripe webhook ticket insert failed: ${insertError.message}`,
+        metadata: {
+          context: "webhook.stripe",
+          cause: "ticket_insert_failed",
+          message: insertError.message,
+          code: insertError.code ?? null,
+          stripe_event_id: event.id,
+          stripe_session_id: session.id,
+          member_id: metadata.member_id,
+          dinner_id: metadata.dinner_id,
+        },
+      });
       return NextResponse.json(
         { error: "Database insert failed" },
         { status: 500 }
@@ -131,6 +177,20 @@ async function handleStripeWebhook(request: NextRequest) {
 
       if (updateError) {
         console.error("Failed to fulfill ticket from webhook:", updateError.message, updateError.details, updateError.code);
+        await logSystemEvent({
+          event_type: "error.caught",
+          actor_label: "webhook:stripe",
+          summary: `Stripe webhook ticket fulfill update failed: ${updateError.message}`,
+          metadata: {
+            context: "webhook.stripe",
+            cause: "ticket_fulfill_update_failed",
+            message: updateError.message,
+            code: updateError.code ?? null,
+            ticket_id: inserted.id,
+            member_id: metadata.member_id,
+            dinner_id: metadata.dinner_id,
+          },
+        });
         return NextResponse.json(
           { error: "Database update failed" },
           { status: 500 }

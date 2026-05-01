@@ -63,7 +63,21 @@ async function runGenerateDinner() {
     console.log(
       `[generate-dinner] Not scheduled day. Today=${today}, first Thursday=${firstThurs}, day after=${dayAfterFirstThurs}`
     );
-    // No system event on the daily no-op fire — would generate ~30 events/month of pure noise.
+    // Heartbeat on the daily no-op fire so "did the cron fire today" is
+    // answerable from inside the system. Excluded from the System feed
+    // inclusion list, so this doesn't add UI noise.
+    await logSystemEvent({
+      event_type: "cron.dinner_generation",
+      actor_label: "cron:generate-dinner",
+      summary: `generate-dinner ran: not scheduled day (today=${today})`,
+      metadata: {
+        outcome: "no_op",
+        reason: "not scheduled day",
+        today,
+        first_thursday: firstThurs,
+        day_after_first_thursday: dayAfterFirstThurs,
+      },
+    });
     return NextResponse.json({
       ran: false,
       reason: "not scheduled day",
@@ -90,6 +104,7 @@ async function runGenerateDinner() {
       actor_label: "cron:generate-dinner",
       summary: `generate-dinner ran: skip month ${targetYear}-${String(targetMonth).padStart(2, "0")}`,
       metadata: {
+        outcome: "no_op",
         skipped: true,
         reason: "skip month",
         target_month: `${targetYear}-${String(targetMonth).padStart(2, "0")}`,

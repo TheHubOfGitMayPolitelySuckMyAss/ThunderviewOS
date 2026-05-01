@@ -62,7 +62,7 @@ async function runPostDinner() {
       event_type: "cron.post_dinner",
       actor_label: "cron:post-dinner",
       summary: `post-dinner ran: no dinner ${yesterdayStr}`,
-      metadata: { updated: 0, reason: "no dinner yesterday", yesterday: yesterdayStr },
+      metadata: { outcome: "no_op", updated: 0, reason: "no dinner yesterday", yesterday: yesterdayStr },
     });
     return NextResponse.json({
       ran: true,
@@ -87,6 +87,7 @@ async function runPostDinner() {
       actor_label: "cron:post-dinner",
       summary: `post-dinner ran: no fulfilled tickets for ${dinner.date}`,
       metadata: {
+        outcome: "no_op",
         updated: 0,
         reason: "no fulfilled tickets",
         dinner_id: dinner.id,
