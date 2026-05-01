@@ -5,8 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendApprovalEmail, sendReApplicationEmail, sendRejectionEmail } from "@/lib/email-send";
 import { ensureAuthUser } from "@/lib/ensure-auth-user";
-import { logSystemEvent } from "@/lib/system-events";
-import { getCurrentActorMemberId } from "@/lib/current-actor";
 
 type ApproveResult = {
   success: boolean;
@@ -147,15 +145,10 @@ export async function linkApplicationToMember(
 
   await sendReApplicationEmail(result.member_id);
 
-  await logSystemEvent({
-    event_type: "application.linked",
-    actor_id: await getCurrentActorMemberId(),
-    subject_member_id: result.member_id,
-    summary: `Linked application to ${result.member_name}`,
-    metadata: {
-      application_id: applicationId,
-    },
-  });
+  // No explicit application.linked log — refineAuditRow now distinguishes
+  // link (member existed before this UPDATE) from fresh approve (member was
+  // created in the same RPC tx) using member.created_at vs the audit row's
+  // changed_at. See APPROVE_VS_LINK_BUFFER_MS in src/lib/activity-feed.ts.
 
   return {
     success: true,

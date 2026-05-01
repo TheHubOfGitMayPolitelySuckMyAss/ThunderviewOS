@@ -234,19 +234,27 @@ async function enrichRows(rows: FeedRowRaw[]): Promise<FeedRow[]> {
   }
 
   const nameLookup = new Map<string, string>();
+  // Used by refineApplications to distinguish a fresh approve (member_id row
+  // was created in the same RPC tx as the application UPDATE) from a re-
+  // application/link (member existed long before the application UPDATE).
+  const memberCreatedAtLookup = new Map<string, string>();
   if (memberIds.size > 0) {
     const admin = createAdminClient();
     const { data: members } = await admin
       .from("members")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, created_at")
       .in("id", Array.from(memberIds));
     for (const m of members ?? []) {
       nameLookup.set(m.id, formatName(m.first_name, m.last_name));
+      if (m.created_at) memberCreatedAtLookup.set(m.id, m.created_at);
     }
   }
 
   return rows.map((r) => {
-    const refined = r.source === "audit" ? refineAuditRow(r, nameLookup) : { event_type: r.event_type, summary: r.summary };
+    const refined =
+      r.source === "audit"
+        ? refineAuditRow(r, nameLookup, memberCreatedAtLookup)
+        : { event_type: r.event_type, summary: r.summary };
     return {
       source: r.source,
       source_id: r.source_id,
@@ -275,7 +283,8 @@ function defaultSummary(r: FeedRowRaw): string {
  */
 function refineAuditRow(
   r: FeedRowRaw,
-  nameLookup: Map<string, string>
+  nameLookup: Map<string, string>,
+  memberCreatedAtLookup: Map<string, string>
 ): { event_type: string; summary: string } {
   const meta = r.metadata as {
     table_name: string;
@@ -292,7 +301,7 @@ function refineAuditRow(
     case "members":
       return refineMembers(meta, actor, subject, isSelf);
     case "applications":
-      return refineApplications(meta, actor, subject);
+      return refineApplications(meta, actor, subject, r.occurred_at, memberCreatedAtLookup);
     case "tickets":
       return refineTickets(meta, actor, subject);
     case "credits":
@@ -441,6 +450,13 @@ function refineMembers(
   };
 }
 
+// Buffer for deciding fresh-approve vs link from member.created_at vs the
+// audit row's changed_at. approve_application creates the member and updates
+// the application within a single SECURITY DEFINER tx — typically <1s apart.
+// A delta beyond this buffer means the member already existed before the
+// approval, i.e. this is a re-application/link, not a fresh approval.
+const APPROVE_VS_LINK_BUFFER_MS = 60_000;
+
 function refineApplications(
   meta: {
     op: "INSERT" | "UPDATE" | "DELETE";
@@ -448,7 +464,9 @@ function refineApplications(
     new_row: Record<string, unknown> | null;
   },
   actor: string | null,
-  subject: string | null
+  subject: string | null,
+  occurredAt: string,
+  memberCreatedAtLookup: Map<string, string>
 ): { event_type: string; summary: string } {
   if (meta.op === "INSERT") {
     const newR = meta.new_row ?? {};
@@ -465,6 +483,36 @@ function refineApplications(
   const newR = meta.new_row ?? {};
   if (old.status !== newR.status) {
     if (newR.status === "approved") {
+      // Distinguish fresh approve (new member created in the same RPC) from
+      // re-application/link (member already existed). The applications table
+      // doesn't have a dedicated link flag — both flows write the same
+      // columns. The unambiguous signal is whether the linked member's row
+      // was created at the same time as this UPDATE.
+      const memberId = (newR.member_id as string | null) ?? null;
+      const memberCreatedAt = memberId ? memberCreatedAtLookup.get(memberId) : undefined;
+      let isLink = false;
+      if (memberCreatedAt) {
+        const memberCreatedMs = Date.parse(memberCreatedAt);
+        const occurredMs = Date.parse(occurredAt);
+        if (
+          Number.isFinite(memberCreatedMs) &&
+          Number.isFinite(occurredMs) &&
+          occurredMs - memberCreatedMs > APPROVE_VS_LINK_BUFFER_MS
+        ) {
+          isLink = true;
+        }
+      }
+
+      if (isLink) {
+        return {
+          event_type: "application.linked",
+          summary: actor && subject
+            ? `${actor} linked an application to ${subject}`
+            : subject
+              ? `Application linked to ${subject}`
+              : "Application linked",
+        };
+      }
       return {
         event_type: "application.approved",
         summary: actor && subject ? `${actor} approved ${subject}` : subject ? `${subject} approved` : "Application approved",
