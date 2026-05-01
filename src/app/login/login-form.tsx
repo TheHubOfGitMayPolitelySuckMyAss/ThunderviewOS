@@ -22,12 +22,17 @@ export default function LoginForm({ redirect }: { redirect?: string }) {
       document.cookie = `auth_redirect=${encodeURIComponent(redirect)}; path=/; max-age=600; SameSite=Lax`;
     }
 
+    // Always use window.location.origin so preview deploys keep magic links
+    // on the preview hostname. NEXT_PUBLIC_SITE_URL is production-only and
+    // would land users on prod after click-through. The Supabase email
+    // template references {{ .RedirectTo }}, so this URL controls where
+    // the magic link points.
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: `${(process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).trim()}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
       },
     });
 
