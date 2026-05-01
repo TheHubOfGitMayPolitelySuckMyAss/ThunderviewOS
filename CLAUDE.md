@@ -428,7 +428,7 @@ Production values are set in Vercel dashboard (Production + Development scopes).
 These are configured in the Supabase dashboard, not in the codebase:
 
 - **Site URL:** `https://thunderview-os.vercel.app`
-- **Redirect URLs allowlist:** `https://thunderview-os.vercel.app/**` and `http://localhost:3000/**`
+- **Redirect URLs allowlist:** `https://thunderview-os.vercel.app/**`, `http://localhost:3000/**`, AND a preview wildcard `https://thunderview-os-git-*-erics-projects-*.vercel.app/**`. The preview wildcard is required for magic links to preview deploys; without it, Supabase silently rejects the redirect and falls back to the project Site URL (production). Working in tandem with the `{{ .RedirectTo }}` template URL — see "Email template requirements" below.
 - **SMTP:** Resend custom SMTP (`team@thunderviewceodinners.com`). Switched from built-in SMTP in Sprint 13. Rate limit: 30/hour (adjustable in Supabase dashboard).
 - **Email templates:** Customized via Management API. See "Email template requirements" below.
 - **Magic link rate limits:** Default — 1 request per 60 seconds per email.
@@ -442,7 +442,7 @@ Configured in the Supabase dashboard, not in the codebase:
 
 ### Email template requirements
 
-Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` as the link target — NOT the default `{{ .ConfirmationURL }}`. The default generates a URL that verifies at Supabase's endpoint and redirects to the bare site root, which never establishes a session. The PKCE flow (used by `@supabase/ssr`) requires the token_hash format hitting our `/auth/confirm` route.
+Magic link and signup confirmation email templates MUST use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}` as the link target — NOT the default `{{ .ConfirmationURL }}` and NOT `{{ .SiteURL }}`. The default `{{ .ConfirmationURL }}` generates a URL that verifies at Supabase's endpoint and redirects to the bare site root, which never establishes a session. `{{ .SiteURL }}` is the project's single Site URL setting (production), so using it would hardcode every magic link to production regardless of where the OTP request came from — preview-deploy auth flows broke that way until the template was switched. The PKCE flow (used by `@supabase/ssr`) requires the token_hash format hitting our `/auth/confirm` route. The `&email=` param lets `/auth/confirm` log `auth.login_failed` events with member identification when token verification fails (e.g. expired magic links). Templates are configured via the Supabase Management API, not the dashboard UI.
 
 ## What's done (Phase 1)
 
@@ -453,7 +453,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - Multi-email support: `member_emails` table migration applied; `members.email` column dropped; `is_admin_or_team()` and "members can view own row" RLS policy rewritten to join through `member_emails`; admin pages (members, dinner detail, credits) read primary email via `member_emails`
 - RLS enabled on all tables with `is_admin_or_team()` function (joins through `member_emails`) + "members can view own row" policy
 - Magic link auth: login page, `/auth/confirm` (PKCE token hash), `/auth/callback` (code exchange), role-based redirect
-- Supabase auth email templates updated to use PKCE token hash pattern (`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`)
+- Supabase auth email templates updated to use PKCE token hash pattern (`{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`; see "Email template requirements" for why `{{ .RedirectTo }}` not `{{ .SiteURL }}`)
 - Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
 - 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter — later removed in Phase 3)
 - Admin dinners list columns (Paid, Intro/Ask, Guests) with clickable rows linking to dinner detail. Paid = sum of quantity where `fulfillment_status IN ('purchased', 'fulfilled')` — includes purchased-but-not-yet-fulfilled future-dinner tickets. Applied/Approved columns removed in Sprint 11.
@@ -530,7 +530,7 @@ Magic link and signup confirmation email templates MUST use `{{ .SiteURL }}/auth
 - **Fulfillment logic** (Sprint 12): Tickets auto-fulfill only when `dinner_id` matches next upcoming dinner. Future-beyond-next tickets stay `purchased`. Dinner dropdown filters out dinners where member already has a purchased/fulfilled ticket. `/admin/dinners` default sort = date DESC with auto-scroll to next upcoming dinner. Portal home shows upcoming-ticket banner with intro/ask freshness nudge (updates on save without reload). `fulfillment_status` values renamed: `pending` → `purchased` throughout code and DB.
 - **Sprint 13 — Email wiring + bug fixes:**
   - All transactional emails wired to trigger events (approval, re-application, rejection, fulfillment, morning-of). Shared `src/lib/email-send.ts` handles template loading + Resend dispatch.
-  - Fulfill-tickets cron (`/api/cron/fulfill-tickets`): daily at 1pm UTC, flips purchased→fulfilled 27 days before dinner + sends fulfillment email. Idempotent (only touches `purchased` tickets).
+  - Fulfill-tickets cron (`/api/cron/fulfill-tickets`) wired. **Rewritten in Sprint 18** — see Sprint 18 entry for current schedule, calendar-month gate logic, and email-first ordering. Original Sprint 13 logic ("daily at 1pm UTC, flips purchased→fulfilled 27 days before dinner") is no longer accurate.
   - Morning-of cron idempotency: `dinners.morning_of_sent_at` column prevents duplicate sends on retry.
   - Admin notification on new application: emails `eric@marcoullier.com` with applicant details + link to `/admin/applications/[id]`.
   - **Bug fix: `has_community_access` was `false` on member creation.** All three member-creation RPCs now set `true`. Backfilled 161 existing members. Root cause: column was renamed from `has_attended` (ticket-triggered) to `has_community_access` (approval-triggered) but the RPCs and import were never updated to match the new semantics.
@@ -633,7 +633,7 @@ Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link —
   - Bulk emails (Monday Before, Monday After, Morning Of Send To All): `email.bulk_sent` with `{ kind, dinner_id, recipient_count }` and actor_id = sending team member.
   - Feedback submission: `feedback.submitted` with kind (bug/feedback) and role.
   - Application linked-to-existing-member flow: `application.linked` (kept explicit because the audit signature is indistinguishable from a fresh approve).
-- **Email template URL change** (applied via Supabase Management API): Magic Link and Confirmation templates now use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`. The `&email=` param lets `/auth/confirm` log `auth.login_failed` events with member identification when token verification fails (e.g. expired magic links).
+- **Email template URL change** (applied via Supabase Management API): Magic Link and Confirmation templates now use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`. The switch from `{{ .SiteURL }}` to `{{ .RedirectTo }}` fixes preview-deploy auth: `{{ .SiteURL }}` hardcodes production, so magic links from preview deploys would land on production after sign-in. The `&email=` param lets `/auth/confirm` log `auth.login_failed` events with member identification when token verification fails (e.g. expired magic links). Required companion change: Supabase URL allow-list includes `https://thunderview-os-git-*-erics-projects-*.vercel.app/**` so preview-targeted redirects are accepted (without the wildcard, Supabase silently falls back to Site URL).
 
 ### Known issues / gaps in this sprint
 
