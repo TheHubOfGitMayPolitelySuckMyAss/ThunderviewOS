@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
 import { logSystemEvent } from "@/lib/system-events";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -126,15 +127,66 @@ async function runPostDinner() {
   }
 
   console.log(`[post-dinner] Updated ${count} members for dinner ${dinner.date}`);
+
+  // Push attended members to Streak — last_dinner_attended changed, which
+  // bumps them from has_ticket → attended (or no-op if precedence higher).
+  for (const memberId of memberIds) {
+    await safePushMember(memberId, "post_dinner_attended");
+  }
+
+  // Not This One cleanup: any member who marked Not This One for the dinner
+  // that just happened gets their exclusion cleared (the dinner has passed,
+  // so "not this one" no longer applies). Push each so Streak reflects the
+  // post-clearance state.
+  const { data: excluded } = await admin
+    .from("members")
+    .select("id")
+    .eq("excluded_from_dinner_id", dinner.id);
+
+  const excludedIds = (excluded ?? []).map((m) => m.id);
+  let ntoCleared = 0;
+
+  if (excludedIds.length > 0) {
+    const { error: clearError } = await admin
+      .from("members")
+      .update({ excluded_from_dinner_id: null })
+      .in("id", excludedIds);
+
+    if (clearError) {
+      // Log but don't fail the cron — attendance update already succeeded.
+      console.error(`[post-dinner] NTO clear error: ${clearError.message}`);
+      await logSystemEvent({
+        event_type: "error.caught",
+        actor_label: "cron:post-dinner",
+        summary: `post-dinner NTO clear failed: ${clearError.message}`,
+        metadata: {
+          context: "cron.post_dinner",
+          cause: "nto_clear_failed",
+          message: clearError.message,
+          dinner_id: dinner.id,
+          dinner_date: dinner.date,
+        },
+      });
+    } else {
+      ntoCleared = excludedIds.length;
+      for (const memberId of excludedIds) {
+        await safePushMember(memberId, "post_dinner_not_this_one_clear");
+      }
+    }
+  }
+
   await logSystemEvent({
     event_type: "cron.post_dinner",
     actor_label: "cron:post-dinner",
     summary: `post-dinner ran: updated ${count} members for ${dinner.date}`,
     metadata: {
+      outcome: "success",
       updated: count,
       dinner_id: dinner.id,
       dinner_date: dinner.date,
       member_count: memberIds.length,
+      streak_attendance_pushes: memberIds.length,
+      streak_nto_cleared: ntoCleared,
     },
   });
   return NextResponse.json({
@@ -142,5 +194,7 @@ async function runPostDinner() {
     updated: count,
     dinnerDate: dinner.date,
     memberCount: memberIds.length,
+    streakAttendancePushes: memberIds.length,
+    streakNtoCleared: ntoCleared,
   });
 }

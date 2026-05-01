@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNewApplicationNotification } from "@/lib/email-send";
+import { safePushApplication } from "@/lib/streak/safe-push";
 
 export async function submitApplication(formData: {
   firstName: string;
@@ -38,6 +39,8 @@ export async function submitApplication(formData: {
   }).select("id").single();
 
   if (error) return { success: false, error: error.message };
+
+  await safePushApplication(data.id, "apply_submission");
 
   // Notify admin — must await or serverless may terminate before send completes
   await sendNewApplicationNotification({

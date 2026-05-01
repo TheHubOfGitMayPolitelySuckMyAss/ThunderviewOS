@@ -4,6 +4,7 @@ import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-acto
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendFulfillmentEmail } from "@/lib/email-send";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 export async function updateMemberField(
   memberId: string,
@@ -25,6 +26,8 @@ export async function updateMemberField(
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(memberId, "admin_member_edit");
   return { success: true };
 }
 
@@ -40,6 +43,14 @@ export async function toggleMemberFlag(
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
+
+  // is_team doesn't affect Streak stage; only push on marketing_opted_in flips.
+  if (field === "marketing_opted_in") {
+    await safePushMember(
+      memberId,
+      value ? "opt_back_in" : "admin_marketing_opt_out"
+    );
+  }
   return { success: true };
 }
 
@@ -53,6 +64,8 @@ export async function removeMember(
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(memberId, "kick_out");
 
   // No explicit member.kicked_out log — audit row covers via the
   // members UPDATE with kicked_out flip.
@@ -70,6 +83,8 @@ export async function reinstateMember(
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(memberId, "reinstate");
 
   // No explicit member.reinstated log — audit row covers via the
   // members UPDATE with kicked_out flip.
@@ -93,6 +108,8 @@ export async function addMemberEmail(
   });
 
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(memberId, "email_change");
   return { success: true };
 }
 
@@ -100,12 +117,25 @@ export async function deleteMemberEmail(
   emailId: string
 ): Promise<{ success: boolean; error?: string }> {
   const admin = await createAdminClientForCurrentActor();
+
+  // Resolve member_id BEFORE the delete — once the row is gone we can't
+  // join back to it.
+  const { data: row } = await admin
+    .from("member_emails")
+    .select("member_id")
+    .eq("id", emailId)
+    .single();
+
   const { error } = await admin
     .from("member_emails")
     .delete()
     .eq("id", emailId);
 
   if (error) return { success: false, error: error.message };
+
+  if (row?.member_id) {
+    await safePushMember(row.member_id, "email_change");
+  }
   return { success: true };
 }
 
@@ -121,6 +151,8 @@ export async function setPrimaryEmail(
   });
 
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(memberId, "email_change");
   return { success: true };
 }
 
@@ -215,6 +247,8 @@ export async function applyCredit(
     return { success: false, error: creditError.message };
   }
 
+  await safePushMember(memberId, "apply_credit");
+
   return { success: true };
 }
 
@@ -277,6 +311,8 @@ export async function compTicket(
   }
 
   await sendFulfillmentEmail(memberId, targetDinner.id);
+
+  await safePushMember(memberId, "comp_ticket");
 
   return { success: true };
 }

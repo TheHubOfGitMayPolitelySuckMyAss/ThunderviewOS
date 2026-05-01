@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -92,6 +93,8 @@ export async function refundTicket(
   // tickets UPDATE: full refund flips fulfillment_status to 'refunded';
   // guest-only refund is detected from the quantity 2→1 + amount_paid drop.
 
+  await safePushMember(ticket.member_id, "refund_ticket");
+
   revalidatePath("/admin/dinners");
   return { success: true };
 }
@@ -129,6 +132,8 @@ export async function creditTicket(
 
   // No explicit ticket.credited log — audit covers it via the
   // tickets UPDATE with fulfillment_status flip to 'credited'.
+
+  await safePushMember(ticket.member_id, "credit_ticket");
 
   revalidatePath("/admin/dinners");
   return { success: true };

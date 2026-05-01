@@ -4,6 +4,7 @@ import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-acto
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { ensureAuthUser } from "@/lib/ensure-auth-user";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
@@ -88,6 +89,8 @@ export async function addMember(formData: {
 
   // Ensure auth.users row exists so the member can log in
   await ensureAuthUser(formData.email);
+
+  await safePushMember(data as string, "add_member");
 
   // No explicit member.added log — audit row covers it via the members
   // INSERT (actor attributed via X-Audit-Actor header on this request).

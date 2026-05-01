@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
+import { safePushMember } from "@/lib/streak/safe-push";
 import sharp from "sharp";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -278,6 +279,8 @@ export async function saveProfile(formData: FormData) {
     if (error) return { success: false, error: error.message };
   }
 
+  await safePushMember(member.id, "portal_profile_save");
+
   return { success: true, noChanges: false };
 }
 
@@ -309,5 +312,11 @@ export async function toggleMarketing(
     .eq("id", member.id);
 
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(
+    member.id,
+    value ? "opt_back_in" : "portal_marketing_opt_out"
+  );
+
   return { success: true };
 }

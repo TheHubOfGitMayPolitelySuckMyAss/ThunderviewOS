@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
 
@@ -29,6 +30,8 @@ export async function GET(request: NextRequest) {
     console.error("Unsubscribe error:", error);
     return NextResponse.redirect(`${SITE_URL}/unsubscribe?status=error`);
   }
+
+  await safePushMember(memberId, "member_unsubscribe");
 
   return NextResponse.redirect(`${SITE_URL}/unsubscribe?status=success`);
 }

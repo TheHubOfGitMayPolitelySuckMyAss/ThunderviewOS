@@ -22,6 +22,7 @@ import {
   sendSendFailureNotification,
 } from "@/lib/email-send";
 import { logSystemEvent } from "@/lib/system-events";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -217,6 +218,7 @@ async function handleResendWebhook(req: Request) {
         .from("member_emails")
         .update({ email_status: "bounced" })
         .eq("id", memberEmail.id);
+      await safePushMember(memberEmail.member_id, "resend_bounce");
     } else if (eventType === "complained") {
       await admin
         .from("member_emails")
@@ -228,6 +230,7 @@ async function handleResendWebhook(req: Request) {
         .from("members")
         .update({ marketing_opted_in: false })
         .eq("id", memberEmail.member_id);
+      await safePushMember(memberEmail.member_id, "resend_complaint");
     }
   }
 

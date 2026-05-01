@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTargetDinner } from "@/lib/ticket-assignment";
 import { sendFulfillmentEmail } from "@/lib/email-send";
 import { logSystemEvent } from "@/lib/system-events";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -200,6 +201,8 @@ async function handleStripeWebhook(request: NextRequest) {
       // Send fulfillment email (dinner details)
       await sendFulfillmentEmail(metadata.member_id, metadata.dinner_id);
     }
+
+    await safePushMember(metadata.member_id, "stripe_webhook");
   }
 
   // For all other events (checkout.session.expired, etc.), acknowledge receipt
