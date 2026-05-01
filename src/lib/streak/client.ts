@@ -64,10 +64,28 @@ function authHeader(): string {
   return `Basic ${encoded}`;
 }
 
+// Streak's body content-type rule (empirical, not documented anywhere coherent):
+//   PUT  endpoints (createBox, createPipelineField) want form-urlencoded.
+//   POST endpoints (updateBox, setBoxField)         want JSON.
+// Sending JSON to a PUT endpoint returns "Insufficient params for Field";
+// sending form-urlencoded to a POST endpoint silently returns nulls.
+// The client picks the right encoding from the method, so callers don't
+// need to think about it.
+type StreakBody = Record<string, unknown>;
+
 type RequestInit = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
-  body?: unknown;
+  body?: StreakBody;
 };
+
+function encodeForm(body: StreakBody): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(body)) {
+    if (v === undefined) continue;
+    params.append(k, String(v));
+  }
+  return params.toString();
+}
 
 class StreakError extends Error {
   status: number;
@@ -109,8 +127,13 @@ async function streakFetch(
     };
     let body: BodyInit | undefined;
     if (init.body !== undefined) {
-      headers["Content-Type"] = "application/json";
-      body = JSON.stringify(init.body);
+      if (method === "PUT") {
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        body = encodeForm(init.body);
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(init.body);
+      }
     }
 
     let res: Response;
@@ -235,7 +258,7 @@ export async function createPipelineField(
   args: { name: string; type?: string }
 ): Promise<StreakField> {
   return (await streakFetch(`/pipelines/${pipelineKey}/fields`, {
-    method: "POST",
+    method: "PUT",
     body: { name: args.name, type: args.type ?? "TEXT_INPUT" },
   })) as StreakField;
 }
