@@ -28,6 +28,7 @@ type Case = {
 // never attended. Each test case mutates one or two fields and expects a
 // specific stage. This makes precedence wins/losses obvious from the diff.
 const baseline: MemberStreakState = {
+  is_team: false,
   marketing_opted_in: true,
   kicked_out: false,
   email_statuses: ["active"],
@@ -37,6 +38,20 @@ const baseline: MemberStreakState = {
 };
 
 const cases: Case[] = [
+  // 0. team — top precedence, beats every other state
+  {
+    name: "team: is_team beats kicked_out + bounced + everything else",
+    state: {
+      ...baseline,
+      is_team: true,
+      kicked_out: true,
+      marketing_opted_in: false,
+      email_statuses: ["bounced"],
+      has_upcoming_ticket: true,
+      last_dinner_attended: "2026-04-02",
+    },
+    expected: "team",
+  },
   // 1. opted_out — wins over everything else
   {
     name: "opted_out: marketing_opted_in=false dominates an active ticket holder",

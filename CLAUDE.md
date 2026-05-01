@@ -690,11 +690,31 @@ The library from Prompt A is now connected. Every state change in OS that affect
 
 ### Known issues / gaps in this sprint
 
-- **Eric still needs to configure the two Streak automations** in the Streak UI to fire on stage moves to Opted Out and Not This One, with the URLs `https://thunderview-os.vercel.app/api/webhooks/streak/opted-out?secret=<STREAK_WEBHOOK_SECRET>` and `https://thunderview-os.vercel.app/api/webhooks/streak/not-this-one?secret=<STREAK_WEBHOOK_SECRET>`. Until the automations exist, manual moves in Streak don't reach OS.
-- **No backfill yet.** Existing 632 members + any pending applications have no `streak_box_key`. Their first state change (any of the 20 sites) will push them — natural backfill via activity. Bulk backfill is Prompt C.
+- ~~**Eric still needs to configure the two Streak automations**~~ Done — automations wired in Streak UI.
+- ~~**No backfill yet.**~~ Done in Prompt C — see Sprint 20 (Prompt C) entry below.
 - **`updateMemberField` pushes on every call** regardless of which field changed. Fields like `current_intro` / `current_ask` / `current_give` don't affect Streak stage, so those pushes are wasted. Push is idempotent and fast — gating per-field would add complexity without value.
 - **Reconciliation/retry queue** for failed pushes is not built. Failures land in `system_events` (`error.caught` with `source: 'streak_push'`) for Eric to review; manual repair via re-running the relevant action.
 - **`webhook.streak` is not in the System feed inclusion list** by design — these events are expected, not failures. Failures within webhook handlers fire `error.caught` (already in the inclusion list).
+
+## What's done (Sprint 20 — Streak integration backfill, Prompt C)
+
+One-time bulk push of every existing OS row that predated Prompt B's forward-sync wiring.
+
+- **Backfill script** (`tmp/streak-backfill.ts`): runnable with `npx tsx --env-file=.env.local tmp/streak-backfill.ts`. Two phases — pending applications first, then members. Filters on `streak_box_key IS NULL` so re-runs only touch rows that haven't landed yet. Uses the same `pushApplicationToStreak` / `pushMemberToStreak` primitives that all 20 forward-sync sites use, so behavior matches exactly.
+- **Single-flight lock** at `tmp/streak-backfill.lock`: prevents concurrent runs and surfaces crashed prior runs that need cleanup. Released on normal exit, SIGINT, and SIGTERM.
+- **Pre-flight**: calls `ensureStreakReady()` and prints pipeline + 7 stage keys + 4 field keys. Counts eligible rows in both phases. Prompts `Continue? (y/N)` before doing any pushes — guard against accidental runs against the wrong env file.
+- **Defensive pagination**: SELECTs use `.range(0, 9999)` with an explicit ceiling check rather than relying on PostgREST's default 1000-row cap. Today's volume is ~637 members, well under the ceiling.
+- **Idempotency**: re-running after partial failure picks up where it left off because successful pushes persist `streak_box_key` inside the same call. Deliberate non-handling: if a row has `streak_box_key` set but the Streak box was manually deleted, the script skips it (filtered out by WHERE clause). Surface manually if needed; don't auto-recreate.
+- **Failure handling**: per-row try/catch logs `ok=true|false` per push. Failures don't abort the run. Summary at the end lists failed IDs. Exit code 1 if any failed.
+- **No production code changes** for the backfill itself — the script is exclusively under `tmp/`. (The follow-on Team stage work below did make small lib changes.)
+- **Team stage** (added after initial backfill): an 8th `Team` Streak stage now sits at the top of the precedence ladder. `is_team = true` pins a member's box to Team, overriding kicked_out / bounced / opted_out / everything else. Rationale: team members run dinners, so they aren't subjects of CRM tracking — but the box still sync-updates name/company/email so contact info stays current. Eric's admin row was set `is_team = true` to include him in this group. Five team boxes (Eric, Danny, Megan, Maggie, Rich) live in Team stage.
+
+### Backfill outcomes
+
+- 0 pending applications, 637 members eligible.
+- 636 succeeded, 1 failed: `f3e173f6-322c-45f5-a4ab-b1a6e5fe6e2e` ("TestSprint1Kick Fake") — kicked-out Sprint 1 test fixture with `email_count = 0`. The constraint trigger that's supposed to enforce ≥1 primary email per member apparently allowed this row through (or predates the trigger). Stale data; safe to delete.
+- One orphan Streak box ("Eric Marcoullier") existed in the pipeline from manual pre-integration setup — deleted during verification.
+- Streak total now matches DB exactly: 636 boxes = 636 members with `streak_box_key` set.
 
 ## What's NOT done
 

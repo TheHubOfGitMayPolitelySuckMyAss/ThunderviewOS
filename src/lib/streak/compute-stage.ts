@@ -24,6 +24,8 @@ import type { StreakStage } from "@/lib/streak/stages";
  * single plain object so it round-trips through synthetic test cases trivially.
  */
 export type MemberStreakState = {
+  /** From members.is_team. Top-precedence — pins box to Team stage. */
+  is_team: boolean;
   /** From members.marketing_opted_in. */
   marketing_opted_in: boolean;
   /** From members.kicked_out. */
@@ -48,11 +50,19 @@ export type MemberStreakState = {
 /**
  * Pure precedence ladder. First match wins. See CLAUDE.md / spec.
  *
+ * Team rule (top): is_team pins the box to Team stage regardless of any other
+ * state. Team members run dinners; their CRM stage is "operator," not subject.
+ * If a team member is also kicked out / bounced / opted out, Team still wins.
+ *
  * Bounced rule: only fires when the member has at least one email row AND
  * every row is bounced. A member with zero email rows is not "all bounced"
  * (vacuously true would be wrong) and falls through to subsequent rules.
  */
 export function computeStageForMember(state: MemberStreakState): StreakStage {
+  if (state.is_team) {
+    return "team";
+  }
+
   if (!state.marketing_opted_in || state.kicked_out) {
     return "opted_out";
   }
@@ -105,7 +115,7 @@ export async function getMemberStreakState(
   const memberRes = await admin
     .from("members")
     .select(
-      "marketing_opted_in, kicked_out, last_dinner_attended, excluded_from_dinner_id"
+      "is_team, marketing_opted_in, kicked_out, last_dinner_attended, excluded_from_dinner_id"
     )
     .eq("id", memberId)
     .single();
@@ -167,6 +177,7 @@ export async function getMemberStreakState(
   }
 
   return {
+    is_team: !!member.is_team,
     marketing_opted_in: !!member.marketing_opted_in,
     kicked_out: !!member.kicked_out,
     email_statuses,

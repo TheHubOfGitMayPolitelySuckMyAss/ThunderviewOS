@@ -5,6 +5,7 @@
  */
 
 export type StreakStage =
+  | "team"
   | "applied"
   | "approved"
   | "attended"
@@ -14,6 +15,7 @@ export type StreakStage =
   | "opted_out";
 
 export const STAGE_NAMES: Record<StreakStage, string> = {
+  team: "Team",
   applied: "Applied",
   approved: "Approved",
   attended: "Attended",
