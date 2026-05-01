@@ -7,7 +7,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import TopNav from "@/components/top-nav";
+import PageViewLogger from "@/components/page-view-logger";
 
 export default async function PortalLayout({
   children,
@@ -52,6 +54,9 @@ export default async function PortalLayout({
   return (
     <div className="flex min-h-screen flex-col bg-bg tv-surface">
       <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} profilePicUrl={member?.profile_pic_url ?? null} />
+      <Suspense fallback={null}>
+        <PageViewLogger />
+      </Suspense>
       <main className="flex-1">{children}</main>
     </div>
   );

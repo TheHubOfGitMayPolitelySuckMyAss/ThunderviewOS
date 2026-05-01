@@ -9,8 +9,8 @@
  *   - Renders a human-readable summary for audit rows (bundled-edit display)
  *   - Resolves actor + subject member names in a single trailing lookup
  *
- * Two surfaces: the People feed (human acted, human-meaningful) and the
- * System feed (everything).
+ * Three surfaces: People (human acted, human-meaningful), System (operational
+ * failures), and Marketing (anonymous page views from the public site).
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,7 +18,7 @@ import { formatName } from "@/lib/format";
 
 export type FeedSource = "system_events" | "email_events" | "audit";
 
-export type FeedKind = "people" | "system";
+export type FeedKind = "people" | "system" | "marketing";
 
 /** Raw row as it lands from the activity_feed view. */
 type FeedRowRaw = {
@@ -174,6 +174,10 @@ export async function getActivityFeed(filters: FeedFilters): Promise<FeedPage> {
       }
     } else if (filters.kind === "system") {
       q = q.in("event_type", SYSTEM_FEED_INCLUDED_TYPES);
+    } else if (filters.kind === "marketing") {
+      // Marketing tab = anonymous page views only. Authenticated page views
+      // belong in People.
+      q = q.eq("event_type", "page.viewed").is("actor_id", null);
     }
 
     if (filters.eventTypes && filters.eventTypes.length > 0) {
@@ -673,10 +677,13 @@ function refineEmailTemplates(
  * People dropdown doesn't include cron/webhook/error types.
  */
 export async function getDistinctEventTypes(kind: FeedKind): Promise<string[]> {
-  // System feed has a fixed inclusion list — return it directly so the dropdown
-  // shows the operational types even before any have fired.
+  // Fixed-scope feeds return their inclusion list directly so the dropdown
+  // shows the relevant types even before any have fired.
   if (kind === "system") {
     return [...SYSTEM_FEED_INCLUDED_TYPES].sort();
+  }
+  if (kind === "marketing") {
+    return ["page.viewed"];
   }
 
   const admin = createAdminClient();

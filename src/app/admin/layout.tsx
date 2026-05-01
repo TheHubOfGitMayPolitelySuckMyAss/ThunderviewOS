@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import TopNav from "@/components/top-nav";
+import PageViewLogger from "@/components/page-view-logger";
 import AdminShell from "./admin-shell";
 
 export default async function AdminLayout({
@@ -54,6 +56,9 @@ export default async function AdminLayout({
   return (
     <div className="flex h-screen flex-col tv-surface">
       <TopNav initials={initials} isAdmin={isAdmin} isTeam={isTeam} profilePicUrl={member?.profile_pic_url ?? null} />
+      <Suspense fallback={null}>
+        <PageViewLogger />
+      </Suspense>
       <AdminShell>{children}</AdminShell>
     </div>
   );
