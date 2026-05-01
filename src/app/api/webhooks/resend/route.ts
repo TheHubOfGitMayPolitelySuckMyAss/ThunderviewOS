@@ -55,6 +55,15 @@ async function handleResendWebhook(req: Request) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error("[resend-webhook] RESEND_WEBHOOK_SECRET not configured");
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:resend",
+      summary: "Resend webhook rejected: RESEND_WEBHOOK_SECRET not configured",
+      metadata: {
+        context: "webhook.resend",
+        cause: "missing_webhook_secret_env",
+      },
+    });
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
 
@@ -77,7 +86,18 @@ async function handleResendWebhook(req: Request) {
       webhookSecret,
     }) as unknown as typeof event;
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[resend-webhook] Signature verification failed:", err);
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:resend",
+      summary: `Resend webhook signature verification failed: ${message}`,
+      metadata: {
+        context: "webhook.resend",
+        cause: "signature_verification_failed",
+        message,
+      },
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -107,6 +127,18 @@ async function handleResendWebhook(req: Request) {
 
   if (!resendEmailId || !recipientEmail) {
     console.error("[resend-webhook] Missing email_id or recipient:", { resendEmailId, recipientEmail });
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:resend",
+      summary: "Resend webhook payload missing email_id or recipient",
+      metadata: {
+        context: "webhook.resend",
+        cause: "malformed_payload",
+        resend_event_type: event.type,
+        resend_email_id: resendEmailId || null,
+        recipient_email: recipientEmail || null,
+      },
+    });
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -132,6 +164,20 @@ async function handleResendWebhook(req: Request) {
       return NextResponse.json({ ok: true, duplicate: true });
     }
     console.error("[resend-webhook] Insert failed:", insertError.message);
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:resend",
+      summary: `Resend webhook email_events insert failed: ${insertError.message}`,
+      metadata: {
+        context: "webhook.resend",
+        cause: "email_events_insert_failed",
+        message: insertError.message,
+        code: insertError.code ?? null,
+        resend_event_type: event.type,
+        resend_email_id: resendEmailId,
+        recipient_email: recipientEmail,
+      },
+    });
     return NextResponse.json({ error: "Insert failed" }, { status: 500 });
   }
 
@@ -210,7 +256,21 @@ async function handleResendWebhook(req: Request) {
       });
     }
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[resend-webhook] Notification send failed (non-fatal):", err);
+    await logSystemEvent({
+      event_type: "error.caught",
+      actor_label: "webhook:resend",
+      summary: `Resend webhook admin notification send failed: ${message}`,
+      metadata: {
+        context: "webhook.resend",
+        cause: "admin_notification_send_failed",
+        message,
+        resend_event_type: event.type,
+        resend_email_id: resendEmailId,
+        recipient_email: recipientEmail,
+      },
+    });
   }
 
   return NextResponse.json({ ok: true, eventType, recipientEmail });

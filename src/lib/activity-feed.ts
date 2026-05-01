@@ -72,6 +72,17 @@ export type FeedPage = {
 const PEOPLE_FEED_EXCLUDED_PREFIXES = ["cron.", "webhook.", "error."];
 const PEOPLE_FEED_EXCLUDED_TYPES = new Set(["email.transactional_sent"]);
 
+// System feed = operational failures and warnings worth a human looking at.
+// Anything not in this list stays in the underlying tables (system_events,
+// audit.row_history, email_events) for ad-hoc SQL but does NOT appear in the
+// /admin/operations System tab.
+const SYSTEM_FEED_INCLUDED_TYPES = [
+  "error.caught",
+  "email.bounced",
+  "email.complained",
+  "email.failed",
+];
+
 function isHumanMeaningful(eventType: string): boolean {
   if (PEOPLE_FEED_EXCLUDED_TYPES.has(eventType)) return false;
   for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {
@@ -161,6 +172,8 @@ export async function getActivityFeed(filters: FeedFilters): Promise<FeedPage> {
       for (const t of PEOPLE_FEED_EXCLUDED_TYPES) {
         q = q.neq("event_type", t);
       }
+    } else if (filters.kind === "system") {
+      q = q.in("event_type", SYSTEM_FEED_INCLUDED_TYPES);
     }
 
     if (filters.eventTypes && filters.eventTypes.length > 0) {
@@ -660,16 +673,20 @@ function refineEmailTemplates(
  * People dropdown doesn't include cron/webhook/error types.
  */
 export async function getDistinctEventTypes(kind: FeedKind): Promise<string[]> {
+  // System feed has a fixed inclusion list — return it directly so the dropdown
+  // shows the operational types even before any have fired.
+  if (kind === "system") {
+    return [...SYSTEM_FEED_INCLUDED_TYPES].sort();
+  }
+
   const admin = createAdminClient();
   let q = admin.from("activity_feed").select("event_type");
-  if (kind === "people") {
-    q = q.not("actor_id", "is", null).neq("source", "email_events");
-    for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {
-      q = q.not("event_type", "like", `${p}%`);
-    }
-    for (const t of PEOPLE_FEED_EXCLUDED_TYPES) {
-      q = q.neq("event_type", t);
-    }
+  q = q.not("actor_id", "is", null).neq("source", "email_events");
+  for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {
+    q = q.not("event_type", "like", `${p}%`);
+  }
+  for (const t of PEOPLE_FEED_EXCLUDED_TYPES) {
+    q = q.neq("event_type", t);
   }
   const { data } = await q.limit(5000);
   const set = new Set<string>();
