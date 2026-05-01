@@ -13,7 +13,8 @@
 
 import { logSystemEvent } from "@/lib/system-events";
 
-const BASE_URL = "https://www.streak.com/api/v1";
+const BASE_V1 = "https://www.streak.com/api/v1";
+const BASE_V2 = "https://api.streak.com/api/v2";
 
 // Pacing: at most 8 requests per second.
 // Token bucket: refill 8 tokens per 1000ms.
@@ -65,17 +66,23 @@ function authHeader(): string {
 }
 
 // Streak's body content-type rule (empirical, not documented anywhere coherent):
-//   PUT  endpoints (createBox, createPipelineField) want form-urlencoded.
-//   POST endpoints (updateBox, setBoxField)         want JSON.
-// Sending JSON to a PUT endpoint returns "Insufficient params for Field";
-// sending form-urlencoded to a POST endpoint silently returns nulls.
-// The client picks the right encoding from the method, so callers don't
-// need to think about it.
+//   v1 PUT  endpoints (createBox, createPipelineField) want form-urlencoded.
+//   v1 POST endpoints (updateBox, setBoxField)         want JSON.
+//   v2 endpoints (Contacts API)                        always want JSON.
+// Sending JSON to a v1 PUT endpoint returns "Insufficient params for Field";
+// sending form-urlencoded to a v1 POST endpoint silently returns nulls.
+// The client picks the right encoding from the (version, method) tuple, so
+// callers don't need to think about it.
 type StreakBody = Record<string, unknown>;
+type StreakVersion = 1 | 2;
 
 type RequestInit = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: StreakBody;
+  /** API version. Default 1. v2 hosts the Contacts API. */
+  version?: StreakVersion;
+  /** Optional query params, merged into the URL. */
+  query?: Record<string, string | undefined>;
 };
 
 function encodeForm(body: StreakBody): string {
@@ -102,7 +109,17 @@ async function streakFetch(
   init: RequestInit = {}
 ): Promise<unknown> {
   const method = init.method ?? "GET";
-  const url = `${BASE_URL}${path}`;
+  const version = init.version ?? 1;
+  const base = version === 2 ? BASE_V2 : BASE_V1;
+  let url = `${base}${path}`;
+  if (init.query) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(init.query)) {
+      if (v !== undefined) qs.append(k, v);
+    }
+    const qstr = qs.toString();
+    if (qstr) url += (url.includes("?") ? "&" : "?") + qstr;
+  }
 
   // Backoff schedule for 429: 500ms, 1500ms, 3500ms (exponential-ish).
   // 5xx: single retry after 500ms.
@@ -127,7 +144,7 @@ async function streakFetch(
     };
     let body: BodyInit | undefined;
     if (init.body !== undefined) {
-      if (method === "PUT") {
+      if (version === 1 && method === "PUT") {
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         body = encodeForm(init.body);
       } else {
@@ -159,6 +176,7 @@ async function streakFetch(
         metadata: {
           method,
           path,
+          version,
           status: res.status,
           duration_ms: Date.now() - startedAt,
         },
@@ -193,6 +211,7 @@ async function streakFetch(
     metadata: {
       method,
       path,
+      version,
       status: lastStatus,
       duration_ms: Date.now() - startedAt,
       failed: true,
@@ -200,6 +219,8 @@ async function streakFetch(
   });
   throw new StreakError(lastStatus, lastBody, `${method} ${path}`);
 }
+
+export { StreakError };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -308,4 +329,76 @@ export async function setBoxField(
 
 export async function deleteBox(boxKey: string): Promise<void> {
   await streakFetch(`/boxes/${boxKey}`, { method: "DELETE" });
+}
+
+// === Contacts (v2) + box-contact linking ===
+//
+// Streak's mail-merge UI pulls recipients from Contacts, NOT from custom
+// columns. So even though our boxes have an "Email" custom field populated,
+// merges return zero recipients until each box has an attached contact.
+//
+// Contacts are team-scoped, not pipeline-scoped. We resolve the team key
+// once (see ensureStreakReady) and reuse it for every contact call.
+
+export type StreakContact = {
+  key: string;
+  emailAddresses?: string[];
+  givenName?: string;
+  familyName?: string;
+};
+
+export async function createContact(
+  teamKey: string,
+  args: { emailAddress: string; getIfExisting?: boolean }
+): Promise<StreakContact> {
+  // When getIfExisting=true, the body MUST contain only emailAddresses.
+  // Streak rejects name fields in that mode. Update name separately via
+  // updateContact() afterward if needed.
+  return (await streakFetch(`/teams/${teamKey}/contacts/`, {
+    method: "POST",
+    version: 2,
+    body: { emailAddresses: [args.emailAddress] },
+    query: args.getIfExisting ? { getIfExisting: "true" } : undefined,
+  })) as StreakContact;
+}
+
+export async function updateContact(
+  contactKey: string,
+  args: { givenName?: string; familyName?: string }
+): Promise<StreakContact> {
+  // NOTE: update endpoint is NOT team-scoped, despite create being so. The
+  // path is `/v2/contacts/{contactKey}` — the contact's team is inferred
+  // from the contact itself. POST to `/v2/teams/{teamKey}/contacts/{key}`
+  // returns 400 "Invalid API path specified".
+  return (await streakFetch(`/contacts/${contactKey}`, {
+    method: "POST",
+    version: 2,
+    body: args,
+  })) as StreakContact;
+}
+
+/**
+ * Link a contact to a box. The field is `contacts` (array of objects with
+ * `key`). Per Streak's docs: "The only contacts associated with the box will
+ * be the ones you include here" — so this is REPLACE semantics, not append.
+ *
+ * For our use case (one canonical contact per box, the member's primary
+ * email or best non-bounced alternative), replace is fine. If we ever need
+ * to preserve manually-added contacts on a box, fetch first and merge.
+ *
+ * Other shapes that don't work (probed during Prompt D):
+ *   - { linkedContactKeys: [key] }  — accepted (200) but doesn't persist
+ *   - { contactKeys: [key] }        — same, ignored
+ *   - { contacts: [key] }           — silent null response
+ *   - { contacts: [{contactKey}] }  — silent null response
+ *   - { contacts: [{emailAddress}] } — silent null response
+ */
+export async function addContactToBox(
+  boxKey: string,
+  contactKey: string
+): Promise<void> {
+  await streakFetch(`/boxes/${boxKey}`, {
+    method: "POST",
+    body: { contacts: [{ key: contactKey }] },
+  });
 }

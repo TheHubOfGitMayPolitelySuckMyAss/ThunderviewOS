@@ -11,6 +11,7 @@
 
 import {
   createPipelineField,
+  getPipeline,
   listPipelineFields,
   listPipelines,
   listPipelineStages,
@@ -28,6 +29,8 @@ const FIELD_DISPLAY_NAMES: Record<StreakFieldKey, string> = {
 
 export type StreakBootstrap = {
   pipelineKey: string;
+  /** Team that owns the Thunderview pipeline. Contacts are team-scoped. */
+  teamKey: string;
   stageKeys: Record<StreakStage, string>;
   fieldKeys: Record<StreakFieldKey, string>;
 };
@@ -101,6 +104,23 @@ export async function ensureStreakReady(): Promise<StreakBootstrap> {
     fieldKeys[internal] = created.key;
   }
 
-  cached = { pipelineKey, stageKeys, fieldKeys };
+  // 4. Resolve the team that owns this pipeline. Streak's pipeline GET
+  //    response carries `teamKey` directly — use it. There is no public
+  //    /users/me/teams endpoint despite what some docs imply (it returns
+  //    400 "Invalid API path"). The pipeline-owns-the-team relationship
+  //    is the canonical resolution.
+  const pipelineDetail = (await getPipeline(pipelineKey)) as {
+    pipelineKey: string;
+    name: string;
+    teamKey?: string;
+  };
+  const teamKey = pipelineDetail.teamKey;
+  if (!teamKey) {
+    throw new Error(
+      `Streak bootstrap: pipeline "${pipelineDetail.name}" GET response did not include teamKey — cannot scope Contacts API calls`
+    );
+  }
+
+  cached = { pipelineKey, teamKey, stageKeys, fieldKeys };
   return cached;
 }

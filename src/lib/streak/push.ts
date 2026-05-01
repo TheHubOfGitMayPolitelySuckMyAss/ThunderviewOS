@@ -8,10 +8,13 @@
  */
 
 import {
+  addContactToBox,
   createBox,
+  createContact,
   deleteBox,
   setBoxField,
   updateBox,
+  updateContact,
 } from "@/lib/streak/client";
 import { ensureStreakReady } from "@/lib/streak/bootstrap";
 import {
@@ -20,6 +23,7 @@ import {
   getMemberStreakState,
 } from "@/lib/streak/compute-stage";
 import { formatName } from "@/lib/format";
+import { logSystemEvent } from "@/lib/system-events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 async function getMemberPrimaryEmail(
@@ -38,6 +42,80 @@ async function getMemberPrimaryEmail(
     );
   }
   return res.data.email;
+}
+
+/**
+ * Pick the email to attach as the box's mail-merge contact.
+ *
+ * Spec (Prompt D): use primary email unless it's bounced AND a non-bounced
+ * alternative exists. If every email is bounced, fall back to primary so the
+ * box still has a contact (the member just won't actually get merged because
+ * they'll land in the Bounced stage).
+ *
+ * Returns null only when the member has zero email rows — defensive guard;
+ * shouldn't happen for any non-fixture member post-Phase 1.
+ */
+async function chooseContactEmailForMember(
+  admin: ReturnType<typeof createAdminClient>,
+  memberId: string
+): Promise<string | null> {
+  const res = await admin
+    .from("member_emails")
+    .select("email, is_primary, email_status")
+    .eq("member_id", memberId);
+  if (res.error) {
+    throw new Error(
+      `chooseContactEmailForMember: query failed: ${res.error.message}`
+    );
+  }
+  const rows = (res.data ?? []) as {
+    email: string;
+    is_primary: boolean;
+    email_status: string;
+  }[];
+  if (rows.length === 0) return null;
+  const primary = rows.find((r) => r.is_primary) ?? null;
+  if (!primary) return null;
+  if (primary.email_status !== "bounced") return primary.email;
+  const nonBounced = rows.find((r) => r.email_status !== "bounced");
+  return nonBounced ? nonBounced.email : primary.email;
+}
+
+/**
+ * Idempotent contact attach: resolve (or create) a contact for the email,
+ * patch its name if it differs from what we have on the OS row, and link
+ * it to the box. Streak's Contacts API treats getIfExisting=true as
+ * server-side dedup, so calling this on every push is cheap.
+ */
+async function attachContactToBox(args: {
+  teamKey: string;
+  boxKey: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}): Promise<void> {
+  const contact = await createContact(args.teamKey, {
+    emailAddress: args.email,
+    getIfExisting: true,
+  });
+  if (!contact?.key) {
+    throw new Error(
+      `attachContactToBox: createContact returned no key for ${args.email}`
+    );
+  }
+
+  const desiredFirst = args.firstName || "";
+  const desiredLast = args.lastName || "";
+  const currentFirst = contact.givenName ?? "";
+  const currentLast = contact.familyName ?? "";
+  if (currentFirst !== desiredFirst || currentLast !== desiredLast) {
+    await updateContact(contact.key, {
+      givenName: desiredFirst,
+      familyName: desiredLast,
+    });
+  }
+
+  await addContactToBox(args.boxKey, contact.key);
 }
 
 export async function pushMemberToStreak(memberId: string): Promise<void> {
@@ -59,7 +137,8 @@ export async function pushMemberToStreak(memberId: string): Promise<void> {
   const stage = computeStageForMember(state);
   const email = await getMemberPrimaryEmail(admin, memberId);
 
-  const { pipelineKey, stageKeys, fieldKeys } = await ensureStreakReady();
+  const { pipelineKey, teamKey, stageKeys, fieldKeys } =
+    await ensureStreakReady();
   const targetStageKey = stageKeys[stage];
   const name = formatName(member.first_name ?? "", member.last_name ?? "");
   const company = member.company_name ?? "";
@@ -92,11 +171,32 @@ export async function pushMemberToStreak(memberId: string): Promise<void> {
   }
 
   // Set all 4 fields unconditionally — simpler than diffing, and Streak
-  // accepts the same value as a no-op write.
+  // accepts the same value as a no-op write. Box email field stays the
+  // primary regardless of bounce status — it's the canonical display
+  // address even when bounced. The contact step below picks a different
+  // email if primary is bounced and an alternative exists.
   await setBoxField(boxKey, fieldKeys.first_name, member.first_name ?? "");
   await setBoxField(boxKey, fieldKeys.last_name, member.last_name ?? "");
   await setBoxField(boxKey, fieldKeys.company, company);
   await setBoxField(boxKey, fieldKeys.email, email);
+
+  // Attach a Contact so mail merges have a recipient. Custom columns alone
+  // don't surface in Streak's mail-merge UI.
+  const contactEmail = await chooseContactEmailForMember(admin, memberId);
+  if (!contactEmail) {
+    void logSystemEvent({
+      event_type: "streak.contact_skipped",
+      metadata: { reason: "no_email", member_id: memberId },
+    });
+    return;
+  }
+  await attachContactToBox({
+    teamKey,
+    boxKey,
+    email: contactEmail,
+    firstName: member.first_name ?? "",
+    lastName: member.last_name ?? "",
+  });
 }
 
 export async function pushApplicationToStreak(
@@ -128,7 +228,8 @@ export async function pushApplicationToStreak(
     );
   }
 
-  const { pipelineKey, stageKeys, fieldKeys } = await ensureStreakReady();
+  const { pipelineKey, teamKey, stageKeys, fieldKeys } =
+    await ensureStreakReady();
   const targetStageKey = stageKeys[stage];
   const name = formatName(app.first_name ?? "", app.last_name ?? "");
   const company = app.company_name ?? "";
@@ -164,6 +265,24 @@ export async function pushApplicationToStreak(
   await setBoxField(boxKey, fieldKeys.last_name, app.last_name ?? "");
   await setBoxField(boxKey, fieldKeys.company, company);
   await setBoxField(boxKey, fieldKeys.email, app.email ?? "");
+
+  // Attach a Contact for mail merge — applications carry their email on the
+  // row directly (no member_emails join yet).
+  const appEmail = (app.email ?? "").trim();
+  if (!appEmail) {
+    void logSystemEvent({
+      event_type: "streak.contact_skipped",
+      metadata: { reason: "no_email", application_id: applicationId },
+    });
+    return;
+  }
+  await attachContactToBox({
+    teamKey,
+    boxKey,
+    email: appEmail,
+    firstName: app.first_name ?? "",
+    lastName: app.last_name ?? "",
+  });
 }
 
 export async function deleteApplicationBox(

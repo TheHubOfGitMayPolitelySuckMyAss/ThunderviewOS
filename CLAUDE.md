@@ -712,9 +712,29 @@ One-time bulk push of every existing OS row that predated Prompt B's forward-syn
 ### Backfill outcomes
 
 - 0 pending applications, 637 members eligible.
-- 636 succeeded, 1 failed: `f3e173f6-322c-45f5-a4ab-b1a6e5fe6e2e` ("TestSprint1Kick Fake") — kicked-out Sprint 1 test fixture with `email_count = 0`. The constraint trigger that's supposed to enforce ≥1 primary email per member apparently allowed this row through (or predates the trigger). Stale data; safe to delete.
+- 636 succeeded, 1 failed: `f3e173f6-322c-45f5-a4ab-b1a6e5fe6e2e` ("TestSprint1Kick Fake") — kicked-out Sprint 1 test fixture with `email_count = 0`. The constraint trigger that's supposed to enforce ≥1 primary email per member apparently allowed this row through (or predates the trigger). Stale data; deleted afterward.
 - One orphan Streak box ("Eric Marcoullier") existed in the pipeline from manual pre-integration setup — deleted during verification.
 - Streak total now matches DB exactly: 636 boxes = 636 members with `streak_box_key` set.
+
+## What's done (Sprint 20 — Streak integration Contacts, Prompt D)
+
+Streak's mail-merge UI pulls recipients from the **Contacts** section on a box, NOT from custom columns. Boxes from Prompts A-C had populated columns but empty Contacts, so merges returned zero recipients — exactly the use case the integration was built for. Prompt D plumbs in Contacts.
+
+- **Two API hosts/versions used**: v1 (boxes, fields, pipelines) at `https://www.streak.com/api/v1/`; v2 (Contacts) at `https://api.streak.com/api/v2/`. The client now takes a `version: 1 | 2` flag and picks the host + body content type accordingly. Same rate limiter, same retry policy.
+- **`createContact(teamKey, { emailAddress, getIfExisting })`**: POST `/api/v2/teams/{teamKey}/contacts/`. With `getIfExisting=true`, the body must contain ONLY `emailAddresses` (Streak rejects name fields in that mode). Server-side dedup by email — re-running pushes is cheap.
+- **`updateContact(contactKey, { givenName, familyName })`**: POST `/api/v2/contacts/{contactKey}`. **NOT** team-scoped despite create being team-scoped. The path `/api/v2/teams/{teamKey}/contacts/{contactKey}` returns 400 "Invalid API path specified" — caught during the bulk run.
+- **`addContactToBox(boxKey, contactKey)`**: POST `/api/v1/boxes/{boxKey}` with body `{ contacts: [{ key: contactKey }] }`. Per Streak docs: "The only contacts associated with the box will be the ones you include here" — REPLACE semantics, not append. For our use case (one canonical contact per box) that's fine. Other shapes that silently fail (probed during Prompt D): `linkedContactKeys: [key]`, `contactKeys: [key]`, `contacts: [key]` (string array), `contacts: [{ contactKey }]`, `contacts: [{ emailAddress }]`. The trick is the array of objects keyed `key`.
+- **`teamKey` resolution** in `ensureStreakReady`: pulled from `getPipeline(pipelineKey)` response (`teamKey` field). There is NO public `/users/me/teams` endpoint despite some docs implying it — that path returns 400. The pipeline-owns-the-team relationship is the canonical resolution.
+- **Push primitives extended** (`pushMemberToStreak`, `pushApplicationToStreak`): after the box exists and custom fields are set, attach a Contact. Email selection for members: primary unless it's bounced AND a non-bounced alternative exists; if all emails are bounced, use primary anyway (member just lands in Bounced stage and won't actually get merged). For applications: the email column on the application row directly. Skip + log `streak.contact_skipped` if no email exists.
+- **Box email field stays primary regardless of bounce status** — it's the canonical display address. The contact email may differ (chooseContactEmailForMember picks the best deliverable address). This split is intentional.
+- **Single-user test** (`tmp/streak-contact-test-eric.ts`): pushes a member by ID, prints the resulting box JSON with the contacts section visible. Eric ran on his own member, verified contact attached and mail merge surfaces it.
+- **Bulk contact attach** (`tmp/streak-contacts-bulk.ts`): same shape as Prompt C's backfill — file-lock at `tmp/streak-contacts-bulk.lock`, pre-flight prints pipeline/team/stage/field keys, prompts confirmation, two phases (applications then members) over rows where `streak_box_key IS NOT NULL`, per-row logging, summary at end. Idempotent: re-runs produce the same Streak state via getIfExisting + REPLACE-semantics on contacts array.
+
+### Known issues / gaps
+
+- **Manually deleted boxes are not recreated** by the bulk script — the WHERE filter only touches rows that already have a `streak_box_key`. Same edge case noted in Prompt C.
+- **Replace semantics on `contacts`** means manually-added secondary contacts on a box would be wiped on next push. Today every box has at most one contact (the script-attached one). If multi-contact use ever matters, fetch + merge before write.
+- **Reconciliation/retry queue for failed contact pushes** is not built. Same posture as Prompt B: failures land in `system_events` (`error.caught` from safe-push, or direct from non-safe paths), Eric reviews and re-runs.
 
 ## What's NOT done
 
