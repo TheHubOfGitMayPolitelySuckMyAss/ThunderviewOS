@@ -403,8 +403,6 @@ function refineAuditRow(
       return refineDinnerSpeakers(meta, actor, subject);
     case "email_templates":
       return refineEmailTemplates(meta, actor);
-    case "email_instances":
-      return { event_type: `email_instance.${meta.op.toLowerCase()}`, summary: `email_instance.${meta.op.toLowerCase()}` };
     default:
       return {
         event_type: `${meta.table_name}.${meta.op.toLowerCase()}`,
@@ -986,9 +984,6 @@ function computeAuditSubjectLabel(
       const slug = (row.slug as string | undefined) ?? null;
       return slug ?? "Email template";
     }
-
-    case "email_instances":
-      return null;
 
     default:
       return null;
