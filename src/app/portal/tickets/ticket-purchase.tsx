@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { purchaseTicket } from "./cart/actions";
+import { purchaseTicket } from "./actions";
 import { allowsGuestTicket } from "@/lib/ticket-rules";
 import { Select } from "@/components/ui/select";
 import { FieldHelp } from "@/components/ui/field-help";
