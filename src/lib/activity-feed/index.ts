@@ -145,25 +145,19 @@ export async function getDistinctEventTypes(kind: FeedKind): Promise<EventTypesR
   }
 
   try {
+    // Server-side DISTINCT via RPC. Replaces a prior client-side dedupe over
+    // a row scan that silently truncated at the PostgREST 1k cap, which let
+    // rare event_types disappear from the dropdown until they fired recently.
     const admin = createAdminClient("system-internal");
-    let q = admin.from("activity_feed").select("event_type");
-    q = q.not("actor_id", "is", null).neq("source", "email_events");
-    for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {
-      q = q.not("event_type", "like", `${p}%`);
-    }
-    for (const t of PEOPLE_FEED_EXCLUDED_TYPES) {
-      q = q.neq("event_type", t);
-    }
-    const { data, error } = await q.limit(5000);
+    const { data, error } = await admin.rpc("get_distinct_people_event_types", {
+      excluded_prefixes: PEOPLE_FEED_EXCLUDED_PREFIXES,
+      excluded_types: Array.from(PEOPLE_FEED_EXCLUDED_TYPES),
+    });
     if (error) {
       console.error("[activity-feed] getDistinctEventTypes failed:", error.message);
       return { ok: false, error: error.message };
     }
-    const set = new Set<string>();
-    for (const r of (data ?? []) as { event_type: string }[]) {
-      set.add(r.event_type);
-    }
-    return { ok: true, types: Array.from(set).sort() };
+    return { ok: true, types: (data ?? []) as string[] };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[activity-feed] getDistinctEventTypes unexpected error:", message);
