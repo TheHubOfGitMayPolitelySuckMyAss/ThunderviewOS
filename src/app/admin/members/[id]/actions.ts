@@ -4,6 +4,7 @@ import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-acto
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendFulfillmentEmail } from "@/lib/email-send";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
 
 export async function updateMemberField(
@@ -395,21 +396,15 @@ export async function checkEmailForMember(
 ): Promise<EmailCheckResult> {
   const supabase = await createClient();
 
-  const { data: memberEmail } = await supabase
-    .from("member_emails")
-    .select("member_id, members(id, first_name, last_name)")
-    .eq("email", email.toLowerCase())
-    .limit(1)
-    .single();
+  const result = await findMemberByAnyEmail<{
+    id: string;
+    first_name: string;
+    last_name: string;
+  }>(supabase, email, "id, first_name, last_name");
 
-  if (memberEmail?.members) {
-    const member = memberEmail.members as unknown as { id: string; first_name: string; last_name: string };
-    const name = formatName(member.first_name, member.last_name);
-    if (member.id !== excludeMemberId) {
-      return { existingMember: { id: member.id, name } };
-    }
-    // Email already belongs to this member
-    return { existingMember: { id: member.id, name } };
+  if (result) {
+    const name = formatName(result.member.first_name, result.member.last_name);
+    return { existingMember: { id: result.member.id, name } };
   }
 
   const { data: apps } = await supabase

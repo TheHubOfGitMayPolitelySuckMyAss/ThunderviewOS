@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail, getMemberPrimaryEmail } from "@/lib/member-lookup";
 import { getTodayMT } from "@/lib/format";
 import { H1, Lede, Eyebrow } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
@@ -35,13 +36,8 @@ export default async function CommunityPage() {
 
   let viewerMemberId: string | null = null;
   if (user?.email) {
-    const { data: viewerEmail } = await admin
-      .from("member_emails")
-      .select("member_id")
-      .eq("email", user.email)
-      .limit(1)
-      .single();
-    viewerMemberId = viewerEmail?.member_id ?? null;
+    const viewerLookup = await findMemberByAnyEmail(admin, user.email);
+    viewerMemberId = viewerLookup?.memberId ?? null;
   }
 
   // Featured member: all three fields filled, attended in last 6 months,
@@ -86,14 +82,7 @@ export default async function CommunityPage() {
   // Fetch featured member's primary email for contact section
   let featuredEmail: string | null = null;
   if (featured) {
-    const { data: fEmail } = await admin
-      .from("member_emails")
-      .select("email")
-      .eq("member_id", featured.id)
-      .eq("is_primary", true)
-      .limit(1)
-      .single();
-    featuredEmail = fEmail?.email ?? null;
+    featuredEmail = await getMemberPrimaryEmail(admin, featured.id);
   }
 
   // Full member list for the table

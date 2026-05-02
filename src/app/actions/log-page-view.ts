@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { logSystemEvent } from "@/lib/system-events";
 import { formatName } from "@/lib/format";
 
@@ -40,21 +41,13 @@ export async function logPageView(input: LogPageViewInput): Promise<void> {
     } = await supabase.auth.getUser();
 
     if (user?.email) {
-      const admin = createAdminClient();
-      const { data: memberEmail } = await admin
-        .from("member_emails")
-        .select("member_id, members!inner(first_name, last_name)")
-        .eq("email", user.email.toLowerCase())
-        .limit(1)
-        .maybeSingle();
-
-      if (memberEmail) {
-        const m = memberEmail.members as unknown as {
-          first_name: string;
-          last_name: string;
-        };
-        actorId = memberEmail.member_id;
-        actorLabel = formatName(m.first_name, m.last_name);
+      const result = await findMemberByAnyEmail<{
+        first_name: string;
+        last_name: string;
+      }>(createAdminClient(), user.email, "first_name, last_name");
+      if (result) {
+        actorId = result.memberId;
+        actorLabel = formatName(result.member.first_name, result.member.last_name);
       }
     }
   } catch (err) {

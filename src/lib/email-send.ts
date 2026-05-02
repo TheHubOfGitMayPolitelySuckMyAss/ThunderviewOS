@@ -8,7 +8,7 @@
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
-import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
+import { formatDateFriendly } from "@/lib/format";
 import { logSystemEvent } from "@/lib/system-events";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -24,39 +24,54 @@ async function getTemplate(slug: string) {
 }
 
 /**
+ * Look up a member's primary email + first_name in one round trip.
+ * Returns null on no row (caller decides whether to log + skip or throw).
+ * Local to this module — public callers should use getMemberPrimaryEmail
+ * from @/lib/member-lookup if they only need the address.
+ */
+async function getRecipient(
+  memberId: string
+): Promise<{ email: string; first_name: string } | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("member_emails")
+    .select("email, members!inner(first_name)")
+    .eq("member_id", memberId)
+    .eq("is_primary", true)
+    .limit(1)
+    .single();
+  if (error || !data) return null;
+  return {
+    email: data.email,
+    first_name: (data.members as unknown as { first_name: string }).first_name,
+  };
+}
+
+/**
  * Send approval email to a newly approved member.
  */
 export async function sendApprovalEmail(memberId: string): Promise<void> {
   try {
-    const admin = createAdminClient();
-    const { data: memberEmail } = await admin
-      .from("member_emails")
-      .select("email, members!inner(first_name)")
-      .eq("member_id", memberId)
-      .eq("is_primary", true)
-      .limit(1)
-      .single();
+    const recipient = await getRecipient(memberId);
+    if (!recipient) return;
 
-    if (!memberEmail) return;
-
-    const member = memberEmail.members as unknown as { first_name: string };
     const template = await getTemplate("approval");
     if (!template) return;
 
-    const subject = template.subject.replace(/\[member\.firstname\]/g, member.first_name);
-    const body = template.body.replace(/\[member\.firstname\]/g, member.first_name);
+    const subject = template.subject.replace(/\[member\.firstname\]/g, recipient.first_name);
+    const body = template.body.replace(/\[member\.firstname\]/g, recipient.first_name);
 
     await resend.emails.send({
       from: EMAIL_FROM,
-      to: memberEmail.email,
+      to: recipient.email,
       subject,
       html: bodyToHtml(body),
     });
     await logSystemEvent({
       event_type: "email.transactional_sent",
       subject_member_id: memberId,
-      summary: `Sent approval email to ${memberEmail.email}`,
-      metadata: { template: "approval", recipient: memberEmail.email, member_id: memberId },
+      summary: `Sent approval email to ${recipient.email}`,
+      metadata: { template: "approval", recipient: recipient.email, member_id: memberId },
     });
   } catch (err) {
     console.error("[email] Failed to send approval email:", err);
@@ -68,35 +83,26 @@ export async function sendApprovalEmail(memberId: string): Promise<void> {
  */
 export async function sendReApplicationEmail(memberId: string): Promise<void> {
   try {
-    const admin = createAdminClient();
-    const { data: memberEmail } = await admin
-      .from("member_emails")
-      .select("email, members!inner(first_name)")
-      .eq("member_id", memberId)
-      .eq("is_primary", true)
-      .limit(1)
-      .single();
+    const recipient = await getRecipient(memberId);
+    if (!recipient) return;
 
-    if (!memberEmail) return;
-
-    const member = memberEmail.members as unknown as { first_name: string };
     const template = await getTemplate("re-application");
     if (!template) return;
 
-    const subject = template.subject.replace(/\[member\.firstname\]/g, member.first_name);
-    const body = template.body.replace(/\[member\.firstname\]/g, member.first_name);
+    const subject = template.subject.replace(/\[member\.firstname\]/g, recipient.first_name);
+    const body = template.body.replace(/\[member\.firstname\]/g, recipient.first_name);
 
     await resend.emails.send({
       from: EMAIL_FROM,
-      to: memberEmail.email,
+      to: recipient.email,
       subject,
       html: bodyToHtml(body),
     });
     await logSystemEvent({
       event_type: "email.transactional_sent",
       subject_member_id: memberId,
-      summary: `Sent re-application email to ${memberEmail.email}`,
-      metadata: { template: "re-application", recipient: memberEmail.email, member_id: memberId },
+      summary: `Sent re-application email to ${recipient.email}`,
+      metadata: { template: "re-application", recipient: recipient.email, member_id: memberId },
     });
   } catch (err) {
     console.error("[email] Failed to send re-application email:", err);
@@ -159,22 +165,13 @@ export async function sendFulfillmentEmail(
   try {
     const admin = createAdminClient();
 
-    const { data: memberEmail } = await admin
-      .from("member_emails")
-      .select("email, members!inner(first_name)")
-      .eq("member_id", memberId)
-      .eq("is_primary", true)
-      .limit(1)
-      .single();
-
-    if (!memberEmail) {
+    const recipient = await getRecipient(memberId);
+    if (!recipient) {
       const msg = `No primary email for member ${memberId}`;
       if (options?.throwOnError) throw new Error(msg);
       console.error("[email]", msg);
       return;
     }
-
-    const member = memberEmail.members as unknown as { first_name: string };
 
     const { data: dinner } = await admin
       .from("dinners")
@@ -199,14 +196,14 @@ export async function sendFulfillmentEmail(
 
     const render = (text: string) =>
       text
-        .replace(/\[member\.firstname\]/g, member.first_name)
+        .replace(/\[member\.firstname\]/g, recipient.first_name)
         .replace(/\[dinner\.date\]/g, formatDateFriendly(dinner.date))
         .replace(/\[dinner\.venue\]/g, dinner.venue)
         .replace(/\[dinner\.address\]/g, dinner.address);
 
     const { error } = await resend.emails.send({
       from: EMAIL_FROM,
-      to: memberEmail.email,
+      to: recipient.email,
       subject: render(template.subject),
       html: bodyToHtml(render(template.body)),
     });
@@ -217,10 +214,10 @@ export async function sendFulfillmentEmail(
     await logSystemEvent({
       event_type: "email.transactional_sent",
       subject_member_id: memberId,
-      summary: `Sent fulfillment email to ${memberEmail.email}`,
+      summary: `Sent fulfillment email to ${recipient.email}`,
       metadata: {
         template: "fulfillment",
-        recipient: memberEmail.email,
+        recipient: recipient.email,
         member_id: memberId,
         dinner_id: dinnerId,
       },

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendApprovalEmail, sendReApplicationEmail, sendRejectionEmail } from "@/lib/email-send";
 import { ensureAuthUser } from "@/lib/ensure-auth-user";
+import { getMemberPrimaryEmail } from "@/lib/member-lookup";
 import {
   safeDeleteApplicationBox,
   safePushMember,
@@ -48,16 +49,7 @@ export async function approveApplication(
   }
 
   // Ensure auth.users row exists so the member can log in via magic link
-  const { data: primaryEmail } = await admin
-    .from("member_emails")
-    .select("email")
-    .eq("member_id", result.member_id)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-  if (primaryEmail) {
-    await ensureAuthUser(primaryEmail.email);
-  }
+  await ensureAuthUser(await getMemberPrimaryEmail(admin, result.member_id));
 
   if (result.is_existing) {
     await sendReApplicationEmail(result.member_id);
@@ -173,16 +165,7 @@ export async function linkApplicationToMember(
   }
 
   // Ensure auth.users row exists for the (possibly new) primary email
-  const { data: primaryEmail } = await admin
-    .from("member_emails")
-    .select("email")
-    .eq("member_id", result.member_id)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-  if (primaryEmail) {
-    await ensureAuthUser(primaryEmail.email);
-  }
+  await ensureAuthUser(await getMemberPrimaryEmail(admin, result.member_id));
 
   await sendReApplicationEmail(result.member_id);
 

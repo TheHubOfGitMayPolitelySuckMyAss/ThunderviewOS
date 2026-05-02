@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { logSystemEvent } from "@/lib/system-events";
 
 export async function GET(request: Request) {
@@ -37,14 +38,8 @@ export async function GET(request: Request) {
       let memberId: string | null = null;
       if (verifiedEmail) {
         try {
-          const admin = createAdminClient();
-          const { data } = await admin
-            .from("member_emails")
-            .select("member_id")
-            .eq("email", verifiedEmail.toLowerCase())
-            .limit(1)
-            .maybeSingle();
-          memberId = data?.member_id ?? null;
+          const result = await findMemberByAnyEmail(createAdminClient(), verifiedEmail);
+          memberId = result?.memberId ?? null;
         } catch (err) {
           console.error("[auth/callback] member lookup failed:", err);
         }

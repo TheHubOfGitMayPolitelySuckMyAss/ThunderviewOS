@@ -9,6 +9,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 
 export async function getCurrentActorMemberId(): Promise<string | null> {
   try {
@@ -18,14 +19,8 @@ export async function getCurrentActorMemberId(): Promise<string | null> {
     } = await supabase.auth.getUser();
     if (!user?.email) return null;
 
-    const admin = createAdminClient();
-    const { data } = await admin
-      .from("member_emails")
-      .select("member_id")
-      .eq("email", user.email.toLowerCase())
-      .limit(1)
-      .maybeSingle();
-    return data?.member_id ?? null;
+    const result = await findMemberByAnyEmail(createAdminClient(), user.email);
+    return result?.memberId ?? null;
   } catch (err) {
     console.error("[current-actor] failed to resolve:", err);
     return null;

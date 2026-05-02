@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import TopNav from "@/components/top-nav";
@@ -25,21 +26,15 @@ export default async function AdminLayout({
 
   const admin = createAdminClient();
 
-  // Fetch member data for initials and team check
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(first_name, last_name, is_team, kicked_out, profile_pic_url)")
-    .eq("email", email)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  const result = await findMemberByAnyEmail<{
     first_name: string;
     last_name: string;
     is_team: boolean;
     kicked_out: boolean;
     profile_pic_url: string | null;
-  } | null;
+  }>(admin, email, "first_name, last_name, is_team, kicked_out, profile_pic_url");
+
+  const member = result?.member ?? null;
 
   let isTeam = false;
   if (!isAdmin) {

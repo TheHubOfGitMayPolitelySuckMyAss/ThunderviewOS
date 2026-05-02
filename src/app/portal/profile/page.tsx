@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -23,17 +24,7 @@ export default async function ProfilePage({
 
   const admin = createAdminClient();
 
-  // Fetch member data
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select(
-      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, kicked_out, profile_pic_url, marketing_opted_in)"
-    )
-    .eq("email", user.email!)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  const result = await findMemberByAnyEmail<{
     id: string;
     first_name: string;
     last_name: string;
@@ -48,8 +39,13 @@ export default async function ProfilePage({
     kicked_out: boolean;
     profile_pic_url: string | null;
     marketing_opted_in: boolean;
-  } | null;
+  }>(
+    admin,
+    user.email!,
+    "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, kicked_out, profile_pic_url, marketing_opted_in"
+  );
 
+  const member = result?.member ?? null;
   if (!member || member.kicked_out) redirect("/portal");
 
   // Get primary email

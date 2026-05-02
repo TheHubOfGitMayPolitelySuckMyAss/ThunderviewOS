@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -47,13 +48,8 @@ export default async function MemberProfilePage({
 
   let isSelf = false;
   if (user?.email) {
-    const { data: viewerEmail } = await admin
-      .from("member_emails")
-      .select("member_id")
-      .eq("email", user.email)
-      .limit(1)
-      .single();
-    isSelf = viewerEmail?.member_id === member.id;
+    const viewerLookup = await findMemberByAnyEmail(admin, user.email);
+    isSelf = viewerLookup?.memberId === member.id;
   }
 
   const name = formatName(member.first_name, member.last_name);

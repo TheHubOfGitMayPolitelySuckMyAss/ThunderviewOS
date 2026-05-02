@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 
 export async function savePortalProfile(formData: FormData) {
   const supabase = await createClient();
@@ -13,21 +14,14 @@ export async function savePortalProfile(formData: FormData) {
 
   const admin = await createAdminClientForCurrentActor();
 
-  // Look up member
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id, current_intro, current_ask, contact_preference)")
-    .eq("email", user.email!)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  const result = await findMemberByAnyEmail<{
     id: string;
     current_intro: string | null;
     current_ask: string | null;
     contact_preference: string | null;
-  } | null;
+  }>(admin, user.email!, "id, current_intro, current_ask, contact_preference");
 
+  const member = result?.member ?? null;
   if (!member) return { success: false, error: "Member not found" };
 
   const newIntro = formData.get("current_intro") as string | null;

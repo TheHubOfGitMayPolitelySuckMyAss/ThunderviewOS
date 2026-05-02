@@ -2,19 +2,14 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { logSystemEvent } from "@/lib/system-events";
 
 async function memberIdForEmail(email: string | null): Promise<string | null> {
   if (!email) return null;
   try {
-    const admin = createAdminClient();
-    const { data } = await admin
-      .from("member_emails")
-      .select("member_id")
-      .eq("email", email.toLowerCase())
-      .limit(1)
-      .maybeSingle();
-    return data?.member_id ?? null;
+    const result = await findMemberByAnyEmail(createAdminClient(), email);
+    return result?.memberId ?? null;
   } catch (err) {
     console.error("[auth/confirm] memberIdForEmail failed:", err);
     return null;

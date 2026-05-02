@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check } from "lucide-react";
@@ -30,16 +31,7 @@ export default async function PortalPage({
   const email = user.email!;
   const admin = createAdminClient();
 
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select(
-      "email, members!inner(id, first_name, attendee_stagetypes, has_community_access, kicked_out, current_intro, current_ask, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended)"
-    )
-    .eq("email", email)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  const result = await findMemberByAnyEmail<{
     id: string;
     first_name: string;
     attendee_stagetypes: string[];
@@ -51,7 +43,13 @@ export default async function PortalPage({
     intro_updated_at: string | null;
     ask_updated_at: string | null;
     last_dinner_attended: string | null;
-  } | null;
+  }>(
+    admin,
+    email,
+    "id, first_name, attendee_stagetypes, has_community_access, kicked_out, current_intro, current_ask, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended"
+  );
+
+  const member = result?.member ?? null;
 
   const isMember = member !== null && member.kicked_out === false;
 

@@ -25,24 +25,7 @@ import {
 import { formatName } from "@/lib/format";
 import { logSystemEvent } from "@/lib/system-events";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-async function getMemberPrimaryEmail(
-  admin: ReturnType<typeof createAdminClient>,
-  memberId: string
-): Promise<string> {
-  const res = await admin
-    .from("member_emails")
-    .select("email")
-    .eq("member_id", memberId)
-    .eq("is_primary", true)
-    .single();
-  if (res.error || !res.data) {
-    throw new Error(
-      `pushMemberToStreak: no primary email for member ${memberId}: ${res.error?.message ?? "missing row"}`
-    );
-  }
-  return res.data.email;
-}
+import { getMemberPrimaryEmail } from "@/lib/member-lookup";
 
 /**
  * Pick the email to attach as the box's mail-merge contact.

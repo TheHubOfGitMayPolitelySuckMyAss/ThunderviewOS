@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createAdminSupabaseClient } from "@supabase/supabase-js";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -59,15 +60,18 @@ export async function proxy(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
-      const { data: memberRow } = await adminClient
-        .from("member_emails")
-        .select("members!inner(is_team, kicked_out)")
-        .eq("email", email!)
-        .limit(1)
-        .single();
-
-      const member = (memberRow?.members as unknown as { is_team: boolean; kicked_out: boolean }) ?? null;
-      const isTeam = member?.is_team === true && member?.kicked_out === false;
+      let isTeam = false;
+      try {
+        const result = await findMemberByAnyEmail<{ is_team: boolean; kicked_out: boolean }>(
+          adminClient,
+          email!,
+          "is_team, kicked_out"
+        );
+        isTeam = result?.member.is_team === true && result.member.kicked_out === false;
+      } catch (err) {
+        // Fail closed — treat as not-team — but surface the error loudly.
+        console.error("[proxy] team check lookup failed, denying admin access:", err);
+      }
 
       if (!isTeam) {
         const url = request.nextUrl.clone();
@@ -95,16 +99,20 @@ export async function proxy(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
-      const { data: memberRow } = await adminClient
-        .from("member_emails")
-        .select("members!inner(has_community_access)")
-        .eq("email", email!)
-        .limit(1)
-        .single();
+      let hasAccess = false;
+      try {
+        const result = await findMemberByAnyEmail<{ has_community_access: boolean }>(
+          adminClient,
+          email!,
+          "has_community_access"
+        );
+        hasAccess = result?.member.has_community_access === true;
+      } catch (err) {
+        // Fail closed — deny portal access — but surface the error loudly.
+        console.error("[proxy] portal access lookup failed, denying:", err);
+      }
 
-      const member = (memberRow?.members as unknown as { has_community_access: boolean }) ?? null;
-
-      if (!member?.has_community_access) {
+      if (!hasAccess) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         return NextResponse.redirect(url);

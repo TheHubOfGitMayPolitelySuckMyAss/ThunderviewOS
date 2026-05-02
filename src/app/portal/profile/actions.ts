@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
 import sharp from "sharp";
 
@@ -24,18 +25,12 @@ export async function portalUpdateProfilePic(
 
   const admin = await createAdminClientForCurrentActor();
 
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id, profile_pic_url)")
-    .eq("email", user.email!)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  const result = await findMemberByAnyEmail<{
     id: string;
     profile_pic_url: string | null;
-  } | null;
+  }>(admin, user.email!, "id, profile_pic_url");
 
+  const member = result?.member ?? null;
   if (!member) return { success: false, error: "Member not found" };
 
   const file = formData.get("profile_pic") as File | null;
@@ -115,17 +110,7 @@ export async function saveProfile(formData: FormData) {
 
   const admin = await createAdminClientForCurrentActor();
 
-  // Look up member with current values
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select(
-      "members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference)"
-    )
-    .eq("email", user.email!)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  const result = await findMemberByAnyEmail<{
     id: string;
     first_name: string;
     last_name: string;
@@ -137,8 +122,13 @@ export async function saveProfile(formData: FormData) {
     current_ask: string | null;
     current_give: string | null;
     contact_preference: string | null;
-  } | null;
+  }>(
+    admin,
+    user.email!,
+    "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference"
+  );
 
+  const member = result?.member ?? null;
   if (!member) return { success: false, error: "Member not found" };
 
   // Parse form data
@@ -296,14 +286,8 @@ export async function toggleMarketing(
 
   const admin = await createAdminClientForCurrentActor();
 
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id)")
-    .eq("email", user.email!)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as { id: string } | null;
+  const result = await findMemberByAnyEmail(admin, user.email!);
+  const member = result ? { id: result.memberId } : null;
   if (!member) return { success: false, error: "Member not found" };
 
   const { error } = await admin
