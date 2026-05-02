@@ -172,6 +172,22 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 - **Portal back-link convention.** Top-nav pages (Home, Tickets, Community, Recap) show no back link. Other portal pages (Members/[id], Profile edit) show back link to logical parent. Documented in `src/app/portal/layout.tsx`. Reference: `ui_kits/portal/index.html`.
 - **PageHeader gap:** known gap. `default` = tv-h1 + 64px, `compact` = tv-h3 + 24px. Portal needs tv-h1 + 32px — neither fits, so portal pages use inline `<H1>` + `<Lede>` with manual `mb-6`. Add `size="portal"` and migrate when this becomes important.
 
+## Tests
+
+pgTAP suites in `supabase/tests/` covering the four most load-bearing trigger/RPC pairs. 35 assertions today; expand here when you add new functions/triggers that mutate state across tables.
+
+- **Files:**
+  - `01_approve_application.sql` — new-member happy path, existing-member rebind w/ primary-email rotation, kicked-out short-circuit (13 assertions).
+  - `02_ticket_triggers.sql` — `on_ticket_insert` sets `first_dinner_attended` + `has_community_access`; `on_ticket_fulfillment_change` recalculates `last_dinner_attended` and reverts `first_dinner_attended` only when refunded dinner matches (8 assertions).
+  - `03_swap_primary_email.sql` — happy promotion, idempotent no-op when target is already primary, cross-member email_id silently breaks state but the deferred constraint raises at COMMIT-equivalent (7 assertions).
+  - `04_audit_trigger_ordering.sql` — `zzz_audit_row_change` snapshots NEW after all BEFORE triggers run; covers kickout cascade, marketing opt-out, intro_updated_at (7 assertions).
+- **Run via Supabase MCP `execute_sql`:** paste the full file body. Each file wraps itself in `BEGIN; ... ROLLBACK;` — zero commit risk against prod schema.
+- **Why ROLLBACK against prod, not a Branch:** simplest infra. Tests use bogus `1900-*` dates, `*@test.invalid` emails, and random UUIDs to avoid colliding with real data. The rollback discards everything including audit rows.
+- **Why a `_tap_log` temp table:** Supabase MCP returns only the last statement's result. Each assertion writes its TAP line into the log table, then the final `SELECT * FROM _tap_log` returns all rows — full per-assertion visibility.
+- **Two pgTAP-quirk gotchas to know if you write more tests:**
+  - `now()` returns transaction-start time, so all rows in one test transaction share `changed_at` and `updated_at`. Order audit rows by `id DESC`, not `changed_at`. Assert timestamp fields with `IS NOT NULL`, not strict `>` comparisons.
+  - The `trg_member_has_primary_email` constraint is `DEFERRABLE INITIALLY DEFERRED` — it only fires at COMMIT. To assert it catches a misuse, run `SET CONSTRAINTS trg_member_has_primary_email IMMEDIATE` inside `throws_ok` to force evaluation. Don't use SAVEPOINT to isolate failures: rollback to the savepoint discards your `_tap_log` writes too.
+
 ## What's NOT done — don't build without explicit prompt
 
 - Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled).
