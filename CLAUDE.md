@@ -2,821 +2,192 @@
 
 # Thunderview OS
 
-Thunderview OS is the management system for Thunderview CEO Dinners — monthly startup CEO dinners in Colorado (~40 attendees), organized by Eric Marcoullier. It replaces a fragmented stack of Squarespace forms, Google Sheets, Streak CRM, and Eric's memory. Single source of truth for applications, members, tickets, credits, dinners, and intros/asks. Built on Next.js + Supabase, deployed on Vercel. This is a separate project from CoachingOS/DigiEric — separate repo, separate Supabase project.
+Next.js 16 + Supabase + Vercel. Replaces a Squarespace/Sheets/Streak stack for a ~40-member CEO dinner program.
 
 ## Operating rules (read first)
 
-- Cloud-first. Vercel + Supabase. No local-only scripts or dependencies. Flag any local-only requirement for cloud migration automatically.
-- Do NOT invent requirements. Build exactly what's specified. If something seems missing, flag it — don't fill it in.
+- Cloud-first. No local-only scripts or dependencies.
+- Don't invent requirements. If something seems missing, flag it — don't fill it in.
 - When Eric reports a bug, ask at least one clarifying question before offering an explanation. Don't infer the cause.
-- Prefer omission over inference. If information is uncertain, say so explicitly.
+- Prefer omission over inference. If uncertain, say so.
 - Don't validate, praise, or smooth ambiguity. Disagree when warranted.
-- Workflow: Eric writes prompts, Claude Code executes. Default assumption: Claude Code does it unless stated otherwise.
-- When Eric asks you to find a resource (token, file, config value) for a specific task, finding it is implicit authorization to use it for that task. Don't ask for permission to proceed.
+- When Eric points you at a resource (token, file, config) for a task, finding it is implicit authorization to use it. Don't ask permission to proceed.
+- **Update existing sections of this doc when work changes the system's state.** Do NOT append "What's done in Sprint N" sections. Sprint history belongs in git log. The doc reflects the system as it is now, not how it got here.
+- Separate from CoachingOS/DigiEric — separate repo, separate Supabase project. Don't conflate.
+- The v4 handoff doc (in Eric's chat sessions, not the repo) is the canonical product spec. Eric will paste relevant sections.
 
-## Canonical spec
+## Cross-cutting invariants
 
-The v4 handoff doc is the source of truth for product decisions. It lives outside the repo (in Eric's chat sessions) and Eric will paste relevant sections when needed. The handoff doc supersedes any conflicting comments or assumptions in the codebase.
+These are the design choices that are easy to violate by reading the code locally and missing the global pattern.
 
-## Stack
+- **Three-table model.** `applications` (vetting events, persist forever, includes demographics), `members` (current-standing approved people, no demographics), `tickets` (paid entry per dinner). Plus `credits`, `dinners`. Demographics on applications never copy to members.
+- **No row deletions.** Soft-delete via `kicked_out` on members. Rejected applications stay — that table IS the suppression list.
+- **Multi-email members via `member_emails`.** Auth, ticket matching, and application matching look up against ALL of a member's emails, not just primary. Primary = email on most recent approved application. Tickets do NOT change primary (Stripe autofill is noisy). Hard bounce on primary auto-promotes most-recent active secondary via `swap_primary_email` RPC.
+- **Audit attribution via `X-Audit-Actor` request header.** Server actions writing to audited tables for human actions use `createAdminClientForCurrentActor()` (in `src/lib/supabase/admin-with-actor.ts`). Cron and webhook handlers use plain `createAdminClient()`. Plain admin client on a human-driven write = audit row with `actor_member_id = NULL` = doesn't appear in the People feed.
+- **Best-effort Streak sync.** Failures land in `system_events` as `error.caught` with `source: 'streak_push'`. Never roll back the OS commit on a Streak failure. Manual repair = re-run the action.
+- **Admin = `eric@marcoullier.com` (hardcoded). Team = members with `is_team = true AND kicked_out = false`.** Same admin UI access. Role check: `is_admin_or_team()` Postgres function (SECURITY DEFINER), used in RLS, proxy, and admin layout.
+- **One Ask per member, overwritten on save.** `members.current_ask`. Prefill logic on portal home: `ask_updated_at > last_dinner_attended`. Char limits: intro 1,000, ask 250, give 500. DB columns are unconstrained TEXT.
+- **`has_community_access` means "is an approved member," not "has attended."** Set `true` by all member-creation RPCs AND by the ticket INSERT trigger (harmless redundancy). Revoked when `kicked_out` flips false→true. Does NOT auto-restore on un-kick.
+- **`fulfillment_status='fulfilled'` means "dinner-details email has been sent." It does NOT mean attended.** Attendance isn't tracked. The only purpose of `fulfilled` is gating the fulfillment email. Tickets for the next upcoming dinner auto-fulfill on Stripe webhook insert. Tickets for further-out dinners stay `purchased` until the daily fulfill-tickets cron flips them once the calendar rolls into the dinner's month.
 
-- **Next.js 16.2.3**, App Router, TypeScript
-- **Tailwind CSS 4** (via `@tailwindcss/postcss`)
-- **Supabase**: `@supabase/supabase-js` ^2.103.2, `@supabase/ssr` ^0.10.2
-- **Stripe**: `stripe` ^22.0.2 (Checkout Sessions + refunds, sandbox mode)
-- **Resend** ^6.11.0 (all transactional emails wired)
-- **lucide-react** (all icons — no emoji, no unicode arrows)
-- **Hosting**: Vercel (production: https://thunderview-os.vercel.app)
-- **Database**: Supabase project `volrbqcolrqarmquaqvy` (us-west-2)
-- **Design system**: `design-system/` directory at repo root. `README.md` is the visual spec (positioning, content rules, visual foundations, layout invariants, iconography). `colors_and_type.css` is the token source. `ui_kits/` has HTML prototypes (marketing, portal, admin, emails). See "Design system" section below.
+## Trigger-managed columns to know about
 
-## Key architectural decisions
+These exist in the schema but you'll wire them wrong if you treat them as ordinary columns.
 
-- **Auth:** Magic link only via Supabase Auth. NO Google OAuth. Uses PKCE flow (`@supabase/ssr` default). Magic link emails route to `/auth/confirm?token_hash=...&type=email`. All auth routes redirect to `/portal` — role-based routing happens on the portal page.
-- **Admin role:** `eric@marcoullier.com` is hard-coded as the sole admin.
-- **Team role:** Any member with `is_team = true` AND `kicked_out = false`. Same admin UI access as admin.
-- **Member role:** Portal-only access (Phase 4).
-- **Role check:** Implemented via `is_admin_or_team()` Postgres function (SECURITY DEFINER) used in RLS policies. Also checked in proxy and admin layout.
-- **Data model philosophy:** Three distinct tables — `applications` (vetting events, persist forever), `members` (current-standing approved people), `tickets` (paid entry for a specific dinner). Plus `credits` and `dinners`.
-- **No row deletions.** Soft-delete via `kicked_out` flag on members. Rejected applications stay in the applications table — that table IS the rejection/suppression list.
-- **Demographics (gender, race, orientation) live on `applications` only.** Never copied to `members`.
-- **One Ask per member.** `members.current_ask` is overwritten on save. Prefill logic: `ask_updated_at > last_dinner_attended`. Character limits: intro 1,000, ask 250, give 500. Enforced client-side (`maxLength`) and server-side (portal save actions). DB columns are unconstrained TEXT.
-- **Give field.** `members.current_give` TEXT. Shown on portal profile editor and member detail pages only — not on the portal home intro/ask form. No timestamp tracking.
-- **Multi-email members.** Members can have multiple email addresses via the `member_emails` table. Lookups (auth, ticket matching, application matching) check against ALL of a member's emails. Primary email = the email on the member's most recent approved application; this is what's used for outbound communication. Primary flips automatically when a new application is approved with a different email. Tickets do NOT change primary email (Stripe autofill is noisy).
-  - ~~TODO: When an application is approved with a different email than primary, flip primary to the application email.~~ Done — `approve_application` and `link_application_to_member` RPCs handle this.
-  - TODO: When a ticket is fulfilled with an unrecognized email, insert a new `member_emails` row with `is_primary = false`, `source = 'ticket'` (add to fulfill action in Phase 3).
+- `members.first_dinner_attended` — set by ticket INSERT trigger if currently null. On refund/credit, reverts only if it matches the refunded ticket's dinner.
+- `members.last_dinner_attended` — set by `post-dinner` cron, NOT by the ticket INSERT trigger. (Trigger removed because fulfillment can happen for future dinners.) On refund/credit, recalculated as MAX of remaining fulfilled tickets for past dinners.
+- `members.intro_updated_at` / `ask_updated_at` — no trigger. Set explicitly by portal save action only when the respective text changes. Admin edits do NOT update these.
+- `members.marketing_opted_out_at` — trigger sets to `now()` on flip-false, clears on flip-true.
+- All audit triggers named `zzz_audit_row_change` so they fire LAST among same-timing AFTER triggers (Postgres fires alphabetically). Otherwise the audit snapshot misses sibling-trigger updates.
 
-## Data model
+## Auth (gotchas, not flow)
 
-Full schema in `supabase/migrations/20260415000000_initial_schema.sql` and `20260415100000_member_emails.sql`. Phase 2 schema additions (`email_status`, historical enum values) applied via `tmp/import.sql`.
+The flow is standard Supabase magic link. The non-obvious parts:
 
-- `dinners` — first-Thursday-of-month events, auto-generated 12 months out via Vercel Cron (`/api/cron/generate-dinner`), skipping Jan/Jul. Date is UNIQUE. Cron fires daily at 1pm UTC; handler runs only on the day after the first Thursday of each month. `venue` TEXT NOT NULL DEFAULT `'ID345'`, `address` TEXT NOT NULL DEFAULT `'3960 High St, Denver, CO 80205'` — both inline-editable on dinner detail page. `title` TEXT NULL — optional dinner topic/theme. `description` TEXT NULL — optional dinner description. Both inline-editable on dinner detail page.
-- `dinner_speakers` — join table linking dinners to member speakers. `dinner_id` UUID (FK → dinners, CASCADE), `member_id` UUID (FK → members, CASCADE), composite PK. No order column or extra fields. Speaker display data (name, company, LinkedIn, website, profile pic) comes from the member row. Any member can be a speaker, including kicked-out members (outside-speaker workflow). RLS: admin/team read+write, authenticated members read.
-- `applications` — vetting records with demographic data, status pending/approved/rejected, persist forever. `first_name` + `last_name` (same split as members). `member_id` is NULL until approved.
-- `members` — approved people, soft-deletable via `kicked_out`. `first_name` + `last_name` (split from single `name` column; backfilled by splitting on first space). `attendee_stagetypes` is `TEXT[]` (not null, default `'{}'`) — supports multi-role membership (e.g. Active CEO + Investor). Note: `applications.attendee_stagetype` remains a single TEXT column; the application form is single-select. Key trigger-managed columns:
-  - `has_community_access` BOOLEAN — set to `true` on member creation (all three RPCs: `approve_application`, `add_member_with_application`, `link_application_to_member`) AND on ticket INSERT (trigger). Being an approved member = community access. Set to `false` on UPDATE when `kicked_out` flips false→true (trigger `trg_revoke_community_access_on_kickout`). Does NOT auto-restore on un-kick or on refund/credit. A future revoke checkbox on the refund flow will allow manual revert (not yet built).
-  - `first_dinner_attended` DATE — set on ticket INSERT to the dinner's date if currently null. On refund/credit, reverts to null only if `first_dinner_attended` matches the refunded ticket's dinner date; otherwise unchanged.
-  - `last_dinner_attended` DATE — set by `post-dinner` cron (fires daily, checks if yesterday was a dinner, updates all members with fulfilled tickets for that dinner). NOT set by the fulfillment trigger (removed — fulfillment can happen for future dinners, which would incorrectly advance this date). On refund/credit, recalculated as MAX of remaining fulfilled tickets for past dinners; null if none remain.
-  - `marketing_opted_out_at` TIMESTAMPTZ — set to `now()` when `marketing_opted_in` flips to `false`, cleared to null when it flips back to `true`. Managed by trigger on UPDATE of `marketing_opted_in`.
-  - `intro_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Intro. Column exists but no trigger — set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp.
-  - `ask_updated_at` TIMESTAMPTZ — tracks when the member last updated their own Ask. No trigger — set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp.
-  - `profile_pic_url` TEXT NULL — full public URL to profile pic in Supabase Storage bucket `profile-pics`. Null = no pic. Set by portal profile save action or admin profile pic upload (`adminUploadProfilePic` action).
-  - `contact_preference` TEXT — `'email'` or `'linkedin'`, default `'linkedin'`. Two effects: (1) determines how the member's name is linked in marketing emails / recap (LinkedIn vs mailto); (2) gates whether email is shown in the Contact section on profile pages. LinkedIn is always visible if present.
-  - `updated_at` — auto-set by trigger.
-- `tickets` — paid entry tied to a member + dinner, with fulfillment lifecycle (purchased/fulfilled/refunded/credited). Tracks payment source and match confidence. `fulfillment_status = 'fulfilled'` means "dinner-details email has been sent." It does NOT mean "attended." Attendance is not tracked. The only reason fulfilled exists is to gate the fulfillment email. Tickets for the next upcoming dinner auto-fulfill immediately on purchase via the Stripe webhook. Tickets for further-out dinners stay `purchased` until the calendar rolls into the dinner's month, then the daily fulfill-tickets cron flips them. The webhook and comp ticket action only flip to fulfilled if `dinner_id` matches `getTargetDinner()`.
-- `tickets` also supports historical imports: `payment_source = 'historical'`, `ticket_type = 'historical'`, `fulfillment_status = 'fulfilled'`, `amount_paid = 0`, no order ID, dinner date as both `purchased_at` and `fulfilled_at`.
-- `credits` — outstanding/redeemed, tied to a source (refunded) ticket and optionally a redeemed ticket.
-- `member_emails` — multiple emails per member. `is_primary` marks the canonical email. Partial unique index enforces at-most-one primary; constraint trigger enforces at-least-one. `source` tracks origin (application/ticket/manual). `email_status` is `'active'` (default), `'bounced'`, or `'complained'`. On a hard bounce of a primary email, the Resend webhook handler auto-promotes the most recently-added `email_status='active'` secondary to primary via the `swap_primary_email` RPC (sequenced before `safePushMember` so the next Streak push picks up the new primary; Streak's contacts array uses replace-semantics and drops the old contact). If no eligible secondary exists, the bounced primary stays primary and the member moves to the Bounced stage in Streak.
-- `email_events` — Resend webhook events for bounces, complaints, and failures. `event_type` CHECK `'bounced'|'complained'|'failed'`. `resend_email_id` + `event_type` is UNIQUE (idempotency). `member_email_id` and `member_id` nullable FKs — backfilled when recipient matches a `member_emails` row. `raw_payload` JSONB stores the full webhook event. `recipient_email` is stored bare+lowercase, parsed from `data.to[0]` regardless of `"Name <email>"` or bare form (historical rows pre-Sprint-20-fix may have contained bracket-format strings; the cleanup migration `20260501100000_cleanup_non_thunderview_email_events.sql` removed all such rows, but the parser is in place for future readers and for any rows that slipped in via reprocessing). RLS: admin/team SELECT only. On hard bounce (`bounce.type = 'Permanent'`): flips `member_emails.email_status` to `'bounced'`, runs secondary promotion, pushes Streak. On soft bounce (`Transient` / `Undetermined` / unknown): inserts the row for dashboard visibility but does NOT change member state, does NOT promote, does NOT push. On complaint: flips to `'complained'` + opts out marketing + pushes Streak. On failure: no member state change. Admin notified on complaint and failure. Webhook at `/api/webhooks/resend`, verified via `RESEND_WEBHOOK_SECRET` (svix signature). Events from non-Thunderview senders on the shared Resend account are silently dropped before any insert (see Known issues).
-- `email_templates` — editable email templates for transactional emails. `slug` (unique, e.g. `'approval'`), `subject`, `body` (with `[member.fieldname]` variable placeholders), `updated_at` (trigger-managed), `updated_by` (FK to members). RLS: admin/team read + update. Also stores generic `monday-before` and `monday-after` slug rows from the earlier generic `email_instances` system (superseded by dedicated tables below — these rows are unused but harmless).
-- `email_instances` — generic per-dinner email instances (draft/test_sent/sent lifecycle). Superseded by dedicated `monday_before_emails` and `monday_after_emails` tables. Table remains but is unused — will be cleaned up in a future session.
-- `monday_before_macro` — singleton row (enforced via `UNIQUE CHECK (singleton = TRUE)`) storing default template content for Monday Before emails. Fields: `subject`, `preheader`, `headline`, `custom_text`, `partnership_boilerplate`. Editable at `/admin/emails/monday-before`. Changes seed future drafts but don't affect existing ones. RLS: admin/team read + update.
-- `monday_before_emails` — per-dinner Monday Before email drafts. `dinner_id` UNIQUE (one draft per dinner). Status lifecycle: `draft` → `sent`. Fields: all macro fields + `signoff_member_id` (unused — kept in DB, removed from UI), `test_sent_at`, `test_sent_after_last_edit` (flips FALSE on any text/image edit, TRUE on test send — gates the Send button), `sent_at`, `sent_by`, `audience_snapshot` (JSONB, frozen recipient list at send time). Sent-lock trigger (`lock_sent_monday_before_email`) blocks all UPDATEs when `status = 'sent'`. RLS: admin/team read + insert + update.
-- `monday_before_email_images` — image attachments for Monday Before emails. `email_id` FK, `group_number` (CHECK IN 1, 5 — two image groups), `display_order`, `storage_path`, `public_url`. Unique index on `(email_id, group_number, display_order)`. Sent-lock trigger blocks writes when parent email is sent. Stored in `email-images` bucket at `monday-before/{email_id}/{group}/{uuid}.jpg`.
-- `monday_after_macro` — singleton row storing default template content for Monday After emails. Fields: `subject`, `preheader`, `headline`, `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`, `partnership_boilerplate`. Same pattern as `monday_before_macro`.
-- `monday_after_emails` — per-dinner Monday After email drafts. Same structure as `monday_before_emails` with additional fields: `opening_text`, `recap_text`, `team_shoutouts`, `our_mission`, `intros_asks_header`. Target dinner = most recent past dinner. Same sent-lock trigger pattern.
-- `monday_after_email_images` — image attachments for Monday After emails. Same as `monday_before_email_images` but `group_number` CHECK IN (1, 2, 3, 4, 5) — five image groups. Stored at `monday-after/{email_id}/{group}/{uuid}.jpg`.
-- `system_events` — append-only log for events not captured by audit or email_events (auth login, cron runs, transactional/bulk email sends, webhook receipt, feedback, errors). Service-role writes only. Used by the Activity Feed. See "Activity feed" section.
+- **PKCE uses `/auth/confirm` (token_hash), not `/auth/callback` (code).** Both routes exist; `/auth/callback` is fallback. Both create their own `createServerClient` inline with direct `cookieStore` access — do NOT use `lib/supabase/server.ts` in auth routes (cookies don't propagate on redirects).
+- **Magic link template MUST use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`.** Not `{{ .ConfirmationURL }}` (verifies at Supabase's endpoint, never establishes session). Not `{{ .SiteURL }}` (hardcodes production, breaks preview deploys). Configured via Supabase Management API, not dashboard.
+- **Supabase URL allow-list needs preview wildcard:** `https://thunderview-os-git-*-erics-projects-*.vercel.app/**`. Without it, preview-targeted magic links silently fall back to Site URL.
+- **All members need an `auth.users` row.** `signInWithOtp` uses `shouldCreateUser: false`. Every member-creation flow calls `ensureAuthUser()` (`src/lib/ensure-auth-user.ts`). Member can't log in? Check `auth.users` first.
+- **`ensureAuthUser` patches GoTrue NULL columns.** Supabase's `admin.createUser()` leaves `email_change` and `email_change_token_new` NULL, GoTrue scans them into non-nullable strings, OTP request fails with "Database error finding user". Fix is the `updateUserById` call inside `ensureAuthUser`.
+- **Proxy uses service-role client for member lookups** (team check, community access). Session client there subjects the query to RLS, blocks non-admin login. Hardcoded admin email check bypasses, so it would silently work for Eric only.
+- **Auth cookies must apply to redirect responses.** `/auth/confirm` and `/auth/callback` set cookies via `cookieStore.set()` AND apply them to the `NextResponse.redirect()` explicitly. Returning a separate redirect drops the cookies.
+
+## Streak integration
+
+Two-way sync. OS is source of truth; Streak is the visible CRM. Best-effort: failed pushes log + swallow, never roll back OS state.
+
+- **Library at `src/lib/streak/`.** `safe-push.ts` wrappers are the only thing call sites use; raw `push.ts` primitives throw and are confined to the lib.
+- **Stage precedence (8 stages, top-down, first match wins):** `Team` (is_team) → `Opted Out` (!marketing_opted_in OR kicked_out) → `Bounced` (≥1 email AND every email bounced; vacuous zero-email case excluded) → `Has Ticket` → `Not This One` → `Attended` → `Approved` → `Applied`. Pure function in `compute-stage.ts`. Stage names must match Streak verbatim — bootstrap throws on missing stages, doesn't auto-create them.
+- **Two API hosts/versions.** v1 (boxes/fields/pipelines) at `https://www.streak.com/api/v1/`. v2 (Contacts) at `https://api.streak.com/api/v2/`. Client takes a `version: 1 | 2` flag.
+- **`teamKey` resolution: pull from `getPipeline(pipelineKey)`.** There is no public `/users/me/teams` endpoint; that path 400s.
+- **`updateContact` is NOT team-scoped despite create being team-scoped.** Use `/api/v2/contacts/{contactKey}`. The team-scoped variant 400s.
+- **`addContactToBox` REPLACES the contacts array.** Body shape `{ contacts: [{ key }] }` (array of objects keyed `key`). Other shapes silently fail. For one-canonical-contact-per-box that's fine. If multi-contact ever matters, fetch + merge before write.
+- **Contacts are required for Streak's mail merge.** Box columns alone don't surface in merge. Push primitives create/attach a Contact after fields are set. Email selection: primary unless bounced AND a non-bounced alternative exists. Box's email field stays primary regardless of bounce status (canonical display); contact email may differ (deliverable address).
+- **Inbound webhook auth via `?secret=` query param** (`STREAK_WEBHOOK_SECRET`). Streak's automation builder doesn't support HMAC payload signing or custom request headers. Both routes (`/api/webhooks/streak/{opted-out,not-this-one}`) return 200 on internal errors after auth so Streak doesn't retry indefinitely; only secret-check failures return 401.
+- **Rate limiter:** in-process token bucket ≤8 req/sec, exp backoff on 429 (max 3 retries), single retry on 5xx. Every call emits `streak.api_call` to `system_events`.
+- **`STREAK_API_KEY` set via REST API, not CLI.** Vercel CLI's `vercel env add NAME preview` can't set "all preview branches" non-interactively. PATCH/POST `/v9` or `/v10` directly with `gitBranch: null`.
 
 ## Audit logging
 
-Row-level audit logging via `audit.row_history` table in a separate `audit` schema. Captures before/after JSONB snapshots of every INSERT, UPDATE, DELETE on business-critical tables. Purpose: individual row recovery without restoring the full database from backup, plus driving the Activity Feed (see "Activity feed" section).
+`audit.row_history` in a separate `audit` schema. SECURITY DEFINER trigger snapshots OLD/NEW JSONB on INSERT/UPDATE/DELETE.
 
-- **Trigger function:** `audit.log_row_change()` (SECURITY DEFINER, owned by postgres). Captures `TG_OP`, `to_jsonb(OLD)`, `to_jsonb(NEW)`, `auth.uid()` into `changed_by`, `current_user` into `changed_by_role`, and the `X-Audit-Actor` request header into `actor_member_id`. PK resolution is hardcoded: all tables use `id` UUID except `dinner_speakers` (composite `dinner_id` + `member_id`).
-- **Trigger naming:** All audit triggers are named `zzz_audit_row_change` so they fire last among same-timing AFTER triggers (Postgres fires alphabetically). This ensures the audit snapshot captures the final row state after other triggers (e.g. `updated_at`, `marketing_opted_out_at`).
-- **Audited tables (10):** `members`, `applications`, `tickets`, `credits`, `member_emails`, `dinners`, `dinner_speakers`, `email_templates`, `email_instances`, `email_events`.
-- **NOT audited:** `system_events` (already an append-only event log; auditing it would be duplicate noise). `monday_before_*`, `monday_after_*` (lower recovery value, already have sent-lock triggers). `auth.*`, `storage.*` (Supabase-managed).
-- **`actor_member_id` column** (added Sprint 19): UUID NULL, populated by the trigger reading `current_setting('request.headers', true)::jsonb ->> 'x-audit-actor'`. Server actions that should attribute their writes use `createAdminClientForCurrentActor()` (see `src/lib/supabase/admin-with-actor.ts`), which attaches the header. Plain `createAdminClient()` is correct for cron, webhook, read-only paths, and writes to non-audited tables. Pooling-safe because PostgREST sets `request.headers` per-request — the GUC value is scoped to the request's transaction and gone when it ends. Verified empirically: 370 concurrent requests with permuted `X-Audit-Actor` values, zero leaks. Cron and webhook writes intentionally omit the header.
-- **Known actor-attribution exception:** `src/app/admin/emails/instances/[id]/actions.ts` (`createInstance`, `saveInstance`, `sendInstanceTest`, `sendInstanceToAll`) writes to audited `email_instances` via plain `createAdminClient()`. Resulting audit rows have `actor_member_id = NULL` and don't appear in the People feed. Intentional — this route + table are scheduled for Phase 7 deletion, so retrofitting is wasted work. Do not patch — delete in Phase 7.
-- **RLS:** Enabled on `audit.row_history`. SELECT policy for admin/team only via `is_admin_or_team()`. No INSERT/UPDATE/DELETE policies — only the SECURITY DEFINER trigger writes.
-- **Schema grants:** `USAGE ON SCHEMA audit` and `SELECT ON audit.row_history` granted to `service_role` and `authenticated`. Required because the `activity_feed` view runs `WITH (security_invoker = true)` — without these grants, callers hit "permission denied for table row_history" and the view query fails.
-- **Indexes:** Composite on `(table_schema, table_name, changed_at DESC)`, expression on `(table_schema, table_name, (row_pk->>'id'))`, BRIN on `changed_at`, partial on `changed_by`, partial on `actor_member_id`.
-- **Limitations:** TRUNCATE and DROP TABLE bypass row-level triggers — no audit entries are created. These catastrophic scenarios require Supabase PITR backups. All normal DML (INSERT/UPDATE/DELETE), including bulk operations, is fully captured and recoverable.
-- **No retention policy.** Table grows forever — fine at our volume. Add cleanup later if needed.
-- **Migrations:** `20260426400000_audit_row_history.sql` (initial), `20260430200000_audit_actor_member_id.sql` (actor_member_id column + trigger update), `20260430220000_audit_schema_grants.sql` (service_role/authenticated grants).
+- **Trigger naming:** `zzz_audit_row_change` (fires last alphabetically, captures sibling-trigger updates).
+- **Audited tables (10):** members, applications, tickets, credits, member_emails, dinners, dinner_speakers, email_templates, email_instances, email_events.
+- **NOT audited:** system_events (already append-only), monday_before_*, monday_after_* (sent-lock triggers exist), auth.*, storage.*.
+- **`actor_member_id` populated from `X-Audit-Actor` request header.** See `createAdminClientForCurrentActor()`. Pooling-safe — `request.headers` is per-request GUC scoped to the transaction.
+- **`activity_feed` view requires explicit grants on `audit` schema.** `USAGE ON SCHEMA audit` + `SELECT ON audit.row_history` to `service_role` and `authenticated`. The view runs `WITH (security_invoker = true)` — without grants, "permission denied for table row_history" with no row-level fallback.
+- **Don't grant `auth.users` to service_role to make activity_feed joins work.** That schema contains password hashes. The view uses `actor_member_id` directly, no `auth.users` join.
+- **Known actor-attribution gap:** `src/app/admin/emails/instances/[id]/actions.ts` writes audited `email_instances` via plain `createAdminClient()`. Audit rows have `actor_member_id = NULL`. Intentional — route + table scheduled for deletion (see What's NOT done).
+- **TRUNCATE and DROP TABLE bypass row-level triggers.** Audit doesn't help in those scenarios — that's what Supabase PITR is for.
 
 ## Activity feed
 
-Three feeds (People, System, Marketing) backed by a unified read API over three event sources (`system_events`, `email_events`, `audit.row_history`). Backs `/admin/operations` and the Member History section on `/admin/members/[id]`. **Filtering is in `getActivityFeed` (`src/lib/activity-feed.ts`), not in the view** — the view UNIONs everything; each feed applies its own filter on top.
+Three feeds (People, System, Marketing) over `system_events` ∪ `email_events` ∪ `audit.row_history`. Backs `/admin/operations` and the Member History on `/admin/members/[id]`.
 
-- **`public.activity_feed` view**: UNIONs the three sources. Audit rows are translated client-side (event_type derived from old/new diff). The view runs `WITH (security_invoker = true)` and uses `actor_member_id` directly — no `auth.users` join (granting `auth.users` to service_role would expose password hashes). Migrations: `20260430110000_activity_feed_view.sql` (initial, dropped/replaced), `20260430210000_activity_feed_actor_coalesce.sql` (intermediate, dropped/replaced), `20260430230000_activity_feed_drop_auth_users_join.sql` (current).
-- **`public.system_events` table**: append-only log for events not captured by audit or email_events. Columns: `id`, `event_type`, `actor_id`, `actor_label`, `subject_member_id`, `summary`, `metadata` JSONB, `occurred_at`. Service-role writes only (no INSERT/UPDATE/DELETE RLS policies). Migration: `20260430100000_system_events.sql`. Indexed on `occurred_at DESC`, `event_type`, `actor_id`, `subject_member_id`. NOT audited.
-- **People feed** = engagement and human-attributed activity. Filter: `actor_id IS NOT NULL AND source ≠ email_events AND event_type NOT LIKE cron.%/webhook.%/error.% AND event_type ≠ email.transactional_sent`. Includes audit-derived events (member edits, ticket purchases, etc.), `auth.login`, `feedback.submitted`, and `page.viewed` from authenticated members.
-- **System feed** = operational failures only. Inclusion list defined as `SYSTEM_FEED_INCLUDED_TYPES` in `src/lib/activity-feed.ts`: `error.caught`, `email.bounced`, `email.complained`, `email.failed`. Cron successes, cron heartbeats, transactional email sends, and audit-derived events do NOT appear in System. The dropdown on the System tab returns the inclusion list directly so an admin can pre-filter even before any failure has fired. **If a future event represents an operational failure that warrants operator attention, add it to the inclusion list explicitly — do not widen the filter.**
-- **Marketing feed** = anonymous engagement. Filter: `event_type = 'page.viewed' AND actor_id IS NULL`. Authenticated page views go to People; anonymous ones go here.
-- **`error.caught` is the universal failure indicator.** Webhook signature verification failures, downstream DB write failures, cron exceptions all produce `error.caught` events with `metadata.cause` identifying the failure mode. Don't proliferate failure event types like `cron.<name>.failed` — use `error.caught` with metadata instead.
-- **Cron heartbeat convention**: every cron fire emits exactly one row. Success-with-action and success-no-op runs emit `cron.<name>` (with `metadata.outcome = 'success'` or `'no_op'`); failures emit `error.caught`. Heartbeats are NOT in the System feed inclusion list — they exist for ad-hoc "did the cron fire today" queries against `system_events`.
-- **Event types in use** (write side; NOT what each feed displays — that's controlled by the filter above):
-  - `auth.login` / `auth.login_failed` (logged by `/auth/confirm` and `/auth/callback`)
-  - `cron.fulfill_tickets`, `cron.post_dinner`, `cron.dinner_generation` (heartbeats)
-  - `webhook.stripe`, `webhook.resend` (webhook receipt)
-  - `email.transactional_sent` (every transactional email send)
-  - `email.bulk_sent` (Monday Before, Monday After, Morning Of Send To All)
-  - `email.bounced` / `email.complained` / `email.failed` (translated from email_events source)
-  - `feedback.submitted`
-  - `page.viewed` (page view tracking — see "Page view tracking" section)
-  - `error.caught` (universal failure indicator)
-  - Audit-derived (refined client-side by `refineAuditRow` from `<table>.<op>`): `member.created`, `member.edited`, `member.kicked_out`, `member.reinstated`, `member.team_added`/`team_removed`, `member.marketing_opted_in`/`opted_out`, `application.submitted`/`approved`/`linked`/`rejected`/`updated`, `ticket.purchased`/`fulfilled`/`refunded`/`refunded_guest`/`credited`, `credit.created`/`redeemed`, `member_email.added`/`primary_set`/`status_changed`/`deleted`, `dinner.created`/`updated`, `speaker.added`/`removed`, `email_template.updated`.
-- **`application.linked` vs `application.approved` disambiguation**: both flows write the same columns on `applications` (status `pending→approved`, `member_id` set), so the audit row alone can't distinguish them. `refineAuditRow` looks up `members.created_at` for the linked member: if it's > 60s before the audit `changed_at`, the member existed before this approval → `application.linked`. Otherwise the member was created in the same RPC tx → `application.approved`. See `APPROVE_VS_LINK_BUFFER_MS` in `src/lib/activity-feed.ts`.
-- **Helpers** (in `src/lib/`):
-  - `system-events.ts → logSystemEvent({…})`: single-insert via service-role admin client. Failures logged but never thrown.
-  - `activity-feed.ts → getActivityFeed({…})`: query view with filters/pagination, refine audit event_type and render bundled-edit summaries from old/new diff. Returns `{ok:true,...} | {ok:false,error}` — callsites render an inline error state rather than silently showing an empty feed.
-  - `current-actor.ts → getCurrentActorMemberId()`: resolves request's auth user → member.id via `member_emails`.
-  - `supabase/admin-with-actor.ts → createAdminClientForCurrentActor()`: service-role client with `X-Audit-Actor` header.
-- **Bundled-edit rendering**: audit UPDATE rows show "Eric edited Aaron's profile (company, LinkedIn, intro)" — up to 5 fields, then falls back to count "(8 fields)". Self-edits render as "Aaron edited their profile (...)". Trigger-managed noise fields (`updated_at`, `intro_updated_at`, `ask_updated_at`, `marketing_opted_out_at`) skipped from the changed-field list.
+- **Filtering is in `getActivityFeed` (`src/lib/activity-feed.ts`), NOT in the view.** The view UNIONs everything; each feed applies its own filter.
+- **`error.caught` is the universal failure indicator.** Webhook signature failures, downstream DB write failures, cron exceptions all produce `error.caught` with `metadata.cause`. Don't proliferate failure event types like `cron.<name>.failed`.
+- **System feed inclusion list is `SYSTEM_FEED_INCLUDED_TYPES`** (currently `error.caught`, `email.bounced`, `email.complained`, `email.failed`). **If a future event represents an operational failure that warrants operator attention, add it to the inclusion list explicitly — do not widen the filter to a prefix or wildcard.**
+- **Cron heartbeat convention:** every cron fire emits exactly one row. Success → `cron.<name>` with `metadata.outcome` ('success' | 'no_op'). Failure → `error.caught`. Heartbeats are NOT in the System feed inclusion list — they exist for ad-hoc "did the cron fire today" queries.
+- **`application.linked` vs `application.approved` disambiguation:** both write the same audit shape. `refineAuditRow` looks up `members.created_at`: if > 60s before audit `changed_at`, member existed pre-approval → `application.linked`. See `APPROVE_VS_LINK_BUFFER_MS`.
+- **Filter dropdown shows raw audit names** (`members.update`), not refined names (`member.edited`) — refinement happens post-query in `enrichRows()`. Pre-existing design gap.
+- **`streak.` prefix is NOT in `PEOPLE_FEED_EXCLUDED_PREFIXES`** (which excludes `cron.`, `webhook.`, `error.`). Currently harmless because all `streak.api_call` rows have `actor_id = NULL` and People requires `actor_id IS NOT NULL`. **If `actor_id` ever gets populated on Streak API call events, those 8,000+ rows flood the People feed. Add `"streak."` to the excluded prefixes before that happens.**
+- **`getActivityFeed` returns `{ok:true,...} | {ok:false,error}`.** Callsites render an inline error rather than silently empty. (Earlier silent-empty hid three permission-denied bugs.)
+- **`FeedRow.subject_label` is the human-readable Subject for all event types.** Computed in `enrichRows` via ≤3 batched DB queries beyond the member lookup: dinners (for tickets + dinner_speakers rows + `/admin/dinners/{id}` page views) and applications (for `/admin/applications/{id}` page views only). Audit row snapshots supply dinner dates for `dinners` table rows directly — no extra query. `page.viewed` subjects resolve via a static route map plus UUID path matchers for `/members/{id}`, `/dinners/{id}`, `/applications/{id}`. Missing entities fall back to `(deleted member)` / `(deleted dinner)` etc.
+- **`dinner_speakers` audit rows have `subject_member_id = NULL` in the view.** The view's CASE expression only sets subject_member_id for `members`, `tickets`, `applications`, `credits`, `member_emails` — not `dinner_speakers`. The speaker's `member_id` lives in `new_row`/`old_row` and must be extracted from the row snapshot.
 
 ## Page view tracking
 
-Every authenticated and anonymous navigation logs a `page.viewed` event to `system_events`. Authenticated views attribute to `members.id` and surface in the People feed; anonymous views attribute to an opaque `anon_id` cookie and surface in the Marketing feed.
+Authenticated and anonymous navigations log `page.viewed` to `system_events`. Authenticated → People feed via `actor_id`. Anonymous → Marketing feed via opaque `anon_id` cookie (HttpOnly, SameSite=Lax, Secure in prod, 1y TTL).
 
-- **Instrumentation**: client component `src/components/page-view-logger.tsx`, mounted in three layouts (`src/app/layout.tsx`, `src/app/portal/layout.tsx`, `src/app/admin/layout.tsx`). Subscribes to `usePathname()` + `useSearchParams()` and fires the `logPageView` server action on pathname change. **Server-component instrumentation in layouts does NOT work in Next.js 16 App Router**: layouts "preserve state, remain interactive, and do not rerender" on intra-layout navigation, so a server component would fire only on initial layout mount. The client component subscribed to the navigation hook is the only reliable approach.
-- **Server action**: `src/app/actions/log-page-view.ts`. Resolves auth user via the session client → `member.id` via `member_emails`. For anonymous visits, sets/reads an opaque `anon_id` UUID cookie (HttpOnly, SameSite=Lax, Secure in production, 1y TTL) and includes it in event metadata. The first view sets the cookie AND uses the same UUID in metadata, so it's correctly attributed.
-- **Skip list** (client-side, no server round-trip): `/api/*`, `/auth/confirm`, `/auth/callback`, `/admin/operations`, `/dev/*`. The root layout's logger additionally skips paths starting with `/portal` and `/admin` (those have their own layouts; otherwise we'd double-log).
-- **Authenticated visits** attribute via `actor_id` and **omit `anon_id` from metadata** even if the cookie is still present from a pre-auth session.
-- **Event shape**: `event_type = 'page.viewed'`, `summary = path`, `metadata = { path, search_params (only when non-empty), anon_id (only when anonymous) }`.
-- **No PII, no fingerprinting, no IP, no user-agent.** Only path, search params, and (for anonymous visits) the opaque cookie value.
+- **Client component `src/components/page-view-logger.tsx`, mounted in three layouts.** Subscribes to `usePathname()` + `useSearchParams()`.
+- **Server-component instrumentation does NOT work in Next.js 16 App Router.** Layouts preserve state and don't rerender on intra-layout navigation, so a server component fires only on initial mount. Must be a client component.
+- **Authenticated visits omit `anon_id`** even if the cookie is still present from a pre-auth session.
+- **No PII, no IP, no UA, no fingerprinting.** Only path, search params (when non-empty), and the opaque cookie value (when anonymous).
+- **Skip list:** `/api/*`, `/auth/confirm`, `/auth/callback`, `/admin/operations`, `/dev/*`. Root layout's logger additionally skips `/portal` and `/admin` (those have own layouts; otherwise we'd double-log).
 
-## Auth flow
+## Email systems
 
-1. User enters email at `/login` (may have `?redirect=/portal/profile` from proxy)
-2. Client stores redirect target in `auth_redirect` cookie (10 min TTL, SameSite=Lax) if present, then calls `supabase.auth.signInWithOtp` with `shouldCreateUser: false` and `emailRedirectTo` set to `${NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`
-3. Supabase sends magic link email (PKCE flow). If the email is not in `auth.users`, the call succeeds silently but no email is sent (prevents orphan auth rows for unknown emails). **All members must have an `auth.users` row to log in** — created automatically on approval/add via `ensureAuthUser()`. Existing members backfilled 2026-04-26.
-4. User clicks link → Supabase template routes to `/auth/confirm?token_hash=...&type=email` on our app
-5. `/auth/confirm` route calls `supabase.auth.verifyOtp({ token_hash, type })`, sets session cookies via `cookieStore`
-6. Both `/auth/confirm` and `/auth/callback` read the `auth_redirect` cookie. If set, redirect there (validated to start with `/`); otherwise redirect to `/portal`. Cookie is cleared after use. Portal page checks role and shows admin button for admin/team.
-7. Proxy (`src/proxy.ts`) refreshes session on every request, protects `/admin/*` routes (unauthenticated → `/login?redirect=...`, non-admin/non-team → `/portal`), protects `/portal/*` routes (unauthenticated → `/login?redirect=...`, non-admin without `has_community_access = true` → `/`), and redirects authenticated users from `/login` to the redirect param or `/portal`. Since kick-out revokes `has_community_access` via trigger, no separate `kicked_out` check is needed in the portal guard.
+- **Five transactional templates wired:** approval, re-application, rejection, fulfillment, morning-of. Editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Body uses `[member.fieldname]` placeholders.
+- **HTML shell `bodyToHtml()` (`src/lib/email.ts`) wraps in a full HTML document.** Never concatenate HTML after calling. Post-processes bare `<a>` tags to inline `color:#9A7A5E` (email clients strip `<style>` blocks).
+- **Marketing emails (Monday Before, Monday After) live in dedicated tables**, NOT in `email_instances`. The generic `email_instances` system was superseded — don't build new templates on it.
+- **Sent-lock triggers are strict.** Once `status = 'sent'`, ALL UPDATEs on the email + image tables are rejected. The send action's final UPDATE succeeds because `OLD.status` is still `'draft'` at that point. Sent emails are immutable by design.
+- **Audience snapshot frozen as JSONB at send time** so the recipient list survives subsequent member changes.
+- **Image pipeline (`src/lib/email-image-pipeline.ts`) hard ceiling 500KB.** Iterative quality reduction (85→40), rejects if quality 40 still over.
+- **`NEXT_PUBLIC_EMAIL_MODE`:** `"testing"` (default) restricts marketing sends to admin + team. `"live"` sends to all `marketing_opted_in = true`. **Flip to `live` before launch.**
+- **Resend webhook is account-scoped — handler filters by sender domain.** Every app on Eric's Resend account POSTs to `/api/webhooks/resend` with a valid svix signature. Handler parses `data.from`, drops anything not `thunderviewceodinners.com` (200 response, no event row, no log — Resend won't retry on 200). New Thunderview-owned sending domain? Update `THUNDERVIEW_DOMAIN` in `src/app/api/webhooks/resend/route.ts`.
+- **Hard vs soft bounces are distinguished.** Only `bounce.type = 'Permanent'` flips `email_status='bounced'`, runs secondary promotion, and pushes Streak. `'Transient'`/`'Undetermined'`/unknown: row persisted for visibility but no member state changes.
+- **Receipt emails: using Stripe's built-in.** Custom kit design exists in `design-system/ui_kits/` but won't be built. Don't propose building it.
+- **Stripe sandbox does NOT auto-send receipts** despite `receipt_email` set on the Checkout Session and the dashboard toggle enabled. Integration is correct — auto-send will be validated at live cutover. Don't debug.
 
-**Gotcha:** `/auth/callback` (code exchange flow) also exists but the primary magic link flow uses `/auth/confirm` (token hash flow). Both are needed. The Magic Link and signup confirmation email templates (configured via Supabase Management API) use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}` — **NOT** `{{ .SiteURL }}`. `{{ .SiteURL }}` is the project's single Site URL setting (production), so using it would hardcode every magic link to production regardless of where the OTP request came from. Preview-deploy auth flows broke that way until the template was switched to `{{ .RedirectTo }}`. Supabase URL allow-list also includes wildcard `https://thunderview-os-git-*-erics-projects-*.vercel.app/**` for preview hostnames; without it, preview-targeted magic links would be silently rejected and fall back to Site URL.
+## Crons (Vercel)
 
-## File structure
+Each emits one heartbeat row to `system_events`.
 
-```
-src/
-├── proxy.ts                            # Session refresh + /admin protection + /portal protection + /login redirect with ?redirect= param preservation (Next.js 16 "proxy", replaces middleware.ts)
-├── components/
-│   ├── top-nav.tsx                     # Authenticated top nav (portal + admin): Fraunces logo, center links (Tickets, Community, Monthly Recap, Admin for team), avatar dropdown (hover + click). Links absolutely centered on viewport
-│   ├── public-nav.tsx                  # Public marketing nav: logo, center links (About/FAQ/Team), Apply + Sign In (or Portal when authenticated). Gallery link removed for launch. Server component with auth check
-│   ├── member-avatar.tsx              # Reusable avatar: shows profile pic if set, clay-500 initials circle if not. Props: member (first_name, last_name, profile_pic_url), size (sm/md/lg)
-│   ├── page-header.tsx                # Shared page header: eyebrow/title/lede/actions with locked rhythm. size="default" (tv-h1, 64px gap) or "compact" (tv-h3, 24px gap). Portal pages don't use this yet — see "Known gap" section
-│   ├── field.tsx                       # Shared form field wrapper: label/required/help/error/children. flex-col with gap-label-input (8px). Error and help mutually exclusive
-│   ├── form-section.tsx               # Eyebrow-labeled field group inside a Card. Props: eyebrow, divider (adds hairline rule). Uses .tv-form-section CSS
-│   ├── email-image-group.tsx          # Shared drag-and-drop image group (@dnd-kit/sortable): sortable list with drag handles, delete buttons, file upload. Used by Monday Before and Monday After draft editors
-│   ├── feedback/
-│   │   ├── feedback-wrapper.tsx       # Server component: detects auth state, renders FeedbackButton
-│   │   ├── feedback-button.tsx        # Client component: floating button (fixed bottom-right) + modal with Bug/Feedback toggle, message textarea, honeypot. Anonymous users see name/email fields
-│   │   └── actions.ts                 # Server action: resolves member from session, sends notification email to Eric. No DB storage
-│   └── ui/                            # Design system primitives (compose these, don't inline)
-│       ├── index.ts                   # Barrel export
-│       ├── button.tsx                 # Primary/secondary/ghost, sm/md/lg, asChild prop for wrapping Links
-│       ├── card.tsx                   # Default/elevated/feature (shadow-glow)/photo variants
-│       ├── pill.tsx                   # Stage/neutral/accent/success/warn/danger with optional dot
-│       ├── avatar.tsx                 # Re-export of member-avatar.tsx
-│       ├── input.tsx                  # Warm focus ring, error state, inset active shadow
-│       ├── textarea.tsx               # Same treatment as input
-│       ├── select.tsx                 # Custom chevron, same treatment
-│       ├── label.tsx                  # 13px medium, optional required asterisk
-│       ├── field-help.tsx             # Hint text, error variant
-│       ├── typography.tsx             # Eyebrow, H1–H4, Lede, Body, Small — thin wrappers around .tv-* classes
-│       └── rich-text-editor.tsx       # Tiptap-based rich text editor (B/I/U/Link toolbar). Dynamically imported (SSR disabled). Used by marketing email editors
-├── lib/supabase/
-│   ├── client.ts                       # Browser client (createBrowserClient)
-│   ├── server.ts                       # Server client (createServerClient with cookieStore)
-│   ├── admin.ts                        # Service role client (bypasses RLS) — use for cron/webhook/no-actor writes
-│   └── admin-with-actor.ts            # createAdminClientForCurrentActor() — service-role client with X-Audit-Actor header. Use for ALL writes to audited tables initiated by a human actor
-├── app/
-│   ├── _components/
-│   │   └── this-months-dinner.tsx     # Server component: next upcoming dinner section (title, date/venue, description, speakers, Apply CTA). Returns null if no future dinner. Used on marketing home
-│   ├── page.tsx                        # Marketing home: hero + stats + This Month's Dinner + three-reason grid + gallery + quote + CTA. Bottom CTA shows real next dinner date from DB. Conditional: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket"
-│   ├── layout.tsx                      # Root layout (Inter + Fraunces + JetBrains Mono via next/font/google, Tailwind). Includes FeedbackWrapper (floating button on every page)
-│   ├── about/page.tsx                  # About page: hero (two-col with photo) + What Thunderview Is (720px prose) + Dinner Format (schedule timeline + venue, bg-elevated) + Upcoming Dinners (date-chip list with Next/Off states from DB) + Our Commitment (clay-bullet list, bg-elevated) + CTA
-│   ├── faq/
-│   │   ├── page.tsx                    # FAQ page: server wrapper with PublicNav
-│   │   └── faq-list.tsx               # Client component: 10 FAQ items in collapsible Card accordions with chevron toggle
-│   ├── team/page.tsx                   # Team page: Eric (Founding Director), Danny (Director), Megan (Director) — stacked Cards with square photos + bios
-│   ├── gallery/page.tsx                # Placeholder (public-nav + H1) — Gallery link removed from public-nav for launch
-│   ├── login/page.tsx                  # Magic link sign-in: server wrapper with PublicNav, reads ?redirect param
-│   ├── login/login-form.tsx            # Client component: email input, send magic link, stores redirect in auth_redirect cookie
-│   ├── unsubscribe/page.tsx            # Unsubscribe confirmation page: success/invalid/error states. Public page with PublicNav
-│   ├── apply/
-│   │   ├── page.tsx                    # Public application form (server wrapper: fetches dinners + schedule)
-│   │   ├── application-form.tsx        # Client component: form fields, validation, submit
-│   │   ├── actions.ts                  # Server action: submitApplication (inserts pending application)
-│   │   └── thanks/
-│   │       ├── page.tsx                # Thank-you page (static)
-│   │       └── confetti.tsx            # Client component: canvas-confetti on page load
-│   ├── auth/
-│   │   ├── confirm/route.ts            # PKCE token hash verification (primary magic link handler). Reads auth_redirect cookie for post-login destination
-│   │   └── callback/route.ts           # Code exchange flow (secondary). Same auth_redirect cookie logic
-│   ├── portal/
-│   │   ├── layout.tsx                  # Portal layout: auth check, TopNav, wraps all /portal/* pages
-│   │   ├── page.tsx                    # Portal home: single-column (640px). Ticket state: confirmation banner + intro/ask form. No-ticket state: dinner details block + ticket purchase for next dinner only
-│   │   ├── portal-form.tsx             # Client component: Intro/Ask textareas with char limits (1000/250), Contact dropdown, three-state counter, Save with toast
-│   │   ├── dinner-details-block.tsx   # Server component: next dinner details (title, date/time/venue, description, speakers with LinkedIn/Website links). Shown when no ticket
-│   │   ├── purchase-confetti.tsx       # Client component: fires confetti on ?purchased=true, cleans up param
-│   │   ├── actions.ts                  # Server action: savePortalProfile (updates intro/ask/contact, sets timestamps only on change)
-│   │   ├── sign-out-button.tsx         # Client component: sign-out button (unused — sign-out now in TopNav dropdown)
-│   │   ├── profile/
-│   │   │   ├── page.tsx                # Profile editor: context-aware back link and save (from dropdown → /portal + toast; from Edit Profile → /portal/community + redirect to member page)
-│   │   │   ├── profile-form.tsx        # Client component: profile form with multi-select stagetypes, email, marketing opt-in toggle, toast. Photo upload/remove uses standalone portalUpdateProfilePic (decoupled from saveProfile)
-│   │   │   ├── crop-modal.tsx          # Client component: react-easy-crop square crop modal (dynamically imported, SSR disabled)
-│   │   │   └── actions.ts             # Server actions: saveProfile (member fields + email swap/insert + timestamps, no photo handling), portalUpdateProfilePic (standalone photo upload/remove via sharp), toggleMarketing (immediate-save marketing opt-in/out)
-│   │   ├── community/
-│   │   │   ├── page.tsx                # Community directory: fetchAll paginated, filtered (has_community_access + not kicked_out)
-│   │   │   └── community-table.tsx     # Client component: searchable, sortable table (Name/Company/Role), rows link to /portal/members/[id]
-│   │   ├── members/
-│   │   │   └── [id]/page.tsx           # Read-only member profile: details + intro/ask. 404 if kicked_out or no community access. Self-view shows Edit Profile button (links to /portal/profile?from=member&id=X)
-│   │   ├── recap/page.tsx              # Last month's recap: fulfilled attendees of most recent past dinner in Card components with intro/ask
-│   │   └── tickets/
-│   │       ├── page.tsx                # Ticket selection: dinner dropdown + buy buttons (server component)
-│   │       ├── ticket-purchase.tsx     # Client component: dinner dropdown (hideable via hideSelector prop), guest-aware buy buttons, calls purchaseTicket action
-│   │       ├── guest/page.tsx          # Legacy guest upsell page (orphaned — no longer navigated to)
-│   │       └── cart/
-│   │           ├── page.tsx            # Legacy cart page (orphaned — no longer navigated to)
-│   │           ├── actions.ts          # Server action: purchaseTicket (creates Stripe Checkout Session, redirects to Stripe). Success URL → /portal?purchased=true
-│   │           └── purchase-button.tsx # Legacy purchase button (orphaned — no longer navigated to)
-│   ├── api/cron/generate-dinner/
-│   │   └── route.ts                    # Vercel Cron: auto-generate dinner 12 months out (daily fire, day-after-first-Thursday logic)
-│   ├── api/cron/post-dinner/
-│   │   └── route.ts                    # Vercel Cron: day after each dinner, sets last_dinner_attended for all fulfilled attendees
-│   ├── api/cron/fulfill-tickets/
-│   │   └── route.ts                    # Vercel Cron: daily 14:00 UTC. Uses getTargetDinner() + calendar-month gate. Sends fulfillment email first (throwOnError), then flips ticket to fulfilled. Failed emails leave ticket as purchased for retry
-│   ├── api/cron/morning-of/              # REMOVED — morning-of email is now manually triggered from /admin/emails/morning-of
-│   ├── api/unsubscribe/
-│   │   └── route.ts                    # GET/POST: HMAC-signed one-click unsubscribe handler. Verifies token, sets marketing_opted_in = false, redirects to /unsubscribe confirmation page
-│   ├── api/webhooks/stripe/
-│   │   └── route.ts                    # Stripe webhook: checkout.session.completed → insert ticket (purchased), auto-fulfill if next dinner
-│   ├── api/webhooks/resend/
-│   │   └── route.ts                    # Resend webhook: email.bounced/complained/failed → insert email_event, flip member_emails status, notify admin on complaint/failure. Svix signature verification
-│   ├── dev/
-│   │   ├── ui/page.tsx                # Dev-only UI primitive showcase (every component in every state)
-│   │   └── emails/[slug]/page.tsx     # Dev-only email template preview with sample data (approval, re-application, rejection, fulfillment, morning-of, admin-notification)
-│   └── admin/
-│       ├── layout.tsx                  # Auth check + role detection + TopNav (server component)
-│       ├── admin-shell.tsx             # Sidebar nav only (client component; header moved to TopNav)
-│       ├── page.tsx                    # Dashboard: next-dinner stats, pending apps, opt-outs
-│       ├── dashboard-accordions.tsx    # Client component: collapsible accordion sections (pending apps, opt-outs)
-│       ├── dinners/
-│       │   ├── page.tsx                # Server wrapper: fetches dinners + funnel stats
-│       │   ├── dinners-table.tsx       # Client component: sortable columns, sticky header, rows link to detail
-│       │   └── [id]/
-│       │       ├── page.tsx            # Server wrapper: fetches dinner + tickets + applications
-│       │       ├── dinner-tickets.tsx  # Client component: active ticket table with Credit/Refund buttons, inactive section with strikethrough
-│       │       ├── dinner-venue.tsx   # Client component: inline-editable venue + address
-│       │       ├── dinner-details.tsx # Client component: inline-editable title + description, speaker add/remove via member search
-│       │       └── actions.ts          # Server actions: refundTicket (full/guest_only), creditTicket, updateDinnerField (venue/address/title/description), searchMembersForSpeaker, addDinnerSpeaker, removeDinnerSpeaker
-│       ├── applications/
-│       │   ├── page.tsx                # Server wrapper
-│       │   ├── applications-table.tsx  # Filter tabs, sortable columns, sticky header, rows link to [id]
-│       │   └── [id]/
-│       │       ├── page.tsx            # Server wrapper: fetches application
-│       │       ├── application-detail.tsx  # Client component: detail layout, approve/reject/link actions
-│       │       └── actions.ts          # Server actions: approveApplication, rejectApplication, linkApplicationToMember, searchMembers
-│       ├── tickets/
-│       │   ├── page.tsx                # Server wrapper: fetches all tickets (paginated past 1k cap)
-│       │   └── tickets-table.tsx       # Client component: search, sortable columns, sticky header, rows link to dinner detail
-│       ├── operations/
-│       │   ├── page.tsx                # Server wrapper: queries activity_feed via getActivityFeed, fetches distinct event_types for filter
-│       │   ├── operations-client.tsx   # Client component: People/System tabs, event_type multi-select, actor search, date range, paginated table
-│       │   └── actions.ts              # Server action: searchMembersForActor (member search for the actor filter)
-│       ├── emails/
-│       │   ├── page.tsx                # Email index: Transactional (top) + Marketing (bottom). Marketing entries have smart buttons: Create draft / Continue draft / View sent
-│       │   ├── template-editor.tsx     # Shared client component: subject/body editing, Send Test Email, Save Changes (used by transactional template pages)
-│       │   ├── create-monday-before-button.tsx  # Client component: creates Monday Before draft from macro, redirects to editor
-│       │   ├── create-monday-after-button.tsx   # Client component: creates Monday After draft from macro, redirects to editor
-│       │   ├── approval/
-│       │   │   ├── page.tsx            # Server wrapper: fetches approval template
-│       │   │   ├── template-editor.tsx # Thin wrapper passing actions + variables to shared editor
-│       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname]), saveTemplate
-│       │   ├── re-application/
-│       │   │   ├── page.tsx            # Server wrapper: fetches re-application template
-│       │   │   ├── template-editor.tsx # Thin wrapper
-│       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname]), saveTemplate
-│       │   ├── rejection/
-│       │   │   ├── page.tsx            # Server wrapper: fetches rejection template
-│       │   │   ├── template-editor.tsx # Thin wrapper
-│       │   │   └── actions.ts          # Server actions: sendTestEmail ([applicant.firstname] from member record for test), saveTemplate
-│       │   ├── fulfillment/
-│       │   │   ├── page.tsx            # Server wrapper: fetches fulfillment template
-│       │   │   ├── template-editor.tsx # Thin wrapper
-│       │   │   └── actions.ts          # Server actions: sendTestEmail ([member.firstname], [dinner.date/venue/address] from next dinner), saveTemplate
-│       │   ├── morning-of/
-│       │   │   ├── page.tsx            # Server wrapper: fetches template + next dinner attendees
-│       │   │   ├── morning-of-editor.tsx # Client component: template editor + attendee preview cards + Preview Full Email button
-│       │   │   └── actions.ts          # Server actions: sendTestEmail, sendPreviewEmail (saved template + live attendees), saveTemplate. Uses shared getDinnerAttendees + buildAttendeeHtml
-│       │   ├── monday-before/
-│       │   │   ├── page.tsx            # Macro editor: 5 structured fields (subject, preheader, headline, custom_text, partnership_boilerplate)
-│       │   │   ├── macro-editor.tsx    # Client component: rich text fields + save. Seeds future drafts
-│       │   │   ├── actions.ts          # Server actions: loadMacro, saveMacro, createDraft, saveDraft, uploadEmailImage, deleteEmailImage, reorderEmailImages, sendTestEmail, sendToAll, getRecipientCount, getTeamMembers
-│       │   │   └── [emailId]/
-│       │   │       ├── page.tsx        # Server wrapper: fetches draft + dinner + images + recipient count
-│       │   │       └── draft-editor.tsx # Client component: all sections, 2 image groups (@dnd-kit), rich text (Tiptap), save/test/send workflow with confirmation modal
-│       │   ├── monday-after/
-│       │   │   ├── page.tsx            # Macro editor: 9 structured fields (subject, preheader, headline, opening_text, recap_text, team_shoutouts, our_mission, intros_asks_header, partnership_boilerplate)
-│       │   │   ├── macro-editor.tsx    # Client component: rich text fields + save
-│       │   │   ├── actions.ts          # Server actions: same pattern as monday-before, plus intros/asks rendering via shared helper
-│       │   │   └── [emailId]/
-│       │   │       ├── page.tsx        # Server wrapper: fetches draft + dinner + images + attendees for intros/asks preview
-│       │   │       └── draft-editor.tsx # Client component: all sections, 5 image groups, intros/asks preview, save/test/send workflow
-│       │   └── instances/[id]/         # Generic email instance editor (used by email_instances table — legacy, may be removed)
-│       │       ├── page.tsx
-│       │       ├── instance-editor.tsx
-│       │       └── actions.ts
-│       ├── members/
-│       │   ├── page.tsx                # Server wrapper: fetches members + upcoming dinners
-│       │   ├── members-table.tsx       # Search, sortable columns, sticky header, kicked-out strikethrough, rows link to [id], Add Member button
-│       │   ├── add-member-modal.tsx    # Add Member form modal (client component)
-│       │   ├── actions.ts             # Server actions: checkEmail, addMember (for Add Member modal)
-│       │   └── [id]/
-│       │       ├── page.tsx            # Server wrapper: fetches member + determines admin role, mounts MemberHistory at bottom
-│       │       ├── member-detail.tsx   # Client component: inline editing, toggles, email modal, remove/reinstate, profile pic upload (Upload Photo/Change Photo buttons + Remove Photo link, same layout as portal profile)
-│       │       ├── member-history.tsx  # Server component: bottom-of-page Member History section (People feed scoped to actor_id = id OR subject_member_id = id)
-│       │       ├── member-history-client.tsx # Client component: paginated 25/page table with event_type filter, refetches via server action
-│       │       ├── member-history-actions.ts # Server action: fetchMemberHistory (delegates to getActivityFeed with scopedToMemberId)
-│       │       └── actions.ts          # Server actions: updateMemberField, toggleMemberFlag, removeMember, reinstateMember, email management, adminUploadProfilePic, applyCredit, compTicket
-├── lib/
-│   ├── email.ts                        # EMAIL_FROM ("Thunderview Team <team@...>"), bodyToHtml() (branded HTML shell with optional appendHtml for morning-of attendees), renderTemplateVars() (shared variable substitution), helper functions (emailCtaButton, emailSignature, emailDetailsTable)
-│   ├── email-send.ts                   # Transactional email senders (approval, re-application, rejection, fulfillment, morning-of, admin notification, complaint notification, send-failure notification). All use bodyToHtml() for branded shell. sendFulfillmentEmail has optional throwOnError param for cron retry logic
-│   ├── email-feedback.ts              # Feedback notification email to Eric. Two-zone layout: top (type pill, from, message) + bottom (debug pre block: member_id, role, timestamp, URL, referrer, UA, viewport). Reply-To = submitter's email
-│   ├── email-image-pipeline.ts        # Shared image compression: validateImageType() + compressEmailImage() — 800px width, JPEG, iterative quality (85→40), ≤500KB, EXIF stripped. Used by Monday Before and Monday After upload actions
-│   ├── email-intros-asks.ts           # Shared Intros & Asks rendering: getDinnerAttendees(dinnerId) fetches fulfilled attendees (not kicked, has community access, deduplicated, sorted content-first) + buildAttendeeHtml() renders inline-styled HTML. Shared between Morning Of and Monday After
-│   ├── email-templates/
-│   │   ├── monday-before.ts           # Monday Before email HTML renderer: 7-section layout (images, headline, custom text, CTA+dinner details, images, partnership, CAN-SPAM footer)
-│   │   └── monday-after.ts            # Monday After email HTML renderer: extended layout (images×5, headline, opening, CTA, recap, shoutouts, mission, intros/asks, partnership, CAN-SPAM footer)
-│   ├── unsubscribe.ts                 # HMAC-signed unsubscribe token generation + verification. Uses UNSUBSCRIBE_SECRET env var
-│   ├── format.ts                       # Shared display utilities (formatName, formatStageType, formatDate, formatTimestamp, formatDinnerDisplay, formatDinnerShort, formatTicketName, getTodayMT, toDateMT, firstThursdayOf)
-│   ├── ensure-auth-user.ts            # ensureAuthUser(email) — creates auth.users row via admin API if not exists. Called on member approval/add
-│   ├── ticket-assignment.ts            # Target dinner logic (getTargetDinner → next upcoming dinner) + ticket type/price mapping (getTicketInfo)
-│   ├── ticket-rules.ts                # Predicate: allowsGuestTicket(dinner) — checks dinner.guests_allowed flag
-│   ├── system-events.ts               # logSystemEvent({event_type, actor_id?, actor_label?, subject_member_id?, summary?, metadata?}) — single insert via service-role admin client; failures logged but never thrown
-│   ├── activity-feed.ts               # getActivityFeed({kind, page, pageSize, eventTypes?, actorMemberId?, scopedToMemberId?, fromDate?, toDate?}) + getDistinctEventTypes(kind). Queries public.activity_feed view, refines audit-row event_type from old/new diff, renders bundled-edit summaries. Returns typed {ok:true,...}|{ok:false,error}; callsites render FeedError inline on failure
-│   └── current-actor.ts               # getCurrentActorMemberId() — resolves session auth user to members.id via member_emails. Used by createAdminClientForCurrentActor and admin actions that explicitly log system events
-public/
-├── brand/
-│   ├── photos/                         # 12 candid dinner photos (webp) + 3 team headshots (eric.webp, danny.webp, megan.webp) — used on marketing home, about, team, recap
-│   └── logo/
-│       ├── wordmark.svg               # SVG wordmark (needs CSS classes to render text — use text logo in nav instead)
-│       └── monogram.svg               # SVG monogram mark
-supabase/
-├── migrations/
-│   ├── 20260415000000_initial_schema.sql   # All tables, indexes, RLS, trigger, is_admin_or_team()
-│   ├── 20260415100000_member_emails.sql    # member_emails table, drops members.email, updates is_admin_or_team()
-│   ├── 20260418000000_add_marketing_opted_out_at.sql  # marketing_opted_out_at column + trigger + backfill
-│   ├── 20260418100000_schema_triggers_and_rename.sql  # first_dinner_attended, has_attended→has_community_access rename, ticket triggers
-│   ├── 20260418200000_add_intro_updated_at.sql       # intro_updated_at column (trigger removed — set explicitly by portal)
-│   ├── 20260418300000_add_member_rpc.sql             # add_member_with_application RPC (Add Member modal)
-│   ├── 20260418400000_swap_primary_email_rpc.sql     # swap_primary_email RPC (atomic primary flip)
-│   ├── 20260418500000_approve_application_rpc.sql    # approve_application RPC v1 (superseded by v2)
-│   ├── 20260418600000_approve_v2_and_link_member_rpcs.sql  # approve_application v2 (kicked-out guard, primary flip) + link_application_to_member RPC
-│   ├── 20260418700000_split_name_columns.sql              # Split name → first_name + last_name on members + applications, backfill, drop name
-│   ├── 20260418800000_update_rpcs_for_name_split.sql      # Update add_member_with_application, approve_application, link_application_to_member RPCs for first_name/last_name
-│   ├── 20260418900000_portal_tickets.sql                  # Add quantity column to tickets, add 'portal' to payment_source CHECK
-│   ├── 20260419000000_phase4_stagetypes_and_kickout.sql   # members.attendee_stagetype → attendee_stagetypes TEXT[]; RPCs write array; kick-out revokes has_community_access trigger
-│   ├── 20260420000000_profile_pic.sql                    # Add profile_pic_url TEXT NULL to members
-│   ├── 20260420100000_stripe_columns.sql                # Add stripe_session_id, stripe_payment_intent_id to tickets (partial unique index)
-│   ├── 20260420200000_stripe_refund_id.sql              # Add stripe_refund_id TEXT NULL to tickets
-│   ├── 20260420300000_guests_allowed.sql                # Add dinners.guests_allowed BOOLEAN NOT NULL DEFAULT false; backfill December → true
-│   ├── 20260420400000_comp_payment_source.sql           # Add 'comp' to tickets.payment_source CHECK constraint
-│   ├── 20260420500000_nullable_preferred_dinner_date.sql # Allow NULL on applications.preferred_dinner_date
-│   ├── 20260420600000_rename_pending_to_purchased.sql   # Rename fulfillment_status 'pending' → 'purchased'; backfill all rows
-│   ├── 20260420700000_email_templates.sql               # email_templates table + RLS + approval template seed
-│   ├── 20260420800000_dinner_venue_address.sql          # Add address column, update venue default to 'ID345', backfill future dinners
-│   ├── 20260420900000_post_dinner_cron_and_trigger_fix.sql  # Remove last_dinner_attended from fulfillment trigger; now set by post-dinner cron
-│   ├── 20260421000000_morning_of_sent_at.sql                # dinners.morning_of_sent_at column for morning-of cron idempotency
-│   ├── 20260421100000_fix_has_community_access_on_approval.sql  # Backfill has_community_access = true for 161 existing members
-│   ├── 20260424000000_add_current_give.sql                     # Add current_give TEXT to members
-│   ├── 20260424100000_morning_of_sent_by.sql                   # Add morning_of_sent_by UUID FK to dinners (tracks who sent morning-of email)
-│   ├── 20260424000001_dinner_details_and_speakers.sql          # Add title/description TEXT NULL to dinners; dinner_speakers join table with RLS
-│   ├── 20260426000000_email_instances.sql                     # Generic email_instances table (superseded by dedicated monday_before/after tables — kept for cleanup)
-│   ├── 20260426100000_monday_before_emails.sql                # monday_before_macro + monday_before_emails + monday_before_email_images + sent-lock triggers + RLS
-│   ├── 20260426200000_monday_after_emails.sql                 # monday_after_macro + monday_after_emails + monday_after_email_images + sent-lock triggers + RLS
-│   ├── 20260426300000_fix_swap_primary_email_rpc.sql          # Fix swap_primary_email RPC: clear old primary before setting new to avoid unique index violation
-│   ├── 20260426400000_audit_row_history.sql                   # audit schema + row_history table + log_row_change() trigger on 9 business tables + RLS
-│   ├── 20260430000000_email_events.sql                       # email_events table + extend member_emails email_status CHECK for 'complained' + audit trigger
-│   ├── 20260430100000_system_events.sql                      # system_events table + indexes + RLS, plus partial index on audit.row_history.changed_by
-│   ├── 20260430110000_activity_feed_view.sql                 # initial activity_feed view (UNIONs system_events + email_events + audit.row_history). NOTE: superseded by 20260430230000
-│   ├── 20260430200000_audit_actor_member_id.sql              # audit.row_history.actor_member_id column + partial index + trigger update to read X-Audit-Actor request header
-│   ├── 20260430210000_activity_feed_actor_coalesce.sql       # view update with COALESCE(actor_member_id, auth.uid resolution). NOTE: superseded by 20260430230000 because the auth.users join failed under security_invoker
-│   ├── 20260430220000_audit_schema_grants.sql                # GRANT USAGE ON SCHEMA audit + SELECT ON audit.row_history TO service_role, authenticated. Required for the activity_feed view to read audit rows under security_invoker
-│   └── 20260430230000_activity_feed_drop_auth_users_join.sql # current activity_feed view: drops auth.users join, uses actor_member_id directly. service_role doesn't have SELECT on auth.users by default and granting it would expose password hashes
-└── seed.sql                                # Original test data (replaced by Phase 2 import)
-tmp/
-├── import.sql                              # Generated Phase 2 import SQL (schema changes + all data)
-├── import_summary.txt                      # Import counts and flags
-└── import_validation.txt                   # Cross-check audit results
-```
+- `/api/cron/dinner-generation` — daily 1pm UTC. Generates next first-Thursday-of-month dinner if missing. Skips Jan/Jul. Handler runs only the day after a first Thursday.
+- `/api/cron/fulfill-tickets` — daily 14:00 UTC (8am MDT / 7am MST). Uses `getTargetDinner()` + calendar-month gate. Email-first ordering: send fulfillment email → flip status on success. Failed emails leave ticket as `purchased` for next-day retry. DB failures after email logged as CRITICAL. Ticket query uses `.range(0, 999)` for 1k cap safety.
+- `/api/cron/post-dinner` — daily. If yesterday was a dinner, updates `last_dinner_attended` for fulfilled-ticket holders. Also clears stale `excluded_from_dinner_id` (NTO state from Streak that's now expired) and pushes affected members. NTO clear errors logged but don't fail the cron.
 
 ## Environment variables
 
-Required in `.env.local` (see `.env.local.example` at repo root):
+Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase publishable/anon key
-- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (server-side only)
-- `NEXT_PUBLIC_SITE_URL` — App origin URL (`http://localhost:3000` for dev, `https://thunderview-os.vercel.app` for production). **Gotcha:** always `.trim()` when reading — a trailing newline in Vercel env vars broke Stripe URLs in Sprint 8.
-- `STRIPE_SECRET_KEY` — Stripe sandbox secret key (`sk_test_...`). Server-side only.
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe sandbox publishable key (`pk_test_...`). Currently unused client-side (Checkout is redirect-based, not embedded).
-- `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret. For local dev: comes from `stripe listen` output. For production: from the registered webhook endpoint (`we_1TOKwXBZUujGbd3L93xKwlDl`).
-- `RESEND_API_KEY` — Resend API key for transactional and marketing emails. Set in Vercel (Production + Preview scopes) and `.env.local`.
-- `RESEND_WEBHOOK_SECRET` — Resend webhook signing secret (svix). Used by `/api/webhooks/resend` to verify bounce/complaint/failure events. Set in Vercel Production scope. Obtained from Resend dashboard after registering the webhook endpoint.
-- `UNSUBSCRIBE_SECRET` — HMAC key for signing unsubscribe tokens in marketing emails. Set in Vercel Production scope. Generate with `openssl rand -hex 32`. Without this, a hardcoded default is used (functional but insecure — anyone who reads the source can forge tokens).
-- `NEXT_PUBLIC_EMAIL_MODE` — Controls marketing email recipient scope. `"testing"` (default) = Send To All only reaches admin + team members. `"live"` = Send To All reaches all marketing-opted-in members. Set in Vercel Production scope. **Flip to `live` before launch.**
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_SITE_URL` — **always `.trim()` when reading** (trailing newline in Vercel env has caused Stripe URL bugs).
+- `STRIPE_SECRET_KEY` (sk_test, sandbox), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (pk_test, currently unused client-side), `STRIPE_WEBHOOK_SECRET` (production endpoint: `we_1TOKwXBZUujGbd3L93xKwlDl`)
+- `RESEND_API_KEY` (Production + Preview + local), `RESEND_WEBHOOK_SECRET` (svix, Production)
+- `STREAK_API_KEY`, `STREAK_WEBHOOK_SECRET` (32-byte hex) — Production + Preview
+- `UNSUBSCRIBE_SECRET` — HMAC for unsubscribe tokens, Production. Generate with `openssl rand -hex 32`. Without it, hardcoded default = forgeable tokens.
+- `NEXT_PUBLIC_EMAIL_MODE` — `"testing"` (default) or `"live"`.
 
-Production values are set in Vercel dashboard (Production + Development scopes). **Note:** Stripe sandbox keys are in both Production and Development scopes — no live keys yet. A future sprint will swap Production to live-mode keys.
+**Adding env vars to Vercel Preview scope: use the REST API, not the CLI.** All-preview-branches requires `gitBranch: null`. The CLI's interactive flow falls into a `git_branch_required` action_required loop. `PATCH /v9/projects/{id}/env/{id}` with `{"gitBranch": null}` to fix an existing entry, or `POST /v10/projects/{id}/env` with `target: ["preview"]` and no `gitBranch` for fresh.
 
-## Supabase configuration (manual, not in code)
-
-These are configured in the Supabase dashboard, not in the codebase:
+## Supabase config (manual, not in code)
 
 - **Site URL:** `https://thunderview-os.vercel.app`
-- **Redirect URLs allowlist:** `https://thunderview-os.vercel.app/**`, `http://localhost:3000/**`, AND a preview wildcard `https://thunderview-os-git-*-erics-projects-*.vercel.app/**`. The preview wildcard is required for magic links to preview deploys; without it, Supabase silently rejects the redirect and falls back to the project Site URL (production). Working in tandem with the `{{ .RedirectTo }}` template URL — see "Email template requirements" below.
-- **SMTP:** Resend custom SMTP (`team@thunderviewceodinners.com`). Switched from built-in SMTP in Sprint 13. Rate limit: 30/hour (adjustable in Supabase dashboard).
-- **Email templates:** Customized via Management API. See "Email template requirements" below.
-- **Magic link rate limits:** Default — 1 request per 60 seconds per email.
+- **Redirect URLs allow-list:** prod, localhost, AND `https://thunderview-os-git-*-erics-projects-*.vercel.app/**`.
+- **SMTP:** Resend custom (`team@thunderviewceodinners.com`). Default rate limit 30/hour.
+- **Auth email templates:** customized via Management API (not dashboard UI). See Auth gotchas above for the required template URL.
+- **Storage buckets:**
+  - `profile-pics` (public-read, authenticated-write, RLS path is `{member_id}.webp`).
+  - `email-images` (public-read).
 
-### Storage buckets
+## Codebase conventions
 
-Configured in the Supabase dashboard, not in the codebase:
+- **Next.js 16 uses `proxy.ts`, not `middleware.ts`.** File is `src/proxy.ts`, function is `export async function proxy(request)`. The `middleware` convention is deprecated.
+- **Server action body limit raised to 5MB** in `next.config.ts` (default 1MB). Required for profile pic upload (PNG blob from client crop canvas).
+- **Photo upload is decoupled from profile save.** Portal: `portalUpdateProfilePic`. Admin: `adminUploadProfilePic`. Neither passes other profile fields. Prevents silent data loss when a new field is added but not threaded through the photo handler's FormData.
+- **Default PostgREST row cap is 1,000.** Silent — no error, just truncated. Any query that might exceed 1k MUST paginate. Use `fetchAll` helper with `.range()`.
+- **Portal pages use the admin client for data reads/writes.** Most table RLS only grants SELECT to admin/team. Portal authenticates via session client, then uses admin client for queries.
+- **Lucide-react for all icons.** No emoji, no unicode arrows.
+- **Button `asChild` pattern:** `<Link>` styled as button → `<Button asChild><Link href="...">Label</Link></Button>`. Button merges classes onto the child.
 
-- **`profile-pics`** — Member profile pictures. Public-read, authenticated-write. RLS: members can only upload at their own `member_id` path. Path structure: `{member_id}.webp` (upsert overwrites). Written by: portal profile editor (session client via RLS), admin member detail (service-role client via `createAdminClient()`). Read by: `<MemberAvatar>` component via public URL stored in `members.profile_pic_url` (includes `?v={timestamp}` cache-bust).
-- **`email-images`** — Marketing email images (Monday Before, Monday After). Public-read. Path structure: `monday-before/{email_id}/{group}/{uuid}.jpg` and `monday-after/{email_id}/{group}/{uuid}.jpg`. Written by: admin email draft editors (service-role client). Read by: email HTML rendering via public URL stored in `monday_before_email_images.public_url` / `monday_after_email_images.public_url`.
+## Design system
 
-### Email template requirements
+`design-system/` at repo root. `README.md` is the visual spec. `colors_and_type.css` is the token source. `ui_kits/` has HTML prototypes.
 
-Magic link and signup confirmation email templates MUST use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}` as the link target — NOT the default `{{ .ConfirmationURL }}` and NOT `{{ .SiteURL }}`. The default `{{ .ConfirmationURL }}` generates a URL that verifies at Supabase's endpoint and redirects to the bare site root, which never establishes a session. `{{ .SiteURL }}` is the project's single Site URL setting (production), so using it would hardcode every magic link to production regardless of where the OTP request came from — preview-deploy auth flows broke that way until the template was switched. The PKCE flow (used by `@supabase/ssr`) requires the token_hash format hitting our `/auth/confirm` route. The `&email=` param lets `/auth/confirm` log `auth.login_failed` events with member identification when token verification fails (e.g. expired magic links). Templates are configured via the Supabase Management API, not the dashboard UI.
+- **CSS tokens use `--tv-` prefix in `globals.css`.** Tailwind 4's `@theme inline` writes to the same custom-property namespace as `:root` — without the prefix, `--font-sans: var(--font-sans)` is circular. Design system source uses unprefixed; `globals.css` adds the prefix.
+- **Do NOT define `--spacing-N` in `@theme inline`.** Tailwind 4 computes numeric spacing utilities (`h-9`, `p-4`, `gap-6`) as `calc(var(--spacing) * N)`. Defining `--spacing-9` overrides that step to our non-linear scale (96px), so `h-9` silently becomes 96px. Only semantic aliases (`--spacing-stack`, `--spacing-section`, `--spacing-tight`) belong in `@theme inline`. Use `var(--tv-space-5)` in arbitrary values for design-system spacing steps; literal pixels for fixed dimensions.
+- **Motion values must be literal in Tailwind classes.** `duration-[var(--tv-dur-fast)]` doesn't resolve — Tailwind arbitrary values for non-standard properties can't reach `:root` vars through `@theme inline`. Use `duration-[120ms]` etc.
+- **Semantic alias rule.** App code uses `bg-bg`, `text-fg1`, `border-border`, `text-accent-hover`, `bg-accent` — NOT raw scale (`bg-cream-50`, `text-clay-600`). Exceptions: active nav/filter state (`bg-ink-900`/`text-cream-50`), Pill component internals.
+- **Portal back-link convention.** Top-nav pages (Home, Tickets, Community, Recap) show no back link. Other portal pages (Members/[id], Profile edit) show back link to logical parent. Documented in `src/app/portal/layout.tsx`. Reference: `ui_kits/portal/index.html`.
+- **PageHeader gap:** known gap. `default` = tv-h1 + 64px, `compact` = tv-h3 + 24px. Portal needs tv-h1 + 32px — neither fits, so portal pages use inline `<H1>` + `<Lede>` with manual `mb-6`. Add `size="portal"` and migrate when this becomes important.
 
-## What's done (Phase 1)
+## What's NOT done — don't build without explicit prompt
 
-- Project scaffolded (Next.js 16, TypeScript, Tailwind CSS 4)
-- Supabase clients: browser (`createBrowserClient`), server (`createServerClient` with cookies), admin (service role)
-- Proxy (`src/proxy.ts`) for session refresh + `/admin` route protection
-- Database schema: 6 tables (dinners, members, applications, tickets, credits, member_emails), indexes, `updated_at` trigger on members, primary-email constraint trigger on member_emails
-- Multi-email support: `member_emails` table migration applied; `members.email` column dropped; `is_admin_or_team()` and "members can view own row" RLS policy rewritten to join through `member_emails`; admin pages (members, dinner detail, credits) read primary email via `member_emails`
-- RLS enabled on all tables with `is_admin_or_team()` function (joins through `member_emails`) + "members can view own row" policy
-- Magic link auth: login page, `/auth/confirm` (PKCE token hash), `/auth/callback` (code exchange), role-based redirect
-- Supabase auth email templates updated to use PKCE token hash pattern (`{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`; see "Email template requirements" for why `{{ .RedirectTo }}` not `{{ .SiteURL }}`)
-- Admin layout: sidebar nav, header with user email + Admin/Team badge, sign-out
-- 4 admin pages, all READ-ONLY: dinner view (with tickets + applications), applications inbox (filter + detail), members list (search + detail), credits (filter — later removed in Phase 3)
-- Admin dinners list columns (Paid, Intro/Ask, Guests) with clickable rows linking to dinner detail. Paid = sum of quantity where `fulfillment_status IN ('purchased', 'fulfilled')` — includes purchased-but-not-yet-fulfilled future-dinner tickets. Applied/Approved columns removed in Sprint 11.
-- Derived "Intro/Ask" ticket status on dinner detail page: shown ONLY on the next upcoming dinner, when `fulfillment_status = 'fulfilled'` AND member has both `current_intro` and `current_ask` AND `ask_updated_at > last_dinner_attended` (or no prior attendance). All other dinners show "Fulfilled" for fulfilled tickets.
-- Portal placeholder ("Portal Coming Soon")
-- Seed data applied to Supabase (10 dinners, 5 members, 3 applications, 5 tickets, 1 credit — replaced by Phase 2 import)
+- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled).
+- `has_community_access` revoke checkbox on refund flow.
+- LinkedIn URL matching for duplicate detection across applications and members.
+- Side-by-side comparison when re-application differs from existing member record.
+- Automatic member field updates from re-application data.
+- CoachingOS sync.
+- Custom receipt email (using Stripe's built-in).
+- Reconciliation/retry queue for failed Streak pushes.
+- Integration test for the `activity_feed` view.
+- Cleanup of `email_instances` table + `instances/[id]/` route (superseded by Monday Before/After).
+- Cleanup of orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`.
 
-## What's done (Phase 2)
+## Pre-launch checklist
 
-- Data migration from Google Sheets, Squarespace Orders, Squarespace Contacts, and Streak CRM. 632 members, 825 member_emails, 706 applications, 1,253 historical tickets, 32 dinners imported. 0 credits (none in historical data).
-- Schema additions applied inline via `tmp/import.sql`: `member_emails.email_status` column (`active`/`bounced`), `'historical'` added to `tickets.payment_source` and `tickets.ticket_type` CHECK constraints.
-- Import audit passed: FK integrity, primary email uniqueness, has_community_access/ticket consistency, marketing opt-out verification all clean.
-- 65 bounced emails flagged via Squarespace cleaned export. 81 members opted out via Squarespace unsubscribed export.
-- Import artifacts in `tmp/`: `import.sql` (generated SQL), `import_summary.txt`, `import_validation.txt`.
-
-## What's done (Phase 3, in progress)
-
-- Admin dashboard home page (`/admin`): next-dinner stats (date, days until, new apps, tickets sold), collapsible accordion sections (pending applications, marketing opt-outs).
-- Schema: `marketing_opted_out_at` TIMESTAMPTZ on members, with trigger on `marketing_opted_in` changes; backfilled 85 existing opt-outs
-- Schema: `first_dinner_attended` DATE on members; backfilled from earliest non-refunded/credited ticket
-- Schema: renamed `has_attended` → `has_community_access` (all code references updated)
-- Triggers on tickets: `trg_ticket_insert` (sets `has_community_access = true` on member, sets `first_dinner_attended` to dinner date if null), `trg_ticket_fulfillment_change` (on fulfill: sets `last_dinner_attended` if later than current; on refund/credit: recalculates `last_dinner_attended` as MAX of remaining fulfilled, reverts `first_dinner_attended` to null if it matched the refunded dinner)
-- Dinner detail: "Approved Without Ticket" list replaces raw applications list. Before dinner date: approved apps whose member has no ticket for this dinner. After dinner date: approved apps whose member had no ticket purchased on or before the dinner date. Ticket rows link to member detail; application rows link to application detail.
-- All list pages: sortable columns (click header to toggle asc/desc), sticky headers
-- Members list: removed `kicked_out` and `is_team` columns; kicked-out members shown with full-row strikethrough
-- Member detail page (`/admin/members/[id]`): server wrapper + client component. `<name> at <company>` heading with strikethrough for kicked-out (no pills — Team and Marketing Opt-Out are now toggles in column two). Column one: all fields editable inline — edit mode triggered by pencil icon on hover (all fields) or click-on-value (non-URL fields only). LinkedIn and Website remain clickable links; pencil icon is the only way to edit them. Editable fields: Name, Company, Type (dropdown), LinkedIn, Website, Intro (textarea), Ask (textarea), Contact Preference (dropdown). Email Addresses section: pencil icon (hover-only) or clicking any email opens the email management modal. Modal supports: add email (with duplicate validation against member_emails and applications), delete email (blocks last email), set primary (via `swap_primary_email` RPC). New emails: `source = 'manual'`. Column two: Application Date (earliest approved), Dinners list, Marketing Opted In toggle (immediate save, triggers `marketing_opted_out_at`), Team toggle (immediate save, admin-only — team members see label), Remove/Reinstate button with confirmation modal. Remove sets `kicked_out = true` + `marketing_opted_in = false`. Reinstate sets `kicked_out = false` + `marketing_opted_in = true`.
-- Add Member modal on members list page: creates member + member_emails + approved application atomically via `add_member_with_application` RPC. Form: Name, Email, Company, Website, LinkedIn, Type, Gender/Race/Orientation dropdowns (default "Prefer not to say"), Preferred Dinner Date. Email validation checks member_emails and applications for duplicates. Success shows "[name] added!" modal.
-- Application detail page (`/admin/applications/[id]`): server wrapper + client component. `<name> at <company>` heading with status pill (yellow pending, green approved, red rejected). "View member →" link when `member_id` exists. Approve button (shown when pending or rejected): `approve_application` RPC creates member + member_emails + updates application in single transaction. If email matches existing member, links without creating duplicate (re-application path) and flips primary email to application email. If existing member is kicked out, blocks with red warning + link to member page. Rejected-to-approved flip supported (clears rejection reason). Reject button (shown when pending): modal with reason dropdown ("Service Provider", "services business", "Other" with freeform input). "Link to existing member" button (shown when pending, no member_id): opens member search modal, links application to selected member via `link_application_to_member` RPC, adds/flips primary email. Blocked if selected member is kicked out. Email TODOs differentiated: template #1 for new member approval, template #2 for re-application/linked existing. Two-column layout unchanged.
-- Detail pages are standalone routes, not inline modals. Table rows use `Link` to navigate to `/admin/members/[id]` or `/admin/applications/[id]`. Browser back button works correctly.
-- Schema: `intro_updated_at` TIMESTAMPTZ on members. No trigger — will be set explicitly by portal save action (Phase 4). Admin edits do not update this timestamp. No backfill — existing rows null.
-- Timezone standardization: all date display and comparison logic uses America/Denver. Shared utilities in `src/lib/format.ts`: `formatDate()` (DATE or TIMESTAMPTZ → display string in MT), `formatTimestamp()` (TIMESTAMPTZ → display with time in MT), `getTodayMT()` (today as YYYY-MM-DD in MT), `toDateMT()` (TIMESTAMPTZ → YYYY-MM-DD in MT for comparisons). No raw `toLocaleDateString()` or `toISOString().slice()` calls remain in the codebase. Stored data is unchanged (TIMESTAMPTZ is UTC internally, DATE columns are timezone-agnostic).
-- Display name cleanup: `formatStageType()` in `src/lib/format.ts` — "Active CEO (Bootstrapping or VC-Backed)" → "Active CEO", "Exited CEO (Acquisition or IPO)" → "Exited CEO"
-- Members search input text color fixed (was invisible against background)
-- Portal ticket purchase flow (`/portal/tickets`): authenticated members pick a dinner from a dropdown (most recent past dinner + next 3 upcoming, filtered to exclude dinners member already has a purchased/fulfilled ticket for). Ticket type and price derived from member's `attendee_stagetypes` (Active/Exited CEO → $40, Investor → $100, Guest → $40). For non-guests-allowed dinners: single "Buy Ticket" button. For guests-allowed dinners: two side-by-side buttons ("Buy Ticket" and "Buy Ticket + Guest", +$40). No intermediate guest/cart pages — click goes directly to Stripe Checkout. Single ticket row with `quantity` column (1 or 2). `payment_source = 'portal'`. Guest eligibility determined by `dinner.guests_allowed` flag via `allowsGuestTicket()` predicate, not by month. Edge cases: existing purchased/fulfilled ticket for a dinner → that dinner filtered from dropdown; kicked out → redirect to portal; no stagetype → contact Eric message; no available dinners → error message.
-- Schema: `quantity` INTEGER NOT NULL DEFAULT 1 on tickets. `payment_source` CHECK updated to include `'portal'`.
-- Proxy updated: `/portal/*` routes now redirect unauthenticated users to `/login`.
-- Portal page: "Buy Your Ticket" button shown for non-kicked-out members.
-- Admin display: dinner detail and dinners list sum `quantity` for attendee counts (not row count). Ticket rows with `quantity > 1` display as "Name +1". Shared helper `formatTicketName()` in `src/lib/format.ts`.
-- Dashboard: removed "Unfulfilled Tickets" accordion (no longer needed with portal ticket flow). Only pending applications and marketing opt-outs remain.
-- Dinner detail redesigned: active tickets table (purchased/fulfilled) with Credit and Refund action buttons per row; Type and Amount columns removed. Refunded/credited tickets shown in a separate bottom section with full-row strikethrough and status pills. Refund-only (no Credit) for qty=2 tickets.
-- Refund flow: calls `stripe.refunds.create()` before flipping DB status (skips Stripe for historical tickets or tickets without `stripe_payment_intent_id`). qty=1 full refund sets `fulfillment_status = 'refunded'`, existing triggers recalculate dates. qty=2 offers "Refund Guest Only" ($40 refund, decrements quantity to 1, reduces amount_paid by $40, keeps status) or "Refund Both" (full refund, sets status to refunded). `stripe_refund_id` stored on ticket. Portal tickets missing `stripe_payment_intent_id` flagged as data anomaly. Comp tickets (`payment_source = 'comp'`) hide Credit/Refund buttons. Confirmation modal for all refunds; Stripe errors surface inline in the modal.
-- Credit flow: sets ticket `fulfillment_status = 'credited'`, creates a `credits` row with `source_ticket_id` and `status = 'outstanding'`. Confirmation modal.
-- Apply Credit on member detail page: "Apply Credit" button shown at top of column two when member has unredeemed credits (`credits.status = 'outstanding'` AND `redeemed_ticket_id IS NULL`). On confirm: computes target dinner via `getTargetDinner()`, inserts ticket as purchased then updates to fulfilled (fires both insert and fulfillment triggers), sets `payment_source = 'credit'`, `amount_paid = 0`, marks oldest unredeemed credit as redeemed. Button stays visible if multiple credits remain.
-- Kicked-out member exclusion from dinner views: approved applications whose linked member has `kicked_out = true` are excluded from dinner funnel counts (Applied/Approved columns on dinners list) and "Approved Without Ticket" lists on dinner detail pages. Applications inbox and tickets are unaffected.
-- `/admin/tickets` page: cross-dinner ticket list with all 1,350+ tickets (paginated past the 1,000-row PostgREST cap). Columns: Purchased, Member (strikethrough if kicked out), Dinner (formatted "May 7th, 2026"), Qty, Amount, Type, Source, Status (colored pills). All columns sortable, default reverse-chron by purchased_at. Search by member name. Row click navigates to dinner detail.
-- `/admin/credits` page removed. Credits now surface contextually: "Credit" button on dinner ticket rows, "Apply Credit" button on member detail. Nav updated: Tickets added between Dinners and Applications, Credits removed.
-- Pagination audit: all admin list queries that could exceed the 1,000-row PostgREST cap now use the `fetchAll` helper with `.range()`. Paginated: applications (718 rows), members (634 rows), tickets (1,350 rows), dinners funnel aggregations (applications + tickets). Bounded queries (`.single()`, `.limit()`, count-only, scoped to single dinner/member) left as-is.
-
-## What's done (Phase 4, in progress)
-
-- Schema: `members.attendee_stagetype` (TEXT, singular) → `members.attendee_stagetypes` (TEXT[], NOT NULL DEFAULT `'{}'`). All 636 existing members backfilled to single-element arrays. The singular column is dropped. `applications.attendee_stagetype` is unchanged — application form remains single-select.
-- RPCs `add_member_with_application`, `approve_application`, `link_application_to_member` now write `members.attendee_stagetypes = ARRAY[<application stagetype>]`. `link_application_to_member` previously did not touch member stagetype; it now overwrites. Re-approving an application overwrites any multi-role customization the member added — intentional for now.
-- Pricing logic in `getTicketInfo()` (in `src/lib/ticket-assignment.ts`) now takes `string[]` and uses priority ladder: Active CEO → $40 (CEO Ticket); else Investor → $100; else Exited CEO → $40; else Guest → $40; fallback CEO Ticket $40. Active CEO trumps Investor when both are present.
-- Trigger `trg_revoke_community_access_on_kickout` (BEFORE UPDATE OF kicked_out on members): when `kicked_out` flips false→true, sets `has_community_access = false`. Un-kicking does NOT auto-restore — admin must set manually if needed.
-- Proxy `/portal/*` guard now requires `has_community_access = true` (admin email bypasses). Members without it redirect to `/`. With the kick-out trigger above, no separate `kicked_out` check is needed.
-- Member detail Type field still single-select in the admin UI (Phase 4 will introduce multi-select); the admin server action wraps the chosen value in a single-element array when writing `attendee_stagetypes`.
-- **Global top nav** (`src/components/top-nav.tsx`): renders on every authenticated page (portal + admin). Left: "Thunderview OS" logo → `/portal`. Center-left: Tickets → `/portal/tickets`, Community → `/portal/community`, Last Month's Intros & Asks → `/portal/recap`. Active-state highlighting. Right: avatar circle with member initials (first_name[0] + last_name[0]). Avatar dropdown: Update Profile → `/portal/profile`, Admin → `/admin` (admin/team only), Sign Out. Admin sidebar now sits below the top nav (was full-height). Admin shell header removed — top nav replaces it.
-- **Portal layout** (`src/app/portal/layout.tsx`): wraps all `/portal/*` pages with TopNav. Fetches member data for initials + role. Auth check.
-- **Portal home page** (`/portal`): single-column layout (`tv-container-narrow`, 640px). Two states: (1) member has an upcoming purchased/fulfilled ticket → confirmation banner ("You're confirmed for [date]") + Intro/Ask/Contact form in a Card; (2) no upcoming ticket → dinner details block + "JOIN THIS DINNER" eyebrow + ticket purchase Card. Dinner details block: "NEXT DINNER" eyebrow, then title (if set), date/time/venue line (e.g. "May 1st, 2026 · 6:00 PM" / "ID345 · 3960 High St..."), description (if set), speakers. Shows "Topic and speakers announced soon." placeholder if all fields empty; otherwise shows whichever of title, description, speakers are present. Speakers render as `<MemberAvatar size="md">` + "Name · Company" on one line, LinkedIn/Website links on second line. Kicked-out and `has_community_access = false` members still shown as speakers. Ticket purchase: sells for the next upcoming dinner only (no dinner dropdown — `hideSelector` prop on TicketPurchase). `/portal/tickets` still has the full multi-dinner picker. Block hidden in ticket-purchased state. Small "Edit your profile" link at bottom. No nav buttons — Tickets, Community, Recap, Profile are all accessible via top nav. Save button with toast on the Intro/Ask form.
-- **Portal save action** (`savePortalProfile` in `src/app/portal/actions.ts`): compares old vs new values; only writes changed fields. Sets `intro_updated_at = now()` only when Intro text actually changed; sets `ask_updated_at = now()` only when Ask text actually changed. Contact-only changes touch neither timestamp. No-op when nothing changed (no DB write, "No changes" toast). Admin edits elsewhere do NOT touch these timestamps (confirmed: `src/app/admin/members/[id]/actions.ts:15-16` explicitly skips them).
-- **Profile editor** (`/portal/profile`): single-column form with all editable member fields. Profile details section: first_name, last_name, primary email, company_name, company_website, linkedin_profile, attendee_stagetypes (multi-select checkboxes). Intro & Ask section: current_intro (textarea), current_ask (textarea), contact_preference (dropdown: LinkedIn/Email). Single Save button with toast. Same timestamp logic as portal home form — `intro_updated_at`/`ask_updated_at` only set when respective text changes. Primary email change: if new email exists in member_emails, flips primary via `swap_primary_email` RPC; if new email, inserts row with `source = 'manual'` then flips. Old email rows persist as secondary.
-- **Community directory** (`/portal/community`): searchable, sortable table of members with `has_community_access = true` and `kicked_out = false`. Columns: Name, Company, Role. Search hits: first_name, last_name, full name, company_name, company_website, linkedin_profile, current_intro, current_ask, contact_preference, attendee_stagetypes. Default sort: first_name ascending. All columns sortable. Uses `fetchAll` with `.range()` for pagination past 1,000-row PostgREST cap (470 community members). All rows rendered client-side after full fetch. Row click routes to `/portal/members/[id]`.
-- **Member profile page** (`/portal/members/[id]`): read-only view of a member's profile for other community members. Shows: name, company, website (link), LinkedIn (link), role (formatted), primary email, preferred contact (capitalized), intro, ask. No demographics (gender/race/orientation — those live on applications only). Returns 404 if member is `kicked_out = true` or `has_community_access = false`. Self-view: shows "Edit Profile" button linking to `/portal/profile` when viewer's member_id matches the page's member.
-- **Recap page** (`/portal/recap`): shows attendees of the most recent completed dinner (latest `dinners.date < today` in MT). Attendees = members with a `fulfillment_status = 'fulfilled'` ticket for that dinner. Excluded: kicked-out, `has_community_access = false`, refunded, credited, purchased (not yet fulfilled) tickets. Marketing-opted-out still shown. Deduplicated by member_id (qty=2 tickets show one row for the primary member). Each card shows name (links to `/portal/members/[id]`), company, full intro text, full ask text. Empty intro/ask hidden (only show what they have). Header: "Thunderview Dinner — [formatted date]" with attendee count. Members with intros/asks sorted first, then others. Empty state for no past dinners.
-- **Profile pictures** (Sprints 6–7): Supabase Storage bucket `profile-pics` (public-read, authenticated-write, RLS: members can only upload at their own member_id path). Column `members.profile_pic_url` TEXT NULL stores full public URL with `?v={timestamp}` cache-bust. Upload on `/portal/profile`: client-side crop via `react-easy-crop` (square aspect, zoom 1–3) in a modal (`crop-modal.tsx`), then server-side processing via `sharp` — resize to 400×400, convert to WebP, strip EXIF. HEIC files skip client crop (browser can't render) and fall back to server center-crop. Max 5MB, accepts JPEG/PNG/WebP/HEIC. Stored at `profile-pics/{member_id}.webp` (upsert overwrites). Photo upload and removal both save immediately (spinner overlay shown, no need to click Save). Admin upload on `/admin/members/[id]`: hover-to-edit pattern on the avatar (pencil overlay on hover), same crop modal and sharp pipeline, uses service-role client (`createAdminClient()`) — does NOT modify RLS on the profile-pics bucket. Remove photo link shown below name when pic exists. Reusable `<MemberAvatar>` component (`src/components/member-avatar.tsx`): shows pic if set, initials circle if not. Sizes: sm (28px), md (40px), lg (120px). Displayed in 8 locations: portal profile upload, portal member profile page, community table rows, recap cards, top-nav dropdown trigger, admin member detail heading (with upload), admin members table rows, admin dinner detail ticket rows, portal dinner details block speakers.
-
-## What's done (Sprints 8–12)
-
-- **Stripe Checkout** (Sprint 8): `purchaseTicket` server action creates a Stripe Checkout Session with inline `price_data` (no pre-configured Products). Metadata includes `member_id`, `dinner_id`, `ticket_type`, `quantity`, `amount_paid`. Webhook at `/api/webhooks/stripe` handles `checkout.session.completed` — inserts ticket as `purchased`, auto-fulfills only if dinner is the next upcoming (via `getTargetDinner()`). Idempotency via `stripe_session_id` partial unique index. Stripe columns on tickets: `stripe_session_id`, `stripe_payment_intent_id`, `stripe_refund_id`.
-- **Stripe refunds** (Sprint 9): Refund button calls `stripe.refunds.create()` before DB status flip. Guest-only refund = $40 (fixed, not half). Historical tickets and tickets without `stripe_payment_intent_id` skip Stripe. Errors surface inline in refund modal. Refund and Credit buttons are hidden for past dinners (dinner date < today in MT) — no refunds or credits once a dinner has passed.
-- **Ticket purchase flow redesign** (Sprint 10): Application form no longer asks for preferred dinner date (`preferred_dinner_date` column made nullable, no longer written). Portal `/portal/tickets` shows explicit dinner dropdown (most recent past dinner + next 3 upcoming) instead of auto-assignment. Member picks dinner, clicks Buy. December guest upsell collapsed into two side-by-side buttons on same page (no intermediate guest/cart pages). `getTargetDinner()` simplified to just return next upcoming dinner.
-- **Per-dinner guests_allowed** (Sprint 10.5): `dinners.guests_allowed` BOOLEAN replaces hardcoded December month check. `allowsGuestTicket()` predicate in `src/lib/ticket-rules.ts`. Admin toggle on `/admin/dinners` list (Guests column, click Yes/No → confirmation modal, spinner while saving). Backfilled: 4 December dinners = true.
-- **Admin surface cleanup** (Sprint 11): Removed Preferred Dinner from applications UI. Removed Applied/Approved columns from dinners list. Dinner detail: removed Pending square, renamed Fulfilled → Purchased (counts purchased + fulfilled), removed Approved Without Ticket section. Newest-first ticket sort + blue "new" pill for first-time members. Intro/Ask status scoped to next upcoming dinner only. Dashboard: Tickets Sold now sums quantity excluding refunded/credited; New Apps excludes rejected. Comp Ticket button on member detail (payment_source='comp', amount_paid=0, auto-fulfilled, no Credit/Refund buttons shown). `payment_source` CHECK: squarespace, credit, historical, portal, comp.
-- **Fulfillment logic** (Sprint 12): Tickets auto-fulfill only when `dinner_id` matches next upcoming dinner. Future-beyond-next tickets stay `purchased`. Dinner dropdown filters out dinners where member already has a purchased/fulfilled ticket. `/admin/dinners` default sort = date DESC with auto-scroll to next upcoming dinner. Portal home shows upcoming-ticket banner with intro/ask freshness nudge (updates on save without reload). `fulfillment_status` values renamed: `pending` → `purchased` throughout code and DB.
-- **Sprint 13 — Email wiring + bug fixes:**
-  - All transactional emails wired to trigger events (approval, re-application, rejection, fulfillment, morning-of). Shared `src/lib/email-send.ts` handles template loading + Resend dispatch.
-  - Fulfill-tickets cron (`/api/cron/fulfill-tickets`) wired. **Rewritten in Sprint 18** — see Sprint 18 entry for current schedule, calendar-month gate logic, and email-first ordering. Original Sprint 13 logic ("daily at 1pm UTC, flips purchased→fulfilled 27 days before dinner") is no longer accurate.
-  - Morning-of cron idempotency: `dinners.morning_of_sent_at` column prevents duplicate sends on retry.
-  - Admin notification on new application: emails `eric@marcoullier.com` with applicant details + link to `/admin/applications/[id]`.
-  - **Bug fix: `has_community_access` was `false` on member creation.** All three member-creation RPCs now set `true`. Backfilled 161 existing members. Root cause: column was renamed from `has_attended` (ticket-triggered) to `has_community_access` (approval-triggered) but the RPCs and import were never updated to match the new semantics.
-  - **Bug fix: all email sends must be `await`ed.** Every `sendXxxEmail()` call was fire-and-forget (no `await`). On Vercel serverless, the function terminates when the response is sent — unawaited promises get killed. All 8 call sites now awaited. Crons already awaited correctly.
-  - **Bug fix: proxy used session client for member lookups.** The proxy queried `member_emails` with the session client (anon key + user cookies), subject to RLS. RLS blocked queries for non-admin users, so no non-admin user could ever reach `/portal` or `/admin` as team. Only `eric@marcoullier.com` worked because the hardcoded admin check bypasses the query. Fixed: proxy now uses the service role client for team and community access checks.
-  - **Bug fix: auth cookie propagation on redirects.** `/auth/confirm` and `/auth/callback` set session cookies via `cookieStore.set()` but returned a separate `NextResponse.redirect()` that didn't carry them. Now explicitly applies cookies to the redirect response.
-  - **Switched Supabase auth SMTP to Resend custom SMTP.** Configured in Supabase dashboard (not code). Eliminates the 4/hour rate limit and the injected unsubscribe footer. Sender: `team@thunderviewceodinners.com`.
-  - Login input text color fixed (was near-invisible on white background).
-
-## What's done (Design system — Sprints 14–15)
-
-- **Design system installed** (`design-system/` at repo root): tokens, fonts, UI kit prototypes, brand assets. Source of truth for all visual decisions. See `design-system/README.md` for positioning, content rules, visual foundations, layout invariants, iconography, and component rules.
-- **Fonts swapped**: Geist/Geist_Mono replaced with Inter (body/UI), Fraunces (display, variable opsz axis), JetBrains Mono (code) via `next/font/google` in `src/app/layout.tsx`.
-- **Token architecture**: Design tokens use `--tv-` prefix in `:root` to avoid circular references with Tailwind 4's `@theme inline` (which writes to the same CSS custom property namespace). All tokens exposed to Tailwind via `@theme inline` in `src/app/globals.css`. Design system source (`design-system/colors_and_type.css`) uses unprefixed names — the `--tv-` prefix is an app-layer concern only.
-- **No dark mode.** The `prefers-color-scheme: dark` media block was removed. Thunderview is explicitly cream-on-cream, never dark.
-- **UI primitives** in `src/components/ui/`: Button (with `asChild` for wrapping Links), Card, Pill, Input, Textarea, Select, Label, FieldHelp, typography wrappers (Eyebrow, H1–H4, Lede, Body, Small). All pages compose these — no inline buttons, cards, or form inputs.
-- **Brand assets** copied to `public/brand/`: 12 dinner photos (webp), wordmark SVG, monogram SVG.
-- **Marketing home page** (`/`): full branded page with hero photo, stats, three-reason grid, editorial quote, photo gallery, bottom CTA. Conditional auth: anonymous → "Apply To Join", authenticated → "Buy A Dinner Ticket". Public nav with About/FAQ/Team/Gallery links (placeholder pages scaffolded).
-- **All portal pages restyled**: top-nav, layout, home, profile, community directory, member view, recap, tickets. Cream backgrounds, Fraunces headings, warm borders, design system primitives throughout.
-- **All admin pages restyled**: sidebar (cream-100, grouped nav), dashboard, dinners list + detail, applications list + detail, members list + detail + add-member modal, tickets list, emails index + template editors + morning-of editor. Warm tables, Pill status badges, Lucide sort arrows, Button primitives on modals.
-- **Transactional email HTML shell** (`bodyToHtml()` in `src/lib/email.ts`): Resend-safe table-based layout, cream #FBF7F0 background, 600px max-width, clay-500 top border, Fraunces headings with Georgia fallback, Inter body with system sans fallback, warm footer. All CSS inline. Optional `appendHtml` parameter for morning-of attendee section. `EMAIL_FROM` = "Thunderview Team <team@thunderviewceodinners.com>".
-- **`sendNewApplicationNotification`** now uses the branded email shell (was raw HTML).
-- **Ticket success page removed**: Stripe success URL now redirects to `/portal?purchased=true`. Confetti fires once via `purchase-confetti.tsx`, query param cleaned up silently via `router.replace`.
-- **Guest ticket button hidden** when dinner doesn't allow guests (was shown disabled at 55% opacity).
-- **Intro/Ask column** on dinners list scoped to next upcoming dinner only (was showing for all dinners — pre-existing bug fixed).
-- **Layout invariant tokens** added: nav height (64px), page gutters (24/48px), container widths (marketing 1040, app 1280, admin 1440), vertical rhythm (section-gap 64px, stack-gap 24px, tight-gap 12px), form spacing, table spacing, modal widths, nav internals. All navs now exactly 64px. All pages use `tv-page-gutter` or `tv-container-*`.
-- **Semantic alias conformance sweep**: all raw-scale Tailwind classes (`bg-cream-50`, `border-line-200`, `text-clay-600`, etc.) replaced with semantic aliases (`bg-bg`, `border-border`, `text-accent-hover`). Remaining raw-scale refs are intentional (active nav state, Pill internals).
-- **Broken motion refs fixed**: all `var(--tv-dur-fast)` / `var(--tv-ease-out)` references replaced with literal values — Tailwind arbitrary values can't resolve CSS vars for non-standard properties through `@theme inline`.
-- **Mobile responsive** across all three tiers: marketing pages, portal pages, and admin pages. Two-column layouts stack on mobile, tables scroll horizontally, nav collapses appropriately. Responsive breakpoints applied during the page restyling work in these sprints and polished in Sprint 16.
-- **Dev routes**: `/dev/ui` (primitive showcase), `/dev/emails/[slug]` (email template preview with sample data). Not linked from any page.
-- ~~**NEEDS DESIGN REVIEW**: Portal uses `max-w-[980px]`~~ Resolved — `--tv-container-portal: 980px` token added, all portal pages use `tv-container-portal` or `tv-container-narrow` (640px for single-column pages).
-- **NEEDS DECISION**: receipt email — using Stripe's built-in receipt. Kit has a design but no sender/template/trigger built. Fulfillment hero photo skipped in email shell — would need per-template image support.
-
-## What's done (System hardening — Sprint 16)
-
-- **Spacing token audit**: all hand-rolled pixel values (`py-[72px]`, `px-[22px]`, etc.) and off-scale standard utilities (`mb-10`, `py-24`, `gap-12`, etc.) replaced with `--space-*` tokens across 18 files. Zero bracket-pixel spacing values remain in feature components. UI primitives (`components/ui/`) untouched.
-- **`<PageHeader>` component** (`src/components/page-header.tsx`): props `eyebrow`, `title`, `lede`, `actions`, `size` (`"default"` | `"compact"`). Rhythm locked by the component — `--tight-gap` (12px) between internals, `--section-gap` (64px) default or `--stack-gap` (24px) compact after the header. 16 pages migrated (admin list pages use compact; placeholder pages use default). Detail pages and portal pages NOT migrated — see "Known gap" below.
-- **`<Field>` component** (`src/components/field.tsx`): props `label`, `required`, `help`, `error`, `children`, `className`. Uses `flex flex-col gap-label-input` (8px) with `!mb-0`/`!mt-0` overrides on Label/FieldHelp to strip built-in margins. Error and help are mutually exclusive. 8 forms migrated (39 fields total). Remaining `<label>` hits are checkbox labels inside Fields and dev showcase.
-- **Public pages restyled** (`/login`, `/apply`, `/apply/thanks`): warm cream palette, Fraunces headings, design system Input/Select/Button, Field-wrapped inputs. Zero `gray-*`/`blue-*`/`slate-*` classes remain. Login split into server wrapper (`page.tsx` with PublicNav) + client form (`login-form.tsx`). Apply form uses Eyebrow section headers, schedule in elevated two-column panel. Thanks page centered card with confetti preserved. Placeholder pages (`/about`, `/faq`, `/team`, `/gallery`) given `tv-paper` texture.
-- **Portal pages restyled** to match `ui_kits/portal/index.html`: portal home, community, tickets (3 paths), recap, member view, profile editor. Tighter heading gaps (32px vs PageHeader's 64px section-gap). Profile editor has `border-t` separator between profile details and intro sections.
-- **Admin pages restyled** to match `ui_kits/admin/index.html`: main area padding tightened to `py-7` (48px). Emails list narrowed to 720px. Member detail wrapper narrowed to 1040px, grid gap tightened to 48px. All existing patterns preserved (dl/dt/dd inline editing, STALE pill, Remove Member, Apply Credit, Comp Ticket).
-- **Email template fixes** (`src/lib/email.ts`): CTA button margin-top increased from 8px to 16px. `bodyToHtml()` now post-processes bare `<a>` tags to add inline `color:#9A7A5E` (clay) since email clients strip `<style>` blocks. Tags with existing `style` attributes left untouched. `email-send.ts` unchanged.
-- **Apply schedule** extended from 12 to 13 months so the schedule always includes the same month next year (e.g. April 2027 when viewing in April 2026).
-
-### Portal back-link convention
-
-Pages in the top nav (Home, Tickets, Community, Recap) show **no** back link — the sticky top nav is how you move between them. Pages not in the top nav (Members/[id], Profile edit) show a back link to their logical parent (Community or Portal home respectively). Documented in a comment at the top of `src/app/portal/layout.tsx`. Reference mock: `ui_kits/portal/index.html`.
-
-### Known gap: PageHeader on portal pages
-
-`<PageHeader>` has two sizes: `default` (tv-h1 + 64px gap) and `compact` (tv-h3 + 24px gap). Portal pages need tv-h1 heading + ~32px gap — neither size fits. Portal pages currently use inline `<H1>` + `<Lede>` with manual `mb-6` instead of PageHeader. **Next step**: add `size="portal"` (tv-h1 heading + 32px gap) and migrate portal pages back to PageHeader.
-
-## What's done (Marketing emails — Sprint 17)
-
-- **Monday Before email system**: dedicated tables (`monday_before_macro`, `monday_before_emails`, `monday_before_email_images`) with full draft→sent lifecycle. Macro editor at `/admin/emails/monday-before` seeds new drafts with 5 structured fields. Per-dinner draft editor at `/admin/emails/monday-before/[emailId]` with subject, preheader, headline, custom text (rich text), 2 sortable image groups, partnership boilerplate, CTA+dinner preview, CAN-SPAM footer. Save Draft / Send Test / Send To All workflow with test-gate (`test_sent_after_last_edit` must be true). Bulk send via Resend `batch.send()` (100/chunk) to all `marketing_opted_in = true` AND `kicked_out = false` members. Sent-lock DB triggers block all writes after send. Audience snapshot frozen as JSONB at send time.
-- **Monday After email system**: same architecture as Monday Before with 9 text fields (subject, preheader, headline, opening_text, recap_text, team_shoutouts, our_mission, intros_asks_header, partnership_boilerplate) and 5 image groups. Includes auto-generated Intros & Asks section from dinner's fulfilled attendees (shared renderer with Morning Of). Target dinner = most recent past dinner.
-- **Rich text editor** (`src/components/ui/rich-text-editor.tsx`): Tiptap-based with B/I/U/Link toolbar. Outputs clean HTML (`<strong>`, `<em>`, `<u>`, `<a>`). Dynamically imported (SSR disabled). Used by `custom_text` and `partnership_boilerplate` fields in Monday Before, all text fields in Monday After macro/draft editors.
-- **Image upload pipeline** (`src/lib/email-image-pipeline.ts`): shared Sharp compression — 800px width, JPEG, iterative quality reduction (85→75→65→55→45→40), stops at first quality ≤500KB. Rejects with descriptive error if quality 40 still exceeds limit. EXIF stripped. Accepts JPEG/PNG/WebP/HEIC.
-- **Drag-and-drop image reordering** (`src/components/email-image-group.tsx`): @dnd-kit/sortable with optimistic local reorder (no snap-back during async server call). Full-size image previews with grip handles and delete buttons.
-- **Intros & Asks rendering extracted** (`src/lib/email-intros-asks.ts`): `getDinnerAttendees()` and `buildAttendeeHtml()` now shared between Morning Of and Monday After. Morning Of refactored to use the shared helper (identical behavior, no formatting changes).
-- **Unsubscribe system**: HMAC-signed tokens per recipient (`src/lib/unsubscribe.ts`), one-click handler at `/api/unsubscribe` (GET+POST for RFC 8058 `List-Unsubscribe-Post`), confirmation page at `/unsubscribe` with success/invalid/error states. Marketing emails include `List-Unsubscribe` and `List-Unsubscribe-Post` headers. CAN-SPAM footer with physical address ("Thunderview CEO Dinners / 2462 S Acoma St / Denver, CO 80223 / USA"). `UNSUBSCRIBE_SECRET` env var set in Vercel production.
-- **Portal marketing opt-in toggle** on `/portal/profile`: "Email preferences" section with checkbox "Receive marketing emails (Dinner Details, Dinner Wrapup)". Immediate-save via `toggleMarketing` action. Helper text explains transactional emails are unaffected. Members can re-subscribe after clicking email unsubscribe link.
-- **Emails index page** reordered: Transactional section first (top), Marketing section second (bottom). Each marketing template shows smart button based on instance state: "Create draft for [date]" / "Continue draft — [date]" / "Sent [date]".
-- **Storage bucket**: `email-images` (public-read) for marketing email images. Paths: `monday-before/{email_id}/{group}/{uuid}.jpg` and `monday-after/{email_id}/{group}/{uuid}.jpg`.
-- **Email testing mode** (`src/lib/email-mode.ts`): `NEXT_PUBLIC_EMAIL_MODE` env var. When `"testing"` (default), `getMarketingRecipients()` returns only admin + team members. When `"live"`, returns all `marketing_opted_in = true` members. Both draft editors show a yellow banner when in testing mode. Shared by Monday Before and Monday After via `getMarketingRecipients()` and `getMarketingRecipientCount()`.
-- **New dependencies**: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`, `@tiptap/extension-underline` (rich text editor), `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (drag-and-drop image reordering).
-
-## What's done (Sprint 18 — system hardening, email events, portal features)
-
-- **Audit logging** (`audit.row_history`): row-level INSERT/UPDATE/DELETE snapshots on 10 business tables. SECURITY DEFINER trigger, `zzz_audit_` prefix for last-fire ordering. See "Audit logging" section above.
-- **`swap_primary_email` RPC fix**: cleared old primary before setting new to avoid unique index violation (was a single UPDATE that triggered intermediate constraint).
-- **`/tickets` → `/portal/tickets` redirect** in proxy.
-- **"Database error finding user" fix**: GoTrue NULL column issue on `auth.users` rows created via admin API. `ensureAuthUser()` now patches via `updateUserById`. 633 rows backfilled.
-- **Morning Of email scoped by `EMAIL_MODE`**: in testing mode, "Send To Attendees" only delivers to admin + team members (attendee list in email body is still full for realistic preview). Yellow testing-mode banner added.
-- **Fulfill-tickets cron rewrite**: replaced brittle "exactly 27 days from now" date match with `getTargetDinner()` + calendar-month gate (handles Jan/Jul skip months). Email-first ordering: send email → flip status on success; failed emails leave ticket as purchased for next-day retry. DB failures after email logged as CRITICAL. Schedule moved to `0 14 * * *` (14:00 UTC = 8am MDT / 7am MST). Ticket query uses `.range(0, 999)` for 1k cap safety.
-- **Featured Member on `/portal/community`**: random eligible member card at top of page on each server render. Eligibility: intro+ask+give all filled, attended in last 6 months, not team, not kicked out, has community access, not the viewer. Omitted when no one qualifies. Pool capped at 100 (picked via `Math.random()` server-side since PostgREST lacks `ORDER BY RANDOM()`).
-- **Contact section redesign** on member profiles and featured member: LinkedIn always shown (if exists), email shown only when `contact_preference = 'email'`. Website removed (already in company heading). "CEO at" prefix removed from company name.
-- **`contact_preference` rules**: two uses — (1) in emails/recap, determines how the member's name is linked (LinkedIn or mailto); (2) in profiles, gates whether email is shown in the Contact section. LinkedIn is always visible if present.
-- **Email events system**: `email_events` table + Resend webhook at `/api/webhooks/resend` (svix signature verification via `RESEND_WEBHOOK_SECRET`). Handles bounces (flip email_status), complaints (flip email_status + opt out marketing + notify Eric), failures (notify Eric). Idempotent via UNIQUE on `(resend_email_id, event_type)`. `member_emails.email_status` CHECK extended to include `'complained'`. Dashboard "Email Issues" accordion (last 30 days, bounced=warn pill, complained=danger pill). Tested end-to-end with a real bounce.
-- **Feedback button + modal**: floating bottom-right on every page (wired in root layout). Bug/Feedback toggle, message textarea (2000 char max), honeypot spam protection. Anonymous users see name/email fields; authenticated users resolved from session. Notification email to Eric with Reply-To set to submitter. Two-zone email: top (for Eric: type, from, message) + bottom (for Claude Code: debug pre block with member_id, role, timestamp, URL, referrer, UA, viewport).
-
-### Remaining hardening opportunities
-
-- **Shared `<DataTable>` component**: admin tables (dinners, tickets, applications, members) and the portal community table all share identical th/td class patterns. A single component would enforce table-cell-padding-x, sticky headers, sort arrows, and row-click behavior.
-- **Shared `<SearchToolbar>` component**: admin pages hand-roll search input + filter tabs. A shared component would lock the toolbar layout and spacing.
-- **Admin detail layout component**: member detail, application detail, and dinner detail all use back-link + heading + two-column grid with similar patterns but different enough to resist a single abstraction today.
-
-## What's done (Sprint 19 — Activity feed + audit actor attribution)
-
-- **Activity feed system**: unified read API over three event sources (`system_events`, `email_events`, `audit.row_history`) projected to a common shape via `public.activity_feed` view. See "Activity feed" section above for full reference.
-- **`/admin/operations` page**: People + System tabs (default People). 100 rows/page, paginated. Filters: event_type multi-select, actor member search, optional date range. Sort: occurred_at DESC. Sidebar entry "Activity" under Operations group.
-- **`<MemberHistory>` section** at the bottom of `/admin/members/[id]`: People feed scoped to `actor_id = id OR subject_member_id = id`. 25/page paginated. Optional event_type filter. Initial render via server component; pagination + filter via `fetchMemberHistory` server action.
-- **Audit actor attribution via X-Audit-Actor header**: new `audit.row_history.actor_member_id` column populated by the trigger reading PostgREST's per-request `request.headers` GUC. `createAdminClientForCurrentActor()` (in `src/lib/supabase/admin-with-actor.ts`) attaches the header to every request from a service-role client, sourcing the actor from the session via `getCurrentActorMemberId()`. All admin server actions and portal save actions on audited tables now use this helper. Cron and webhook handlers intentionally use the plain admin client (no actor).
-- **Pooling-safe by design**: `request.headers` is a per-request GUC scoped to the transaction, so values can't leak across pooled connections. This is the correctness-safe alternative to session-level `SET app.actor_id`.
-- **Instrumentation**: `logSystemEvent({…})` calls added at:
-  - `/auth/confirm` and `/auth/callback`: `auth.login` on success (resolves member via verified email) and `auth.login_failed` on failure when the `?email=` query param matches a member_emails row.
-  - All three crons: `cron.fulfill_tickets`, `cron.post_dinner`, `cron.dinner_generation` at end-of-run with summary metadata. Crons wrapped in try/catch → `error.caught` on throws.
-  - Stripe + Resend webhooks: `webhook.stripe`, `webhook.resend` on receipt; both wrapped in try/catch.
-  - Every transactional email send (approval, re-application, rejection, fulfillment, morning-of, admin notifications, complaint, send-failure, feedback): `email.transactional_sent` with `{ template, recipient, member_id }`.
-  - Bulk emails (Monday Before, Monday After, Morning Of Send To All): `email.bulk_sent` with `{ kind, dinner_id, recipient_count }` and actor_id = sending team member.
-  - Feedback submission: `feedback.submitted` with kind (bug/feedback) and role.
-  - Application linked-to-existing-member flow: `application.linked` (kept explicit because the audit signature is indistinguishable from a fresh approve).
-- **Email template URL change** (applied via Supabase Management API): Magic Link and Confirmation templates now use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`. The switch from `{{ .SiteURL }}` to `{{ .RedirectTo }}` fixes preview-deploy auth: `{{ .SiteURL }}` hardcodes production, so magic links from preview deploys would land on production after sign-in. The `&email=` param lets `/auth/confirm` log `auth.login_failed` events with member identification when token verification fails (e.g. expired magic links). Required companion change: Supabase URL allow-list includes `https://thunderview-os-git-*-erics-projects-*.vercel.app/**` so preview-targeted redirects are accepted (without the wildcard, Supabase silently falls back to Site URL).
-
-### Known issues / gaps in this sprint
-
-- **Error handling in `getActivityFeed`** silently returns an empty list on query failure. Hid three separate permission-denied errors during this sprint. Should propagate or surface to the UI.
-- **`application.linked` produces dual events** in the People feed: one `application.approved` (audit-derived from status flip) and one `application.linked` (explicit system_event). Distinguishable by event_type label but visually noisy. Acceptable for now.
-- **Field-level admin edits captured by audit only**, not by explicit `logSystemEvent`. Audit attribution works (via the X-Audit-Actor header), so they appear correctly attributed in the feed via the `member.edited` translation in `refineAuditRow`.
-- **No integration test** for the activity_feed view. A single PostgREST round-trip test would have caught the audit-schema-grant + auth.users-grant failures immediately.
-
-## What's done (Sprint 20 — Streak integration foundations, Prompt A)
-
-Foundation layer for the OS ↔ Streak sync. Library is fully wired but **inert** — no state-change site calls into it yet (that's Prompt B). Nothing changes from a user's perspective after this sprint.
-
-- **Schema additions** (`20260501000000_streak_integration_columns.sql`):
-  - `applications.streak_box_key TEXT NULL` — Streak box key for this application's box. Set on `/apply` submission (Prompt B), copied to `members.streak_box_key` on approval, cleared on rejection.
-  - `members.streak_box_key TEXT NULL` — Streak box key for this member's box. Inherited from application on approval, or set on first push for add/link paths.
-  - `members.excluded_from_dinner_id UUID NULL` — FK to `dinners(id) ON DELETE SET NULL`. Tracks "Not This One" state. Set by inbound Streak webhook (Prompt B), cleared by post-dinner cron (Prompt B), `ON DELETE SET NULL` so dinner deletion silently clears.
-- **Streak API client** (`src/lib/streak/client.ts`): HTTP Basic auth (`API_KEY:` base64), in-process token-bucket pacing at ≤8 req/sec, exponential backoff on 429 (max 3 retries), single retry on 5xx. Every call emits `streak.api_call` to `system_events` with `{method, path, status, duration_ms}`. Functions: `listPipelines`, `getPipeline`, `listPipelineFields`, `createPipelineField`, `listPipelineStages`, `createBox`, `getBox`, `updateBox`, `setBoxField`, `deleteBox`. createBox uses `PUT /pipelines/{key}/boxes`, updateBox uses `POST /boxes/{key}`, setBoxField uses `POST /boxes/{key}/fields/{fieldKey}` with `{value}` body — Streak's own conventions, not REST-canonical.
-- **Stage constants** (`src/lib/streak/stages.ts`): 7-stage enum + display names (`Applied`, `Approved`, `Attended`, `Has Ticket`, `Not This One`, `Bounced`, `Opted Out`). Bootstrap matches stages by exact name — these strings must match the Streak pipeline verbatim.
-- **Stage computation** (`src/lib/streak/compute-stage.ts`): split into pure + DB fetcher to make precedence cheaply testable.
-  - `computeStageForMember(state: MemberStreakState): StreakStage` — pure. Precedence ladder, first match wins: opted_out (marketing_opted_in=false OR kicked_out=true) → bounced (≥1 email AND every email bounced; vacuously-true zero-email case explicitly excluded) → has_ticket → not_this_one → attended → approved.
-  - `computeStageForApplication(app)` — pure. Returns `'applied'` only when `status='pending' AND member_id IS NULL`; else `null` (no standalone Streak box).
-  - `getMemberStreakState(memberId)` — DB fetcher. 4 reads via service-role client. Includes "active exclusion" check that filters stale exclusions (past-dinner) at fetch time.
-- **Bootstrap** (`src/lib/streak/bootstrap.ts`): `ensureStreakReady()` resolves the Thunderview pipeline, all 7 stage keys (throws with the missing list if any are absent — stages are curated in Streak, not auto-created), and the 4 custom fields (`First Name`, `Last Name`, `Company`, `Email` — auto-created if missing). Result cached in module scope; `resetStreakCache()` for tests/scripts.
-- **Push primitives** (`src/lib/streak/push.ts`): all 4 throw on Streak API failure; caller (Prompt B) decides retry/logging.
-  - `pushMemberToStreak(memberId)` — fetches member + state, computes stage, creates box if `streak_box_key` is null (persists key back to row) else updates in place. Sets all 4 fields unconditionally (simpler than diffing).
-  - `pushApplicationToStreak(applicationId)` — same shape, always targets `applied` stage. Pulls name/email/company from the application row directly. Throws if the application isn't in the applied state.
-  - `deleteApplicationBox(applicationId)` / `deleteMemberBox(memberId)` — no-op if `streak_box_key` is null; else delete + null the column.
-- **Verification** (`tmp/streak-precedence-verify.ts`): runnable pure-function exercise covering all 6 member precedence cases (positive + negative for bounced rule, plus precedence-lose cases for not_this_one) and 4 application cases. 14 cases pass; exits non-zero on any mismatch. **No test framework installed** — explicit choice given the project has no test culture; flag in CLAUDE.md is enough.
-- **Bootstrap smoke** (`tmp/streak-bootstrap-smoke.ts`): one-off runnable that calls `ensureStreakReady()` and prints resolved keys. Run with `npx tsx --env-file=.env.local tmp/streak-bootstrap-smoke.ts`. Eric runs once after deploy to verify the 4 custom fields appear in the Streak UI.
-- **`tsx` added as devDep** for running TS scripts under `tmp/` from the local terminal. Cloud-first not violated — these are convenience runners, not a production runtime dependency.
-- **`STREAK_API_KEY`** added to `.env.local`, `.env.local.example`, and Vercel **Production + Preview** scopes (no `gitBranch`, set via REST API per the CLAUDE.md gotcha — CLI's interactive flow can't set "all preview branches" non-interactively).
-
-### Known gaps / not yet wired
-
-- **Library is inert.** No state-change site (approve, reject, link, ticket insert/refund, opt-out toggle, kick, bounce webhook, post-dinner cron) calls `pushMemberToStreak` or `pushApplicationToStreak` yet — that's Prompt B.
-- **No inbound webhook** at `/api/webhooks/streak/*` — Prompt B.
-- **No backfill** of existing 632 members + pending applications — Prompt C.
-- ~~**Auto-promote non-bounced secondary email to primary on bounce** — separate independent open loop.~~ Closed Sprint 20 (Resend webhook hardening): on hard primary bounce, handler promotes the most recently-added active secondary via `swap_primary_email` before `safePushMember`. See `member_emails` / `email_events` table descriptions.
-
-## What's done (Sprint 20 — Streak integration wiring, Prompt B)
-
-The library from Prompt A is now connected. Every state change in OS that affects pipeline stage fires a Streak push, and Eric's manual moves to Opted Out / Not This One in Streak flow back into OS state.
-
-- **Safe-push wrappers** (`src/lib/streak/safe-push.ts`): `safePushMember`, `safePushApplication`, `safeDeleteApplicationBox`, `safeDeleteMemberBox`. Each calls the underlying primitive and on error logs an `error.caught` system event with `{ source: 'streak_push', op, member_id?|application_id?, error }` then returns. Best-effort sync: a failed push never rolls back the OS commit.
-- **Raw primitives now confined to `src/lib/streak/`**: every call site uses the safe wrapper. Verified by grep.
-- **Outbound wiring — 20 call sites**: apply submission, approve (with box-key migration: app box_key copied onto member when member is new; orphan-deleted when member already had a box), reject, link (orphan-delete app box + push existing member), addMember, Stripe webhook, compTicket, applyCredit, refund (full + guest-only), credit, Resend bounce/complaint, unsubscribe link, removeMember, reinstateMember, portal `toggleMarketing` (both directions), admin `toggleMemberFlag` (marketing only — `is_team` doesn't affect Streak stage), portal `saveProfile`, admin `updateMemberField`, admin `addMemberEmail`/`deleteMemberEmail`/`setPrimaryEmail`, post-dinner cron (attended members).
-- **Spec gap filled**: portal `toggleMarketing` and admin `toggleMemberFlag` flipping `marketing_opted_in` to FALSE were not in the original Prompt B table — only the kick/Resend/unsubscribe paths covered the "to false" case. Pushing on every flip regardless of direction; op_name distinguishes intent (`opt_back_in` vs `portal_marketing_opt_out` vs `admin_marketing_opt_out`).
-- **Inbound webhook auth**: shared secret in `?secret=` query param. `STREAK_WEBHOOK_SECRET` env var (32-byte hex, set in Vercel Production + Preview, no `gitBranch`). Streak's automation builder doesn't expose HMAC payload signing or custom request headers, so query-param secret is the chosen default. Eric appends `?secret=<value>` to the webhook URL when wiring the automation. **Both routes return 200 on internal errors after auth** so Streak doesn't retry indefinitely; failures are captured in `system_events` for review. Only secret-check failures return 401.
-- **Inbound webhook routes**: `/api/webhooks/streak/opted-out` flips `marketing_opted_in = false`; `/api/webhooks/streak/not-this-one` sets `excluded_from_dinner_id` to the next upcoming dinner via `getTargetDinner()`. Both look up the member by `streak_box_key`, log a `webhook.streak` system event with `{stage, box_key, member_id}`, and call `safePushMember` to keep Streak in sync (idempotent in the common case, corrective if precedence puts the member somewhere higher).
-- **Webhook helper module** (`src/lib/streak/inbound.ts`): shared `verifyStreakSecret`, `extractBoxKey` (tolerates `box_key` / `boxKey` / `key` payload variations), `logWebhookFailure`, and shared response helpers. Both routes use it.
-- **Post-dinner cron extension** (`/api/cron/post-dinner/route.ts`): after the existing attendance update, also clears `excluded_from_dinner_id` for any member excluded from yesterday's dinner (the dinner has passed, so exclusion no longer applies) and pushes each affected member. Cron-completion log now includes `streak_attendance_pushes` and `streak_nto_cleared` counts. Errors during NTO clear are logged but don't fail the cron.
-- **Audit attribution**: substantive OS state changes use `createAdminClientForCurrentActor()` per existing pattern. Streak housekeeping writes (box-key migrate/null in approve_application server action) and webhook handlers use plain `createAdminClient()` — these aren't Eric-attributed actions, just plumbing.
-- **End-to-end test** (`tmp/streak-prompt-b-e2e.ts`): runnable script exercises the full chain on production data with full cleanup. Steps: insert pending application → push → verify Applied box → approve RPC → run housekeeping migration → push member → verify Approved box → POST `/not-this-one` webhook → verify `excluded_from_dinner_id` set → POST `/opted-out` webhook → verify `marketing_opted_in = false` → cleanup. All 8 steps passed against production. Cleanup ordering: applications → member_emails → null `system_events.subject_member_id`/`actor_id` references → members.
-
-### Known issues / gaps in this sprint
-
-- ~~**Eric still needs to configure the two Streak automations**~~ Done — automations wired in Streak UI.
-- ~~**No backfill yet.**~~ Done in Prompt C — see Sprint 20 (Prompt C) entry below.
-- **`updateMemberField` pushes on every call** regardless of which field changed. Fields like `current_intro` / `current_ask` / `current_give` don't affect Streak stage, so those pushes are wasted. Push is idempotent and fast — gating per-field would add complexity without value.
-- **Reconciliation/retry queue** for failed pushes is not built. Failures land in `system_events` (`error.caught` with `source: 'streak_push'`) for Eric to review; manual repair via re-running the relevant action.
-- **`webhook.streak` is not in the System feed inclusion list** by design — these events are expected, not failures. Failures within webhook handlers fire `error.caught` (already in the inclusion list).
-
-## What's done (Sprint 20 — Streak integration backfill, Prompt C)
-
-One-time bulk push of every existing OS row that predated Prompt B's forward-sync wiring.
-
-- **Backfill script** (`tmp/streak-backfill.ts`): runnable with `npx tsx --env-file=.env.local tmp/streak-backfill.ts`. Two phases — pending applications first, then members. Filters on `streak_box_key IS NULL` so re-runs only touch rows that haven't landed yet. Uses the same `pushApplicationToStreak` / `pushMemberToStreak` primitives that all 20 forward-sync sites use, so behavior matches exactly.
-- **Single-flight lock** at `tmp/streak-backfill.lock`: prevents concurrent runs and surfaces crashed prior runs that need cleanup. Released on normal exit, SIGINT, and SIGTERM.
-- **Pre-flight**: calls `ensureStreakReady()` and prints pipeline + 7 stage keys + 4 field keys. Counts eligible rows in both phases. Prompts `Continue? (y/N)` before doing any pushes — guard against accidental runs against the wrong env file.
-- **Defensive pagination**: SELECTs use `.range(0, 9999)` with an explicit ceiling check rather than relying on PostgREST's default 1000-row cap. Today's volume is ~637 members, well under the ceiling.
-- **Idempotency**: re-running after partial failure picks up where it left off because successful pushes persist `streak_box_key` inside the same call. Deliberate non-handling: if a row has `streak_box_key` set but the Streak box was manually deleted, the script skips it (filtered out by WHERE clause). Surface manually if needed; don't auto-recreate.
-- **Failure handling**: per-row try/catch logs `ok=true|false` per push. Failures don't abort the run. Summary at the end lists failed IDs. Exit code 1 if any failed.
-- **No production code changes** for the backfill itself — the script is exclusively under `tmp/`. (The follow-on Team stage work below did make small lib changes.)
-- **Team stage** (added after initial backfill): an 8th `Team` Streak stage now sits at the top of the precedence ladder. `is_team = true` pins a member's box to Team, overriding kicked_out / bounced / opted_out / everything else. Rationale: team members run dinners, so they aren't subjects of CRM tracking — but the box still sync-updates name/company/email so contact info stays current. Eric's admin row was set `is_team = true` to include him in this group. Five team boxes (Eric, Danny, Megan, Maggie, Rich) live in Team stage.
-
-### Backfill outcomes
-
-- 0 pending applications, 637 members eligible.
-- 636 succeeded, 1 failed: `f3e173f6-322c-45f5-a4ab-b1a6e5fe6e2e` ("TestSprint1Kick Fake") — kicked-out Sprint 1 test fixture with `email_count = 0`. The constraint trigger that's supposed to enforce ≥1 primary email per member apparently allowed this row through (or predates the trigger). Stale data; deleted afterward.
-- One orphan Streak box ("Eric Marcoullier") existed in the pipeline from manual pre-integration setup — deleted during verification.
-- Streak total now matches DB exactly: 636 boxes = 636 members with `streak_box_key` set.
-
-## What's done (Sprint 20 — Streak integration Contacts, Prompt D)
-
-Streak's mail-merge UI pulls recipients from the **Contacts** section on a box, NOT from custom columns. Boxes from Prompts A-C had populated columns but empty Contacts, so merges returned zero recipients — exactly the use case the integration was built for. Prompt D plumbs in Contacts.
-
-- **Two API hosts/versions used**: v1 (boxes, fields, pipelines) at `https://www.streak.com/api/v1/`; v2 (Contacts) at `https://api.streak.com/api/v2/`. The client now takes a `version: 1 | 2` flag and picks the host + body content type accordingly. Same rate limiter, same retry policy.
-- **`createContact(teamKey, { emailAddress, getIfExisting })`**: POST `/api/v2/teams/{teamKey}/contacts/`. With `getIfExisting=true`, the body must contain ONLY `emailAddresses` (Streak rejects name fields in that mode). Server-side dedup by email — re-running pushes is cheap.
-- **`updateContact(contactKey, { givenName, familyName })`**: POST `/api/v2/contacts/{contactKey}`. **NOT** team-scoped despite create being team-scoped. The path `/api/v2/teams/{teamKey}/contacts/{contactKey}` returns 400 "Invalid API path specified" — caught during the bulk run.
-- **`addContactToBox(boxKey, contactKey)`**: POST `/api/v1/boxes/{boxKey}` with body `{ contacts: [{ key: contactKey }] }`. Per Streak docs: "The only contacts associated with the box will be the ones you include here" — REPLACE semantics, not append. For our use case (one canonical contact per box) that's fine. Other shapes that silently fail (probed during Prompt D): `linkedContactKeys: [key]`, `contactKeys: [key]`, `contacts: [key]` (string array), `contacts: [{ contactKey }]`, `contacts: [{ emailAddress }]`. The trick is the array of objects keyed `key`.
-- **`teamKey` resolution** in `ensureStreakReady`: pulled from `getPipeline(pipelineKey)` response (`teamKey` field). There is NO public `/users/me/teams` endpoint despite some docs implying it — that path returns 400. The pipeline-owns-the-team relationship is the canonical resolution.
-- **Push primitives extended** (`pushMemberToStreak`, `pushApplicationToStreak`): after the box exists and custom fields are set, attach a Contact. Email selection for members: primary unless it's bounced AND a non-bounced alternative exists; if all emails are bounced, use primary anyway (member just lands in Bounced stage and won't actually get merged). For applications: the email column on the application row directly. Skip + log `streak.contact_skipped` if no email exists.
-- **Box email field stays primary regardless of bounce status** — it's the canonical display address. The contact email may differ (chooseContactEmailForMember picks the best deliverable address). This split is intentional.
-- **Single-user test** (`tmp/streak-contact-test-eric.ts`): pushes a member by ID, prints the resulting box JSON with the contacts section visible. Eric ran on his own member, verified contact attached and mail merge surfaces it.
-- **Bulk contact attach** (`tmp/streak-contacts-bulk.ts`): same shape as Prompt C's backfill — file-lock at `tmp/streak-contacts-bulk.lock`, pre-flight prints pipeline/team/stage/field keys, prompts confirmation, two phases (applications then members) over rows where `streak_box_key IS NOT NULL`, per-row logging, summary at end. Idempotent: re-runs produce the same Streak state via getIfExisting + REPLACE-semantics on contacts array.
-
-### Known issues / gaps
-
-- **Manually deleted boxes are not recreated** by the bulk script — the WHERE filter only touches rows that already have a `streak_box_key`. Same edge case noted in Prompt C.
-- **Replace semantics on `contacts`** means manually-added secondary contacts on a box would be wiped on next push. Today every box has at most one contact (the script-attached one). If multi-contact use ever matters, fetch + merge before write.
-- **Reconciliation/retry queue for failed contact pushes** is not built. Same posture as Prompt B: failures land in `system_events` (`error.caught` from safe-push, or direct from non-safe paths), Eric reviews and re-runs.
-- **Email-change contact cleanup is not needed.** Considered as Prompt E; verified empirically that `POST /v1/boxes/{boxKey}` with `{ contacts: [{ key }] }` REPLACES the contacts array (not additive), so when a member's primary email changes and a push fires, the new contact's key replaces the old one — no stale-contact buildup. Decision documented here so a future reader doesn't redesign around a bug that doesn't manifest.
-
-## What's NOT done
-
-Don't build these without an explicit prompt:
-
-- Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled) — future sprint. ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets` uses `getTargetDinner()` + calendar-month gate, email-first ordering, daily at 14:00 UTC.
-- `has_community_access` revoke checkbox on refund flow — allows manual revert to `false` when refunding a ticket (future sprint)
-- ~~Application form~~ Done (Sprint 10) — hosted on Thunderview OS at `/apply`. Preferred dinner date field removed.
-- Attendee portal: Phase 4 complete (portal home, profile editor, community directory, recap page all done).
-- ~~Email sending (Resend wiring)~~ Done (Phase 5). All transactional emails wired: approval (on approve), re-application (on approve existing / link), rejection (on reject), fulfillment (on Stripe webhook auto-fulfill + comp ticket), morning-of (manually triggered from `/admin/emails/morning-of` — cron removed). Templates editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Refund confirmations handled natively by Stripe.
-- ~~Stripe payment integration~~ Done (Sprint 8) — Stripe Checkout Sessions, webhook-driven ticket creation, sandbox mode.
-- ~~Bulk email templates~~ Done (Sprint 17) — Monday Before and Monday After with dedicated tables, image pipeline, rich text, unsubscribe system
-- Streak API integration — Phase 7
-- CoachingOS sync — Phase 10+
-- LinkedIn URL matching for automatic duplicate detection across applications and members
-- Side-by-side comparison when re-application has different data than existing member record (name, company, website changes)
-- Automatic member field updates from re-application data
-- Custom receipt email — kit design exists in `design-system/ui_kits/` but won't be built. Using Stripe's built-in receipt instead
-
-## Upcoming work
-
-- ~~Transactional emails via Resend~~ Done — all five templates wired to events
-- ~~Fulfillment cron~~ Done — `/api/cron/fulfill-tickets` (rewritten Sprint 18: target-dinner + calendar-month gate, email-first)
-- ~~Design system~~ Done — tokens, fonts, primitives, full page restyling, email shell, layout invariants
-- Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes)
-- Dead code cleanup: remove orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`
-- ~~Restyle remaining unstyled pages: `/login`, `/apply`~~ Done (Sprint 16)
-- ~~Add `--container-portal: 980px` token~~ Done — `--tv-container-portal: 980px` and `--tv-container-narrow: 640px` added, all portal pages migrated
-- Add `size="portal"` to PageHeader (tv-h1 + 32px gap) and migrate portal pages to use it
-- ~~Receipt email: decide whether to build custom (kit design exists) or keep Stripe built-in~~ Decided — keeping Stripe's built-in receipt
-- Dead code cleanup: remove generic `email_instances` table, `create-instance-button.tsx`, `instances/[id]/` route (superseded by dedicated Monday Before/After tables)
-- Fulfillment email hero photo: per-template image support if wanted
-- ~~Page-by-page detail polish pass~~ Done — marketing pages (about, faq, team) built, Card component migration, section spacing fix
-- ~~Marketing pages: /about, /faq, /team~~ Done — all three built with real content, dynamic data, design system primitives
-- ~~Gallery link~~ Removed from public-nav for launch (placeholder page still exists)
-- ~~Activity feed + Operations page + Member History~~ Done (Sprint 19)
-- ~~Surface query errors from `getActivityFeed` to the UI instead of silently returning empty list~~ Done (Sprint 20) — typed `{ok:true}|{ok:false,error}` result, inline `FeedError` component on all three callsites
-- Integration test for the `activity_feed` view (PostgREST round-trip) to catch grant/permission regressions
-
-## Pre-launch checklist (before real users hit this)
-
-- [x] Switch Supabase SMTP from built-in to Resend (done Sprint 13 — configured in Supabase dashboard)
-- [x] Verify Thunderview sending domain in Resend (SPF, DKIM, DMARC) — `thunderviewceodinners.com` verified. DKIM TXT + SPF MX/TXT on the `send` subdomain in Squarespace DNS; no conflict with Google Workspace MX/SPF on root domain. DMARC at `_dmarc` with `v=DMARC1; p=none` (monitoring mode)
-- [x] Customize magic link email template (subject, body, branding) — branded HTML shell matching `bodyToHtml()`, subject "Sign in to Thunderview", template in `tmp/magic-link-template.html`. Apply via Supabase dashboard > Authentication > Email Templates > Magic Link
-- [x] Verified all Supabase auth email templates use the `/auth/confirm?token_hash=...&type=email` pattern (not `{{ .ConfirmationURL }}`)
-- [x] Confirm From address is a Thunderview domain (`team@thunderviewceodinners.com` via Resend custom SMTP)
-- [x] Confirm injected unsubscribe footer is gone (custom SMTP eliminates it)
-- [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope)
-- [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production env vars (currently sends marketing emails to admin+team only)
-- [x] Build Resend webhook endpoint at `/api/webhooks/resend/route.ts` — handles bounce, complaint, and failure events. Flips `member_emails.email_status`, opts out marketing on complaint, notifies admin on complaint/failure
-- [x] Register webhook in Resend dashboard (pointing at `https://thunderview-os.vercel.app/api/webhooks/resend`, events: email.bounced, email.complained, email.failed)
-- [x] Resend webhook signature verification via `RESEND_WEBHOOK_SECRET` in Vercel Production scope. Tested end-to-end with a real bounce (2026-04-30)
-
-## Known issues / gotchas
-
-- **PKCE flow uses `/auth/confirm`, not `/auth/callback`.** The `@supabase/ssr` package defaults to PKCE. Supabase's magic link email template generates URLs with `token_hash` query param pointing to `/auth/confirm`. The `/auth/callback` route (code exchange) also exists as a fallback. Both routes create their own `createServerClient` inline with direct `cookieStore` access — do not use the shared `lib/supabase/server.ts` helper in auth routes, as cookies won't propagate on redirects.
-- **Next.js 16 uses `proxy.ts` instead of `middleware.ts`.** The file is `src/proxy.ts` with `export async function proxy(request)`. The `middleware` convention is deprecated.
-- **Adding new env vars to Vercel Preview scope: use the REST API.** All required preview env vars are now set permanently across all preview branches (`gitBranch: null`, `target: ["preview"]`). The Vercel CLI's `vercel env add NAME preview` flow can't apply to all-preview-branches non-interactively — it falls into a `git_branch_required` action_required loop. Use the REST API: `PATCH /v9/projects/{id}/env/{id}` with `{"gitBranch": null}` to remove a per-branch restriction (preserves the value), or `POST /v10/projects/{id}/env` with `target: ["preview"]` and no `gitBranch` for a fresh add.
-- ~~**Supabase built-in SMTP is rate-limited.**~~ Resolved — switched to Resend custom SMTP. New rate limit: 30/hour (adjustable in Supabase dashboard → Authentication → Rate Limits).
-- **Supabase/PostgREST default row cap.** Supabase limits query results to 1,000 rows by default. This is silent — no error, just truncated results. Any query that might return more than 1,000 rows MUST paginate. This has caused bugs across multiple projects. Always account for it.
-- **Portal pages and proxy use admin client for data queries.** RLS policies on most tables (tickets, dinners, applications, members) only grant SELECT to admin/team. Portal pages authenticate the user via the session client (`createClient`), then use the admin client (`createAdminClient`) for all data reads and writes. The proxy also uses the service role client for member lookups (team check, community access check) — using the session client here caused all non-admin logins to fail because RLS blocked the query. Same pattern as the `/apply` form: authenticate with session, query with admin.
-- **Server action body size limit is 5MB** (set in `next.config.ts` under `experimental.serverActions.bodySizeLimit`). Default Next.js limit is 1MB. Raised because profile pic uploads send a PNG blob from the client-side crop canvas, which can exceed 1MB for larger source images. If this limit needs changing, it's in `next.config.ts`.
-- **CSS token `--tv-` prefix is required in `globals.css`.** Tailwind 4's `@theme inline` writes to the same CSS custom property namespace as `:root`. Without the prefix, `--font-sans: var(--font-sans)` is circular. The design system source (`design-system/colors_and_type.css`) uses unprefixed names; `globals.css` adds the `--tv-` prefix; `@theme inline` references `var(--tv-*)`. If you add a new token, follow this pattern.
-- **Do NOT define `--spacing-N` in `@theme inline`.** Tailwind 4 computes numeric spacing utilities (`h-9`, `p-4`, `gap-6`) as `calc(var(--spacing) * N)`. Defining `--spacing-9` overrides that step to our non-linear scale (96px), so `h-9` silently becomes 96px instead of 36px. Only semantic aliases (`--spacing-stack`, `--spacing-section`, `--spacing-tight`, `--spacing-form-row`, `--spacing-label-input`, `--spacing-button-grp`, `--spacing-gutter-sm/lg`, `--spacing-nav`) belong in `@theme inline`. Use `var(--tv-space-5)` in arbitrary values when you need a design-system spacing step: `gap-[var(--tv-space-5)]`. For literal pixel dimensions (avatar sizes, icon sizes), use pixel arbitrary values: `h-[36px] w-[36px]`.
-- **Motion values must be literals in Tailwind classes.** `duration-[var(--tv-dur-fast)]` doesn't resolve — Tailwind arbitrary values for non-standard properties can't reach `:root` vars through `@theme inline`. Use literal values: `duration-[120ms]`, `duration-[220ms]`, `duration-[420ms]`.
-- **Semantic alias rule.** App code uses `bg-bg`, `text-fg1`, `border-border` — NOT raw scale names like `bg-cream-50`, `text-ink-900`, `border-line-200`. The raw scale stays in `:root` as underlying definitions. Same for `text-accent-hover` (not `text-clay-600`), `bg-accent` (not `bg-clay-500`). Exceptions: `bg-ink-900`/`text-cream-50` for active nav/filter state (no semantic alias for this pattern), Pill component internals.
-- **Button `asChild` pattern.** Any `<Link>` that looks like a button must use `<Button asChild><Link href="...">Label</Link></Button>`. No anchor-styled-as-button with hand-tuned padding/colors. The Button component merges its classes onto the child element.
-- **`bodyToHtml()` wraps in a full HTML document.** It's no longer just `\n` → `<br>`. Every caller gets a branded shell. The `appendHtml` parameter lets you inject pre-rendered HTML inside the shell (used by morning-of for attendee list). Don't concatenate HTML after calling `bodyToHtml()` — it would land outside the `</html>` tag.
-- **Stripe sandbox does not auto-send receipts.** Even with `receipt_email` set on the Checkout Session and the dashboard toggle enabled, sandbox mode silently skips receipt emails. Integration is correct — auto-send will be validated at Phase 8 live cutover. Do not debug further.
-- **Members need an `auth.users` row to log in.** `shouldCreateUser: false` on the OTP call means Supabase won't auto-create auth users. Every member-creation flow (approve, add, link) must call `ensureAuthUser(email)` from `src/lib/ensure-auth-user.ts`. If a member reports they can't log in, check `auth.users` first — the member_emails row alone is not enough. Discovered 2026-04-26 when 632 imported members had no auth rows.
-- **`ensureAuthUser` patches GoTrue NULL columns.** Supabase's `admin.createUser()` leaves `email_change` and `email_change_token_new` as NULL, but GoTrue's Go code scans them into non-nullable strings — causing "Database error finding user" on OTP requests. `ensureAuthUser()` now calls `updateUserById` after creation to normalize these fields. Existing 633 rows were backfilled 2026-04-27.
-- **Photo upload is decoupled from profile save.** Portal profile uses `portalUpdateProfilePic` (standalone action that only touches `profile_pic_url`). Admin uses `adminUploadProfilePic`. Neither passes other member fields through. `saveProfile` does not handle photos. This prevents silent data loss when a new field is added but not included in the photo handler's FormData.
-- **Marketing email tables are separate from `email_templates`/`email_instances`.** The generic `email_instances` table was built first but replaced by dedicated `monday_before_*` and `monday_after_*` tables that support structured fields, image groups, and richer lifecycle tracking. The generic tables remain in the DB but are unused. Don't build new marketing templates on `email_instances` — follow the Monday Before/After pattern with dedicated tables. Known actor-attribution gap on this route, intentionally not patched. `src/app/admin/emails/instances/[id]/actions.ts` (`createInstance`, `saveInstance`, `sendInstanceTest`, `sendInstanceToAll`) writes to audited `email_instances` via plain `createAdminClient()`. Audit rows from these calls land with `actor_member_id = NULL` and silently drop out of the People feed. Deferred to Phase 7 deletion of the route + table rather than fixed. Do not patch — delete in Phase 7.
-- **Image compression pipeline has a hard 500KB ceiling.** The iterative quality reduction (85→40) stops at the first quality level that fits. If quality 40 still exceeds 500KB, the upload is rejected with an error showing original and compressed sizes. This is intentional — email clients have image size limits and large images degrade deliverability.
-- **Sent-lock triggers are strict.** Once `status = 'sent'`, the DB trigger rejects ALL UPDATEs on `monday_before_emails` / `monday_after_emails` and their image tables. The send action's final UPDATE (status + sent_at + sent_by + audience_snapshot) succeeds because `OLD.status` is still `'draft'` at that point. Don't try to update sent emails — they're immutable by design.
-- **RichTextEditor suppresses initial onChange.** Tiptap fires `onUpdate` on mount, which would falsely set the parent form's `hasEdited` state. The component uses a `mountedRef` to skip the first callback. If the editor seems to not trigger changes, check this mechanism.
-- **`has_community_access` means "is an approved member," not "has attended a dinner."** This column was originally named `has_attended` and set only by the ticket INSERT trigger. It was renamed to `has_community_access` in Phase 3 but the RPCs still wrote `false` on member creation until Sprint 13. Fixed: all member-creation RPCs now set `true`. The ticket trigger also still sets `true` (harmless redundancy). If you're writing new code that creates members, always set `has_community_access = true`.
-- **Use `createAdminClientForCurrentActor()` for ALL writes to audited tables initiated by a human actor.** The plain `createAdminClient()` doesn't attach the X-Audit-Actor header, so audit rows from human-driven server actions land with `actor_member_id = NULL` and don't show up in the People feed. Cron and webhook handlers should use plain `createAdminClient()` (no actor exists). Discovered Sprint 19 when portal saveProfile and 4 admin-emails saveTemplate actions were missed in the initial wire-up.
-- **Don't grant SELECT on `auth.users` to service_role or authenticated.** Tempting when a query needs to resolve `auth.uid()` to a user record, but `auth.users` contains password hashes and other sensitive fields. Use a SECURITY DEFINER function for the lookup instead, or restructure to avoid the join (the activity_feed view's audit subquery dropped its `auth.users` join for this reason).
-- **`security_invoker = true` views need explicit grants on every underlying table.** The `activity_feed` view uses `security_invoker = true` so callers query through their own RLS. That means service_role and authenticated need USAGE on `audit` schema + SELECT on `audit.row_history`, otherwise the view query throws "permission denied" with no row-level fallback. Granted in `20260430220000_audit_schema_grants.sql`. RLS still gates row visibility for `authenticated` via `is_admin_or_team()`.
-- **Activity feed filter dropdown shows raw audit names, not refined display names.** `getDistinctEventTypes()` queries the `activity_feed` view and returns raw `<table>.<op>` strings (e.g. `members.update`). The TS refinement to `member.edited` / `member.kicked_out` etc. happens in `enrichRows()` post-query and is not reflected in the dropdown. A user filtering the People tab for "members who got kicked out" has no path to do so — `members.update` mixes all member UPDATE types together. Pre-existing design gap; fix would require either refining in the view layer or a client-side raw→refined mapping.
-- **`streak.api_call` prefix is not excluded from the People feed filter.** `PEOPLE_FEED_EXCLUDED_PREFIXES` covers `cron.`, `webhook.`, `error.` but not `streak.`. Currently harmless because all `streak.api_call` rows have `actor_id = NULL` and the People feed requires `actor_id IS NOT NULL`. If `actor_id` is ever populated on Streak API call events, those rows (8,000+) would flood the People feed. Add `"streak."` to `PEOPLE_FEED_EXCLUDED_PREFIXES` before that happens.
-- **Resend webhook is account-scoped — handler filters by sender domain.** Every app on Eric's Resend account (currently Thunderview + Show Harder) POSTs to `/api/webhooks/resend` with a valid svix signature. The handler parses `data.from`, computes the @-domain, and silently drops anything whose domain is not `thunderviewceodinners.com` (200 response, no `email_events` insert, no `system_events` log — Resend doesn't retry on 200). Three stray Show Harder rows pre-deploy were removed via `20260501100000_cleanup_non_thunderview_email_events.sql`. If a new Thunderview-owned sending domain is added (e.g. a separate transactional subdomain), update the `THUNDERVIEW_DOMAIN` constant in `src/app/api/webhooks/resend/route.ts` or it will be silently dropped.
-- **Hard vs soft bounces are now distinguished.** The handler reads `bounce.type` from the Resend payload. Only `"Permanent"` (hard) flips `member_emails.email_status` to `'bounced'`, runs secondary promotion, and pushes Streak. `"Transient"`, `"Undetermined"`, or any unknown value is treated as soft: the `email_events` row is still persisted (so the bounce shows up in the admin Email Issues accordion), but no member state changes. Pre-Sprint-20 the handler treated every bounce as hard, which would have permanently flagged Morgan Tregenza's address based on transient/general bounces from a different sending app on the shared Resend account.
+- [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope).
+- [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production.
+- [ ] Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes).
