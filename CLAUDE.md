@@ -72,12 +72,11 @@ Two-way sync. OS is source of truth; Streak is the visible CRM. Best-effort: fai
 `audit.row_history` in a separate `audit` schema. SECURITY DEFINER trigger snapshots OLD/NEW JSONB on INSERT/UPDATE/DELETE.
 
 - **Trigger naming:** `zzz_audit_row_change` (fires last alphabetically, captures sibling-trigger updates).
-- **Audited tables (10):** members, applications, tickets, credits, member_emails, dinners, dinner_speakers, email_templates, email_instances, email_events.
+- **Audited tables (9):** members, applications, tickets, credits, member_emails, dinners, dinner_speakers, email_templates, email_events.
 - **NOT audited:** system_events (already append-only), monday_before_*, monday_after_* (sent-lock triggers exist), auth.*, storage.*.
 - **`actor_member_id` populated from `X-Audit-Actor` request header.** See `createAdminClientForCurrentActor()`. Pooling-safe — `request.headers` is per-request GUC scoped to the transaction.
 - **`activity_feed` view requires explicit grants on `audit` schema.** `USAGE ON SCHEMA audit` + `SELECT ON audit.row_history` to `service_role` and `authenticated`. The view runs `WITH (security_invoker = true)` — without grants, "permission denied for table row_history" with no row-level fallback.
 - **Don't grant `auth.users` to service_role to make activity_feed joins work.** That schema contains password hashes. The view uses `actor_member_id` directly, no `auth.users` join.
-- **Known actor-attribution gap:** `src/app/admin/emails/instances/[id]/actions.ts` writes audited `email_instances` via plain `createAdminClient()`. Audit rows have `actor_member_id = NULL`. Intentional — route + table scheduled for deletion (see What's NOT done).
 - **TRUNCATE and DROP TABLE bypass row-level triggers.** Audit doesn't help in those scenarios — that's what Supabase PITR is for.
 
 ## Activity feed
@@ -109,7 +108,7 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 
 - **Five transactional templates wired:** approval, re-application, rejection, fulfillment, morning-of. Editable at `/admin/emails/*`. From: `team@thunderviewceodinners.com`. Body uses `[member.fieldname]` placeholders.
 - **HTML shell `bodyToHtml()` (`src/lib/email.ts`) wraps in a full HTML document.** Never concatenate HTML after calling. Post-processes bare `<a>` tags to inline `color:#9A7A5E` (email clients strip `<style>` blocks).
-- **Marketing emails (Monday Before, Monday After) live in dedicated tables**, NOT in `email_instances`. The generic `email_instances` system was superseded — don't build new templates on it.
+- **Marketing emails (Monday Before, Monday After) live in dedicated tables** (`monday_before_emails`, `monday_after_emails`), each with its own route under `/admin/emails/`, image table, and template renderer in `lib/email-templates/`. The 5 transactional templates above use the shared `email_templates` table; new marketing templates should follow the dedicated-table pattern.
 - **Sent-lock triggers are strict.** Once `status = 'sent'`, ALL UPDATEs on the email + image tables are rejected. The send action's final UPDATE succeeds because `OLD.status` is still `'draft'` at that point. Sent emails are immutable by design.
 - **Audience snapshot frozen as JSONB at send time** so the recipient list survives subsequent member changes.
 - **Image pipeline (`src/lib/email-image-pipeline.ts`) hard ceiling 500KB.** Iterative quality reduction (85→40), rejects if quality 40 still over.
@@ -183,8 +182,6 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 - Custom receipt email (using Stripe's built-in).
 - Reconciliation/retry queue for failed Streak pushes.
 - Integration test for the `activity_feed` view.
-- Cleanup of `email_instances` table + `instances/[id]/` route (superseded by Monday Before/After).
-- Cleanup of orphaned `/portal/tickets/guest/`, `/portal/tickets/cart/page.tsx`, `/portal/tickets/cart/purchase-button.tsx`.
 
 ## Pre-launch checklist
 
