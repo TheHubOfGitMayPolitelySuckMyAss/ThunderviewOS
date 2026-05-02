@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { findMemberByAnyEmail, getMemberPrimaryEmail } from "@/lib/member-lookup";
 import { getTodayMT } from "@/lib/format";
 import { H1, Lede, Eyebrow } from "@/components/ui/typography";
@@ -8,22 +9,6 @@ import { formatName, formatStageType } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
 import CommunityTable from "./community-table";
 import Link from "next/link";
-
-// PostgREST on Supabase caps responses at 1000 rows server-side.
-// Paginate with .range() until drained.
-async function fetchAll<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
-): Promise<T[]> {
-  const PAGE = 1000;
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data } = await build(from, from + PAGE - 1);
-    if (!data?.length) break;
-    out.push(...data);
-    if (data.length < PAGE) break;
-  }
-  return out;
-}
 
 export default async function CommunityPage() {
   const admin = createAdminClient("read-only");

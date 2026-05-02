@@ -1,22 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import DinnersTable from "./dinners-table";
 import PageHeader from "@/components/page-header";
-
-// PostgREST on Supabase caps responses at 1000 rows server-side, so .limit()
-// above that is silently clamped. Paginate with .range() until drained.
-async function fetchAll<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
-): Promise<T[]> {
-  const PAGE = 1000;
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data } = await build(from, from + PAGE - 1);
-    if (!data?.length) break;
-    out.push(...data);
-    if (data.length < PAGE) break;
-  }
-  return out;
-}
 
 export default async function DinnersPage() {
   const supabase = await createClient();
