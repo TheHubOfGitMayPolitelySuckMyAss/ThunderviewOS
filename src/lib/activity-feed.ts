@@ -14,7 +14,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatName } from "@/lib/format";
+import { formatName, formatDate } from "@/lib/format";
 
 export type FeedSource = "system_events" | "email_events" | "audit";
 
@@ -43,6 +43,7 @@ export type FeedRow = {
   actor_name: string | null;
   subject_member_id: string | null;
   subject_name: string | null;
+  subject_label: string | null;
   summary: string;
   metadata: Record<string, unknown>;
   occurred_at: string;
@@ -241,20 +242,67 @@ export async function getActivityFeed(filters: FeedFilters): Promise<FeedResult>
 async function enrichRows(rows: FeedRowRaw[]): Promise<FeedRow[]> {
   if (rows.length === 0) return [];
 
-  // Collect all member ids referenced (actor + subject) for one trailing lookup.
+  // Collect all entity IDs needed for batch lookups.
   const memberIds = new Set<string>();
+  // Dinner IDs that require a DB lookup (not already in a row snapshot).
+  const dinnerIds = new Set<string>();
+  // Dinner labels extracted from dinners audit row snapshots — free, no query.
+  const dinnerLabelFromSnapshot = new Map<string, string>();
+  // Application IDs needed only for page.viewed /admin/applications/{id} paths.
+  const applicationIds = new Set<string>();
+
   for (const r of rows) {
     if (r.actor_id) memberIds.add(r.actor_id);
     if (r.subject_member_id) memberIds.add(r.subject_member_id);
+
+    if (r.source === "audit") {
+      const meta = r.metadata as {
+        table_name: string;
+        row_pk: Record<string, unknown>;
+        old_row: Record<string, unknown> | null;
+        new_row: Record<string, unknown> | null;
+      };
+      const row = meta.new_row ?? meta.old_row ?? {};
+
+      if (meta.table_name === "dinner_speakers") {
+        // subject_member_id is NULL for dinner_speakers in the view — collect manually.
+        const memberId = row.member_id as string | undefined;
+        if (memberId) memberIds.add(memberId);
+        const dinnerId = row.dinner_id as string | undefined;
+        if (dinnerId) dinnerIds.add(dinnerId);
+      } else if (meta.table_name === "tickets") {
+        const dinnerId = row.dinner_id as string | undefined;
+        if (dinnerId) dinnerIds.add(dinnerId);
+      } else if (meta.table_name === "dinners") {
+        // Date lives in the snapshot — pre-populate without a query.
+        const dinnerId = meta.row_pk.id as string | undefined;
+        const date = row.date as string | undefined;
+        if (dinnerId && date) dinnerLabelFromSnapshot.set(dinnerId, formatDinnerLabel(date));
+      }
+    } else if (r.event_type === "page.viewed") {
+      const path = (r.metadata.path as string | undefined) ?? "";
+      const memberMatch = path.match(
+        /\/members\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      );
+      if (memberMatch) memberIds.add(memberMatch[1]);
+      const dinnerMatch = path.match(
+        /\/dinners\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      );
+      if (dinnerMatch) dinnerIds.add(dinnerMatch[1]);
+      const appMatch = path.match(
+        /\/applications\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      );
+      if (appMatch) applicationIds.add(appMatch[1]);
+    }
   }
 
+  const admin = createAdminClient();
+
+  // Batch member lookup.
   const nameLookup = new Map<string, string>();
-  // Used by refineApplications to distinguish a fresh approve (member_id row
-  // was created in the same RPC tx as the application UPDATE) from a re-
-  // application/link (member existed long before the application UPDATE).
+  // Used by refineApplications to distinguish fresh approve from re-application link.
   const memberCreatedAtLookup = new Map<string, string>();
   if (memberIds.size > 0) {
-    const admin = createAdminClient();
     const { data: members } = await admin
       .from("members")
       .select("id, first_name, last_name, created_at")
@@ -262,6 +310,31 @@ async function enrichRows(rows: FeedRowRaw[]): Promise<FeedRow[]> {
     for (const m of members ?? []) {
       nameLookup.set(m.id, formatName(m.first_name, m.last_name));
       if (m.created_at) memberCreatedAtLookup.set(m.id, m.created_at);
+    }
+  }
+
+  // Batch dinner lookup (only IDs not already known from snapshots).
+  const dinnerLookup = new Map<string, string>(dinnerLabelFromSnapshot);
+  const missingDinnerIds = Array.from(dinnerIds).filter((id) => !dinnerLookup.has(id));
+  if (missingDinnerIds.length > 0) {
+    const { data: dinners } = await admin
+      .from("dinners")
+      .select("id, date")
+      .in("id", missingDinnerIds);
+    for (const d of dinners ?? []) {
+      dinnerLookup.set(d.id, formatDinnerLabel(d.date as string));
+    }
+  }
+
+  // Batch application lookup (page.viewed paths only).
+  const applicationLookup = new Map<string, string>();
+  if (applicationIds.size > 0) {
+    const { data: apps } = await admin
+      .from("applications")
+      .select("id, first_name, last_name")
+      .in("id", Array.from(applicationIds));
+    for (const a of apps ?? []) {
+      applicationLookup.set(a.id, formatName(a.first_name as string, a.last_name as string));
     }
   }
 
@@ -279,6 +352,7 @@ async function enrichRows(rows: FeedRowRaw[]): Promise<FeedRow[]> {
       actor_name: r.actor_id ? nameLookup.get(r.actor_id) ?? null : null,
       subject_member_id: r.subject_member_id,
       subject_name: r.subject_member_id ? nameLookup.get(r.subject_member_id) ?? null : null,
+      subject_label: computeSubjectLabel(r, nameLookup, dinnerLookup, applicationLookup),
       summary: refined.summary ?? r.summary ?? defaultSummary(r),
       metadata: r.metadata,
       occurred_at: r.occurred_at,
@@ -774,6 +848,176 @@ export async function getDistinctEventTypes(kind: FeedKind): Promise<EventTypesR
     console.error("[activity-feed] getDistinctEventTypes unexpected error:", message);
     return { ok: false, error: message };
   }
+}
+
+// ---- subject label helpers ----
+
+function formatDinnerLabel(dateStr: string): string {
+  return formatDate(dateStr, { month: "short", day: "numeric", year: "numeric" });
+}
+
+const PAGE_LABELS: Record<string, string> = {
+  "/": "Home",
+  "/about": "About",
+  "/faq": "FAQ",
+  "/team": "Team",
+  "/apply": "Apply",
+  "/portal": "Portal Home",
+  "/portal/profile": "Profile",
+  "/portal/recap": "Recap",
+  "/portal/tickets": "Tickets",
+  "/portal/community": "Community",
+  "/admin": "Admin",
+  "/admin/dashboard": "Dashboard",
+  "/admin/operations": "Operations",
+  "/admin/members": "Members",
+  "/admin/dinners": "Dinners",
+  "/admin/applications": "Applications",
+  "/admin/tickets": "Tickets",
+  "/admin/emails": "Emails",
+  "/admin/emails/templates": "Email Templates",
+  "/admin/emails/approval": "Approval Email",
+  "/admin/emails/rejection": "Rejection Email",
+  "/admin/emails/re-application": "Re-application Email",
+  "/admin/emails/fulfillment": "Fulfillment Email",
+  "/admin/emails/morning-of": "Morning-of Email",
+};
+
+function subjectLabelForPagePath(
+  path: string,
+  nameLookup: Map<string, string>,
+  dinnerLookup: Map<string, string>,
+  applicationLookup: Map<string, string>
+): string {
+  const staticLabel = PAGE_LABELS[path];
+  if (staticLabel) return staticLabel;
+
+  const memberMatch = path.match(
+    /\/(?:portal|admin)\/members\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+  );
+  if (memberMatch) {
+    return `Member: ${nameLookup.get(memberMatch[1]) ?? "(deleted member)"}`;
+  }
+
+  const dinnerMatch = path.match(
+    /\/admin\/dinners\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+  );
+  if (dinnerMatch) {
+    const label = dinnerLookup.get(dinnerMatch[1]);
+    return `Dinner: ${label ?? "(deleted dinner)"}`;
+  }
+
+  const appMatch = path.match(
+    /\/admin\/applications\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+  );
+  if (appMatch) {
+    return `Application: ${applicationLookup.get(appMatch[1]) ?? "(deleted application)"}`;
+  }
+
+  return path.replace(/^\//, "") || "Home";
+}
+
+function computeAuditSubjectLabel(
+  r: FeedRowRaw,
+  nameLookup: Map<string, string>,
+  dinnerLookup: Map<string, string>
+): string | null {
+  const meta = r.metadata as {
+    table_name: string;
+    op: string;
+    row_pk: Record<string, unknown>;
+    old_row: Record<string, unknown> | null;
+    new_row: Record<string, unknown> | null;
+  };
+  const row = meta.new_row ?? meta.old_row ?? {};
+
+  switch (meta.table_name) {
+    case "members":
+      if (!r.subject_member_id) return null;
+      return nameLookup.get(r.subject_member_id) ?? "(deleted member)";
+
+    case "applications": {
+      const first = (row.first_name as string | null | undefined) ?? "";
+      const last = (row.last_name as string | null | undefined) ?? "";
+      const name = formatName(first, last) || "(unknown applicant)";
+      return `${name} (application)`;
+    }
+
+    case "tickets": {
+      const memberName = r.subject_member_id
+        ? (nameLookup.get(r.subject_member_id) ?? "(deleted member)")
+        : null;
+      const dinnerId = (row.dinner_id as string | undefined) ?? null;
+      const dinnerLabel = dinnerId ? (dinnerLookup.get(dinnerId) ?? null) : null;
+      if (memberName && dinnerLabel) return `${memberName} — ${dinnerLabel}`;
+      return memberName;
+    }
+
+    case "credits":
+      if (!r.subject_member_id) return null;
+      return `${nameLookup.get(r.subject_member_id) ?? "(deleted member)"} credit`;
+
+    case "member_emails": {
+      const email = (row.email as string | undefined) ?? "";
+      if (!r.subject_member_id) return email || null;
+      const name = nameLookup.get(r.subject_member_id) ?? "(deleted member)";
+      return email ? `${name} (${email})` : name;
+    }
+
+    case "dinners": {
+      const date = (row.date as string | undefined) ?? null;
+      if (date) return `Dinner: ${formatDinnerLabel(date)}`;
+      const dinnerId = meta.row_pk.id as string | undefined;
+      const cached = dinnerId ? dinnerLookup.get(dinnerId) : undefined;
+      return cached ? `Dinner: ${cached}` : "Dinner";
+    }
+
+    case "dinner_speakers": {
+      const memberId = (row.member_id as string | undefined) ?? null;
+      const dinnerId = (row.dinner_id as string | undefined) ?? null;
+      const speakerName = memberId ? (nameLookup.get(memberId) ?? null) : null;
+      const dinnerLabel = dinnerId ? (dinnerLookup.get(dinnerId) ?? null) : null;
+      if (speakerName && dinnerLabel) return `${speakerName} (${dinnerLabel})`;
+      if (speakerName) return speakerName;
+      return dinnerLabel ? `Speaker — ${dinnerLabel}` : null;
+    }
+
+    case "email_templates": {
+      const slug = (row.slug as string | undefined) ?? null;
+      return slug ?? "Email template";
+    }
+
+    case "email_instances":
+      return null;
+
+    default:
+      return null;
+  }
+}
+
+function computeSubjectLabel(
+  r: FeedRowRaw,
+  nameLookup: Map<string, string>,
+  dinnerLookup: Map<string, string>,
+  applicationLookup: Map<string, string>
+): string | null {
+  if (r.source === "audit") {
+    return computeAuditSubjectLabel(r, nameLookup, dinnerLookup);
+  }
+  if (r.event_type === "page.viewed") {
+    const path = (r.metadata.path as string | undefined) ?? "";
+    return subjectLabelForPagePath(path, nameLookup, dinnerLookup, applicationLookup);
+  }
+  if (r.source === "email_events") {
+    if (r.subject_member_id) {
+      return nameLookup.get(r.subject_member_id) ?? (r.metadata.recipient as string | undefined) ?? null;
+    }
+    return (r.metadata.recipient as string | undefined) ?? null;
+  }
+  if (r.subject_member_id) {
+    return nameLookup.get(r.subject_member_id) ?? null;
+  }
+  return null;
 }
 
 export { isHumanMeaningful };

@@ -157,8 +157,10 @@ export default function MemberHistoryClient(props: Props) {
                         className="text-accent hover:underline"
                         href={`/admin/members/${r.subject_member_id}`}
                       >
-                        {r.subject_name ?? "Unknown"}
+                        {r.subject_label ?? r.subject_name ?? "Unknown"}
                       </Link>
+                    ) : r.subject_label ? (
+                      <span className="text-fg2">{r.subject_label}</span>
                     ) : (
                       <span className="text-fg3">—</span>
                     )}
