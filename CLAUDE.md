@@ -136,6 +136,7 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 - `RESEND_API_KEY` (Production + Preview + local), `RESEND_WEBHOOK_SECRET` (svix, Production)
 - `STREAK_API_KEY`, `STREAK_WEBHOOK_SECRET` (32-byte hex) — Production + Preview
 - `UNSUBSCRIBE_SECRET` — HMAC for unsubscribe tokens, Production. Generate with `openssl rand -hex 32`. Without it, hardcoded default = forgeable tokens.
+- `CRON_SECRET` — checked by every `/api/cron/*` route via `Authorization: Bearer ${CRON_SECRET}`. Vercel cron invocations send this automatically. Without it, an unauthenticated request can fire any cron.
 - `NEXT_PUBLIC_EMAIL_MODE` — `"testing"` (default) or `"live"`.
 
 **Adding env vars to Vercel Preview scope: use the REST API, not the CLI.** All-preview-branches requires `gitBranch: null`. The CLI's interactive flow falls into a `git_branch_required` action_required loop. `PATCH /v9/projects/{id}/env/{id}` with `{"gitBranch": null}` to fix an existing entry, or `POST /v10/projects/{id}/env` with `target: ["preview"]` and no `gitBranch` for fresh.
@@ -185,6 +186,5 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 
 ## Pre-launch checklist
 
-- [ ] Set Vercel preview env vars (currently missing anon key + service role key in preview scope).
 - [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production.
 - [ ] Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes).
