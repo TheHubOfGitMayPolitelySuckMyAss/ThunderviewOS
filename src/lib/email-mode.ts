@@ -28,7 +28,7 @@ type RecipientRow = {
  * - live: all marketing-opted-in, non-kicked-out members
  */
 export async function getMarketingRecipients(): Promise<RecipientRow[]> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const mode = getEmailMode();
 
   if (mode === "testing") {

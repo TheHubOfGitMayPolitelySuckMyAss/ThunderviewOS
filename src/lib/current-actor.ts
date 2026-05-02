@@ -19,7 +19,7 @@ export async function getCurrentActorMemberId(): Promise<string | null> {
     } = await supabase.auth.getUser();
     if (!user?.email) return null;
 
-    const result = await findMemberByAnyEmail(createAdminClient(), user.email);
+    const result = await findMemberByAnyEmail(createAdminClient("system-internal"), user.email);
     return result?.memberId ?? null;
   } catch (err) {
     console.error("[current-actor] failed to resolve:", err);

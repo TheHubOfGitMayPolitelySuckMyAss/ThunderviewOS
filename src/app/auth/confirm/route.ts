@@ -8,7 +8,7 @@ import { logSystemEvent } from "@/lib/system-events";
 async function memberIdForEmail(email: string | null): Promise<string | null> {
   if (!email) return null;
   try {
-    const result = await findMemberByAnyEmail(createAdminClient(), email);
+    const result = await findMemberByAnyEmail(createAdminClient("public-flow"), email);
     return result?.memberId ?? null;
   } catch (err) {
     console.error("[auth/confirm] memberIdForEmail failed:", err);

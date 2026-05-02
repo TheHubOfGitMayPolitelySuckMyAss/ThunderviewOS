@@ -102,7 +102,7 @@ async function attachContactToBox(args: {
 }
 
 export async function pushMemberToStreak(memberId: string): Promise<void> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const memberRes = await admin
     .from("members")
@@ -185,7 +185,7 @@ export async function pushMemberToStreak(memberId: string): Promise<void> {
 export async function pushApplicationToStreak(
   applicationId: string
 ): Promise<void> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const appRes = await admin
     .from("applications")
@@ -271,7 +271,7 @@ export async function pushApplicationToStreak(
 export async function deleteApplicationBox(
   applicationId: string
 ): Promise<void> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const res = await admin
     .from("applications")
     .select("streak_box_key")
@@ -299,7 +299,7 @@ export async function deleteApplicationBox(
 }
 
 export async function deleteMemberBox(memberId: string): Promise<void> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const res = await admin
     .from("members")
     .select("streak_box_key")

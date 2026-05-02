@@ -62,7 +62,7 @@ export async function approveApplication(
   //   - app has box & member has no box        → migrate the box to member
   //   - app has no box                         → push will create one for member
   // Box-key writes use plain admin (infra plumbing, not an Eric-attributed edit).
-  const housekeeping = createAdminClient();
+  const housekeeping = createAdminClient("system-internal");
   const { data: appBox } = await housekeeping
     .from("applications")
     .select("streak_box_key")

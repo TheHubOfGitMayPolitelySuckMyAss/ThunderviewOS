@@ -25,7 +25,7 @@ export async function sendTestEmail(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   // For test sends, use the team member's own first_name as [applicant.firstname]
   const { data: memberEmail } = await admin

@@ -22,7 +22,7 @@ export default async function ProfilePage({
 
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const result = await findMemberByAnyEmail<{
     id: string;

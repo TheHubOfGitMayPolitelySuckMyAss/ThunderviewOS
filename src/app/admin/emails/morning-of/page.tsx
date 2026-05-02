@@ -5,7 +5,7 @@ import { isTestingMode } from "@/lib/email-mode";
 import MorningOfEditor from "./morning-of-editor";
 
 export default async function MorningOfTemplatePage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const { data: template } = await admin
     .from("email_templates")

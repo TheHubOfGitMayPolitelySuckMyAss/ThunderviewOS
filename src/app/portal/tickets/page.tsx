@@ -15,7 +15,7 @@ export default async function TicketSelectionPage() {
 
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   // Look up member by auth email
   const { data: memberEmail } = await admin

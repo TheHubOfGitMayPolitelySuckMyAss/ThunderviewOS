@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     return malformedResponse();
   }
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("webhook");
 
   const { data: member } = await admin
     .from("members")

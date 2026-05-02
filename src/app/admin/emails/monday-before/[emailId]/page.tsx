@@ -11,7 +11,7 @@ export default async function MondayBeforeDraftPage({
   params: Promise<{ emailId: string }>;
 }) {
   const { emailId } = await params;
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const { data: email } = await admin
     .from("monday_before_emails")

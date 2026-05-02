@@ -160,7 +160,7 @@ export async function searchMembersForSpeaker(
 ): Promise<
   { id: string; name: string; company_name: string | null }[]
 > {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const words = query.trim().split(/\s+/).filter(Boolean);
   let q = admin

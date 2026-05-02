@@ -7,7 +7,7 @@ import { H1, Eyebrow, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 
 export default async function RecapPage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
   const today = getTodayMT();
 
   // Most recent completed dinner = latest date < today

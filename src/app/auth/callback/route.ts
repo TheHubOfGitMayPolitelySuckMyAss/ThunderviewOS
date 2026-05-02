@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       let memberId: string | null = null;
       if (verifiedEmail) {
         try {
-          const result = await findMemberByAnyEmail(createAdminClient(), verifiedEmail);
+          const result = await findMemberByAnyEmail(createAdminClient("public-flow"), verifiedEmail);
           memberId = result?.memberId ?? null;
         } catch (err) {
           console.error("[auth/callback] member lookup failed:", err);

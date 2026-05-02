@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${SITE_URL}/unsubscribe?status=invalid`);
   }
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("public-flow");
 
   // Set marketing_opted_in = false (the trigger on members handles marketing_opted_out_at)
   const { error } = await admin

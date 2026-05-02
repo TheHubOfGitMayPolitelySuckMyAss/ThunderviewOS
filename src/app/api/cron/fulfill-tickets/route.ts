@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 }
 
 async function runFulfillTickets() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("cron");
 
   // getTargetDinner uses date >= todayMT, so today's dinner counts as "upcoming"
   const targetDinner = await getTargetDinner("", admin);

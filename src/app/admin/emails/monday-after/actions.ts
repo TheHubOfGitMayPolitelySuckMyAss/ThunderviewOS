@@ -26,7 +26,7 @@ async function getAuthMember() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select("email, members!inner(id, first_name, last_name)")
@@ -45,7 +45,7 @@ async function getAuthMember() {
 // ============================================================
 
 export async function loadMacro() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { data } = await admin
     .from("monday_after_macro")
     .select("*")
@@ -64,7 +64,7 @@ export async function saveMacro(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { error } = await admin
     .from("monday_after_macro")
     .update({ ...fields, updated_by: member.id })
@@ -86,7 +86,7 @@ export async function createDraft(dinnerId: string): Promise<{ success: boolean;
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const macro = await loadMacro();
   if (!macro) return { success: false, error: "Macro template not found" };
 
@@ -125,7 +125,7 @@ export async function saveDraft(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { error } = await admin
     .from("monday_after_emails")
     .update({ ...fields, test_sent_after_last_edit: false })
@@ -160,7 +160,7 @@ export async function uploadEmailImage(
 
   const uuid = crypto.randomUUID();
   const storagePath = `monday-after/${emailId}/${groupNumber}/${uuid}.jpg`;
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const { error: uploadError } = await admin.storage
     .from("email-images")
@@ -211,7 +211,7 @@ export async function deleteEmailImage(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const { data: image } = await admin
     .from("monday_after_email_images")
@@ -260,7 +260,7 @@ export async function reorderEmailImages(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   for (let i = 0; i < orderedIds.length; i++) {
     await admin.from("monday_after_email_images").update({ display_order: i }).eq("id", orderedIds[i]);
   }
@@ -282,7 +282,7 @@ export async function sendTestEmail(emailId: string): Promise<{ success: boolean
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const { data: email } = await admin
     .from("monday_after_emails")
@@ -344,7 +344,7 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const { data: email } = await admin
     .from("monday_after_emails")
@@ -445,7 +445,7 @@ export { getMarketingRecipientCount as getRecipientCount };
 export { isTestingMode };
 
 export async function getTeamMembers(): Promise<{ id: string; name: string }[]> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const { data: adminEmail } = await admin
     .from("member_emails")

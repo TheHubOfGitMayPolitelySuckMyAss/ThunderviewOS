@@ -32,7 +32,7 @@ export async function submitFeedback(input: FeedbackInput): Promise<{ success: b
   }
 
   const supabase = await createClient();
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const {
     data: { user },

@@ -26,7 +26,7 @@ export async function getDinnerAttendees(
   dinnerId: string,
   admin?: ReturnType<typeof createAdminClient>
 ): Promise<Attendee[]> {
-  const client = admin ?? createAdminClient();
+  const client = admin ?? createAdminClient("system-internal");
 
   const { data: tickets } = await client
     .from("tickets")

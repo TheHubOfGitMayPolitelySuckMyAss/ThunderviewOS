@@ -158,7 +158,7 @@ function labelFor(field: string): string {
  * derived rules. We over-fetch and trim. At our scale this is fine.
  */
 export async function getActivityFeed(filters: FeedFilters): Promise<FeedResult> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.max(1, filters.pageSize ?? 100);
 
@@ -296,7 +296,7 @@ async function enrichRows(rows: FeedRowRaw[]): Promise<FeedRow[]> {
     }
   }
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Batch member lookup.
   const nameLookup = new Map<string, string>();
@@ -822,7 +822,7 @@ export async function getDistinctEventTypes(kind: FeedKind): Promise<EventTypesR
   }
 
   try {
-    const admin = createAdminClient();
+    const admin = createAdminClient("system-internal");
     let q = admin.from("activity_feed").select("event_type");
     q = q.not("actor_id", "is", null).neq("source", "email_events");
     for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {

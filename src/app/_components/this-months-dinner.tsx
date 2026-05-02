@@ -17,7 +17,7 @@ type Speaker = {
 };
 
 export default async function ThisMonthsDinner() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("public-flow");
   const todayMT = getTodayMT();
 
   const { data: dinner } = await admin

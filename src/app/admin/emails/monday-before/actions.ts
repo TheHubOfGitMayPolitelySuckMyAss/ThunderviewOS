@@ -24,7 +24,7 @@ async function getAuthMember() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { data: memberEmail } = await admin
     .from("member_emails")
     .select("email, members!inner(id, first_name, last_name)")
@@ -43,7 +43,7 @@ async function getAuthMember() {
 // ============================================================
 
 export async function loadMacro() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { data } = await admin
     .from("monday_before_macro")
     .select("*")
@@ -58,7 +58,7 @@ export async function saveMacro(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { error } = await admin
     .from("monday_before_macro")
     .update({ ...fields, updated_by: member.id })
@@ -80,7 +80,7 @@ export async function createDraft(dinnerId: string): Promise<{ success: boolean;
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Load macro to seed
   const macro = await loadMacro();
@@ -120,7 +120,7 @@ export async function saveDraft(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { error } = await admin
     .from("monday_before_emails")
     .update({ ...fields, test_sent_after_last_edit: false })
@@ -158,7 +158,7 @@ export async function uploadEmailImage(
   // Upload to Supabase Storage
   const uuid = crypto.randomUUID();
   const storagePath = `monday-before/${emailId}/${groupNumber}/${uuid}.jpg`;
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   const { error: uploadError } = await admin.storage
     .from("email-images")
@@ -215,7 +215,7 @@ export async function deleteEmailImage(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Get image details
   const { data: image } = await admin
@@ -272,7 +272,7 @@ export async function reorderEmailImages(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Update display_order for each image
   for (let i = 0; i < orderedIds.length; i++) {
@@ -302,7 +302,7 @@ export async function sendTestEmail(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Load email + dinner + images
   const { data: email } = await admin
@@ -370,7 +370,7 @@ export async function sendToAll(
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Load email + dinner
   const { data: email } = await admin
@@ -490,7 +490,7 @@ export { getMarketingRecipientCount as getRecipientCount };
 export { isTestingMode };
 
 export async function getTeamMembers(): Promise<{ id: string; name: string }[]> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
 
   // Admin + team members
   const { data: adminEmail } = await admin

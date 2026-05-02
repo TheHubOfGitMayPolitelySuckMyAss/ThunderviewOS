@@ -26,10 +26,15 @@
  *    cast exception and writes NULL. Same outcome as omission.
  *
  * When NOT to use this:
- *  - Cron handlers and webhook handlers — there is no human actor; use the
- *    plain `createAdminClient()`.
- *  - Public flows that don't have an authenticated user (e.g. /apply form
- *    submission). Use `createAdminClient()`.
+ *  - Cron handlers — `createAdminClient("cron")`.
+ *  - Webhook handlers — `createAdminClient("webhook")`.
+ *  - Public/unauthenticated flows (e.g. /apply form submission, /, /about) —
+ *    `createAdminClient("public-flow")`.
+ *  - Page renders or query-only server actions — `createAdminClient("read-only")`.
+ *  - Library helpers called from many contexts — `createAdminClient("system-internal")`.
+ *
+ * The reason parameter on `createAdminClient` exists to force a deliberate
+ * choice rather than a default; see ./admin.ts for the full reason list.
  */
 
 import { createClient } from "@supabase/supabase-js";

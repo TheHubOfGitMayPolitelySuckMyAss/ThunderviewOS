@@ -14,7 +14,7 @@ import { logSystemEvent } from "@/lib/system-events";
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
 async function getTemplate(slug: string) {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { data } = await admin
     .from("email_templates")
     .select("subject, body")
@@ -32,7 +32,7 @@ async function getTemplate(slug: string) {
 async function getRecipient(
   memberId: string
 ): Promise<{ email: string; first_name: string } | null> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const { data, error } = await admin
     .from("member_emails")
     .select("email, members!inner(first_name)")
@@ -114,7 +114,7 @@ export async function sendReApplicationEmail(memberId: string): Promise<void> {
  */
 export async function sendRejectionEmail(applicationId: string): Promise<void> {
   try {
-    const admin = createAdminClient();
+    const admin = createAdminClient("system-internal");
     const { data: app } = await admin
       .from("applications")
       .select("first_name, email")
@@ -163,7 +163,7 @@ export async function sendFulfillmentEmail(
   options?: { throwOnError?: boolean }
 ): Promise<void> {
   try {
-    const admin = createAdminClient();
+    const admin = createAdminClient("system-internal");
 
     const recipient = await getRecipient(memberId);
     if (!recipient) {

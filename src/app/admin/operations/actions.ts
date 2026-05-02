@@ -9,7 +9,7 @@ export async function searchMembersForActor(
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
   const words = trimmed.split(/\s+/).filter(Boolean);
 
   let q = admin

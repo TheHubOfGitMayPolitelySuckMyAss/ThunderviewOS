@@ -44,7 +44,7 @@ export async function logPageView(input: LogPageViewInput): Promise<void> {
       const result = await findMemberByAnyEmail<{
         first_name: string;
         last_name: string;
-      }>(createAdminClient(), user.email, "first_name, last_name");
+      }>(createAdminClient("system-internal"), user.email, "first_name, last_name");
       if (result) {
         actorId = result.memberId;
         actorLabel = formatName(result.member.first_name, result.member.last_name);

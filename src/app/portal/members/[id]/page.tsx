@@ -16,7 +16,7 @@ export default async function MemberProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   // Fetch member
   const { data: member } = await admin

@@ -22,7 +22,7 @@ export async function purchaseTicket(formData: FormData) {
 
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   // Look up member
   const { data: memberEmail } = await admin

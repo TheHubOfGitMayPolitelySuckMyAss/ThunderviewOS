@@ -4,7 +4,7 @@ import { formatName } from "@/lib/format";
 import MacroEditor from "./macro-editor";
 
 export default async function MondayBeforeMacroPage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const { data: macro } = await admin
     .from("monday_before_macro")

@@ -109,7 +109,7 @@ export function computeStageForApplication(app: {
 export async function getMemberStreakState(
   memberId: string
 ): Promise<MemberStreakState> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const today = getTodayMT();
 
   const memberRes = await admin

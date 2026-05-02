@@ -24,7 +24,7 @@ function formatDinnerDate(dateStr: string): string {
 }
 
 export default async function ApplyPage() {
-  const supabase = createAdminClient();
+  const supabase = createAdminClient("public-flow");
   const today = getTodayMT();
 
   // Fetch all dinners from today onward

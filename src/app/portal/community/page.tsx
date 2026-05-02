@@ -26,7 +26,7 @@ async function fetchAll<T>(
 }
 
 export default async function CommunityPage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   // Get current user's member_id so we don't feature them to themselves
   const supabase = await createClient();

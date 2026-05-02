@@ -4,7 +4,7 @@ import { formatName } from "@/lib/format";
 import RejectionEditor from "./template-editor";
 
 export default async function RejectionTemplatePage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const { data: template } = await admin
     .from("email_templates")

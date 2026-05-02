@@ -24,7 +24,7 @@ export default async function HomePage() {
 
   const isAuthenticated = !!user;
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("public-flow");
   const { data: nextDinner } = await admin
     .from("dinners")
     .select("date")

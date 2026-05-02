@@ -39,7 +39,7 @@ const transactionalEmails = [
 ];
 
 export default async function EmailsPage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
   const todayMT = getTodayMT();
 
   // Fetch target dinners

@@ -11,7 +11,7 @@ import { createAdminClient } from "./supabase/admin";
  * on OTP requests. We patch these via updateUserById after creation.
  */
 export async function ensureAuthUser(email: string): Promise<void> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("system-internal");
   const normalized = email.toLowerCase();
 
   // createUser with email_confirm: true is idempotent-ish —

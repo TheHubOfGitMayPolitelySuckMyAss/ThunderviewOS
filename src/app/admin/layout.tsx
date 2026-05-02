@@ -24,7 +24,7 @@ export default async function AdminLayout({
   const email = user.email!;
   const isAdmin = email === "eric@marcoullier.com";
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const result = await findMemberByAnyEmail<{
     first_name: string;

@@ -43,7 +43,7 @@ export async function sendTestEmail(
 
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const { data: memberEmail } = await admin
     .from("member_emails")

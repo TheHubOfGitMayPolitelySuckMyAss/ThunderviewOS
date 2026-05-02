@@ -29,7 +29,7 @@ export default async function PortalPage({
   }
 
   const email = user.email!;
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const result = await findMemberByAnyEmail<{
     id: string;

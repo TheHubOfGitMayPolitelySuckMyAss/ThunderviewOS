@@ -185,7 +185,7 @@ async function handleResendWebhook(req: Request) {
   const bounceType = (data.bounce as { type?: string } | undefined)?.type ?? null;
   const isHardBounce = eventType === "bounced" && bounceType === "Permanent";
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("webhook");
 
   // Insert event (idempotent via UNIQUE on resend_email_id + event_type).
   // We persist every Thunderview event — even soft bounces — for dashboard visibility.

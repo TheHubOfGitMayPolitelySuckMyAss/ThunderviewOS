@@ -104,7 +104,7 @@ async function handleStripeWebhook(request: NextRequest) {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    const admin = createAdminClient();
+    const admin = createAdminClient("webhook");
 
     // Idempotency: check if ticket already exists for this session
     const { data: existing } = await admin

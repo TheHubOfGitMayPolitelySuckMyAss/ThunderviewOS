@@ -80,7 +80,7 @@ function buildDinnerList(dinners: { date: string }[], nextDate: string | null): 
 }
 
 export default async function AboutPage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("public-flow");
   const todayMT = getTodayMT();
 
   const { data: dinners } = await admin

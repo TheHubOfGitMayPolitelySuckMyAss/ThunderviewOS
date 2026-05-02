@@ -49,7 +49,7 @@ async function runPostDinner() {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-  const admin = createAdminClient();
+  const admin = createAdminClient("cron");
 
   // Check if yesterday was a dinner
   const { data: dinner } = await admin

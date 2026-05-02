@@ -122,7 +122,7 @@ async function runGenerateDinner() {
   const targetDate = firstThursdayOf(targetYear, targetMonth);
 
   // Insert with conflict guard
-  const admin = createAdminClient();
+  const admin = createAdminClient("cron");
   const { data, error } = await admin
     .from("dinners")
     .upsert({ date: targetDate }, { onConflict: "date", ignoreDuplicates: true })

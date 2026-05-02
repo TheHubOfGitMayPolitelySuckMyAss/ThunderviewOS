@@ -4,7 +4,7 @@ import { formatName } from "@/lib/format";
 import FulfillmentEditor from "./template-editor";
 
 export default async function FulfillmentTemplatePage() {
-  const admin = createAdminClient();
+  const admin = createAdminClient("read-only");
 
   const { data: template } = await admin
     .from("email_templates")

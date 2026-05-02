@@ -25,7 +25,7 @@ export type SystemEventInput = {
 
 export async function logSystemEvent(input: SystemEventInput): Promise<void> {
   try {
-    const admin = createAdminClient();
+    const admin = createAdminClient("system-internal");
     const { error } = await admin.from("system_events").insert({
       event_type: input.event_type,
       actor_id: input.actor_id ?? null,

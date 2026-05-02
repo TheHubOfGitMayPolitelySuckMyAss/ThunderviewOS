@@ -18,7 +18,7 @@ export async function submitApplication(formData: {
   iAmCeo: string | null;
   isNotServices: string | null;
 }): Promise<{ success: boolean; error?: string }> {
-  const admin = createAdminClient();
+  const admin = createAdminClient("public-flow");
 
   const { data, error } = await admin.from("applications").insert({
     first_name: formData.firstName.trim(),
