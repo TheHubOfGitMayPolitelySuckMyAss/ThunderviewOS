@@ -1,9 +1,18 @@
 /**
  * Resend webhook handler for email bounce, complaint, and failure events.
  *
- * Verifies signature via svix headers, inserts into email_events (idempotent),
- * updates member_emails status on bounce/complaint, and notifies admin on
- * complaint/failure.
+ * Verifies signature via svix headers, filters to Thunderview-originated sends,
+ * normalizes recipient strings, inserts into email_events (idempotent), updates
+ * member_emails status, auto-promotes a non-bounced secondary when a primary
+ * hard-bounces, and notifies admin on complaint/failure.
+ *
+ * Hard-bounce vs soft-bounce: only `bounce.type = "Permanent"` flips state.
+ * Transient/Undetermined bounces persist for dashboard visibility but do not
+ * change member_emails.email_status, do not promote, and do not push to Streak.
+ *
+ * The Resend webhook is account-scoped — every app on Eric's Resend account
+ * POSTs here. We filter on `data.from` domain and silently drop anything not
+ * sent from `thunderviewceodinners.com`.
  *
  * Deploy order:
  * 1. Deploy this code
@@ -32,6 +41,26 @@ const EVENT_TYPE_MAP: Record<string, "bounced" | "complained" | "failed"> = {
   "email.delivery_delayed": "failed",
   "email.failed": "failed",
 };
+
+const THUNDERVIEW_DOMAIN = "thunderviewceodinners.com";
+
+/**
+ * Extract a bare lowercase email from any of:
+ *   "Name <email>", "<email>", "email"
+ * Returns "" if no plausible address is found.
+ */
+function parseRecipientEmail(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const bracketed = raw.match(/<([^>]+)>/);
+  const candidate = (bracketed?.[1] ?? raw).trim().toLowerCase();
+  return candidate.includes("@") ? candidate : "";
+}
+
+function parseSenderDomain(raw: string | null | undefined): string {
+  const email = parseRecipientEmail(raw);
+  const at = email.lastIndexOf("@");
+  return at >= 0 ? email.slice(at + 1) : "";
+}
 
 export async function POST(req: Request) {
   try {
@@ -102,6 +131,14 @@ async function handleResendWebhook(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Thunderview-only filter: silently drop events from other apps on the
+  // shared Resend account. No email_events insert, no system_events log.
+  // Resend treats 200 as accepted and won't retry.
+  const senderDomain = parseSenderDomain(event.data?.from as string | undefined);
+  if (senderDomain !== THUNDERVIEW_DOMAIN) {
+    return NextResponse.json({ ok: true, skipped: "non_thunderview_sender" });
+  }
+
   await logSystemEvent({
     event_type: "webhook.resend",
     actor_label: "webhook:resend",
@@ -120,9 +157,10 @@ async function handleResendWebhook(req: Request) {
 
   const data = event.data;
   const resendEmailId = (data.email_id as string) ?? "";
-  // Resend sends `to` as an array; per Jan 2026 changelog each event is single-recipient
+  // Resend sends `to` as an array; per Jan 2026 changelog each event is single-recipient.
+  // The array entries can be bare ("foo@bar.com") or bracketed ("Name <foo@bar.com>").
   const toArr = data.to as string[] | undefined;
-  const recipientEmail = (toArr?.[0] ?? "").toLowerCase();
+  const recipientEmail = parseRecipientEmail(toArr?.[0]);
   const subject = (data.subject as string) ?? null;
   const occurredAt = event.created_at ?? new Date().toISOString();
 
@@ -143,9 +181,14 @@ async function handleResendWebhook(req: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  // Hard vs soft bounce. Only Permanent bounces flip state.
+  const bounceType = (data.bounce as { type?: string } | undefined)?.type ?? null;
+  const isHardBounce = eventType === "bounced" && bounceType === "Permanent";
+
   const admin = createAdminClient();
 
-  // Insert event (idempotent via UNIQUE on resend_email_id + event_type)
+  // Insert event (idempotent via UNIQUE on resend_email_id + event_type).
+  // We persist every Thunderview event — even soft bounces — for dashboard visibility.
   const { data: inserted, error: insertError } = await admin
     .from("email_events")
     .insert({
@@ -182,10 +225,11 @@ async function handleResendWebhook(req: Request) {
     return NextResponse.json({ error: "Insert failed" }, { status: 500 });
   }
 
-  // Match recipient to a member_emails row (case-insensitive)
+  // Match recipient to a member_emails row (case-insensitive).
+  // recipientEmail is already bare + lowercased.
   const { data: memberEmail } = await admin
     .from("member_emails")
-    .select("id, member_id")
+    .select("id, member_id, is_primary")
     .ilike("email", recipientEmail)
     .limit(1)
     .single();
@@ -213,11 +257,50 @@ async function handleResendWebhook(req: Request) {
     }
 
     // Update member state based on event type
-    if (eventType === "bounced") {
+    if (eventType === "bounced" && isHardBounce) {
       await admin
         .from("member_emails")
         .update({ email_status: "bounced" })
         .eq("id", memberEmail.id);
+
+      // Auto-promote a non-bounced secondary to primary when the bounced
+      // email was the primary. Must run BEFORE safePushMember so the next
+      // Streak push picks up the new primary (Streak's contacts array uses
+      // replace-semantics, so the old contact gets dropped).
+      if (memberEmail.is_primary) {
+        const { data: candidates } = await admin
+          .from("member_emails")
+          .select("id")
+          .eq("member_id", memberEmail.member_id)
+          .eq("email_status", "active")
+          .neq("id", memberEmail.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const promotion = candidates?.[0];
+        if (promotion) {
+          const { error: rpcError } = await admin.rpc("swap_primary_email", {
+            p_member_id: memberEmail.member_id,
+            p_new_primary_email_id: promotion.id,
+          });
+          if (rpcError) {
+            console.error("[resend-webhook] swap_primary_email failed:", rpcError.message);
+            await logSystemEvent({
+              event_type: "error.caught",
+              actor_label: "webhook:resend",
+              summary: `swap_primary_email failed during bounce promotion: ${rpcError.message}`,
+              metadata: {
+                context: "webhook.resend",
+                cause: "promote_secondary_failed",
+                member_id: memberEmail.member_id,
+                bounced_member_email_id: memberEmail.id,
+                promoted_member_email_id: promotion.id,
+                message: rpcError.message,
+              },
+            });
+          }
+        }
+      }
+
       await safePushMember(memberEmail.member_id, "resend_bounce");
     } else if (eventType === "complained") {
       await admin
@@ -232,6 +315,8 @@ async function handleResendWebhook(req: Request) {
         .eq("id", memberEmail.member_id);
       await safePushMember(memberEmail.member_id, "resend_complaint");
     }
+    // Soft bounces (non-Permanent): no email_status flip, no promotion, no Streak push.
+    // Row persists in email_events for dashboard visibility.
   }
 
   // Notify admin on complaint or failure (non-blocking — don't 5xx on failure)
@@ -276,5 +361,11 @@ async function handleResendWebhook(req: Request) {
     });
   }
 
-  return NextResponse.json({ ok: true, eventType, recipientEmail });
+  return NextResponse.json({
+    ok: true,
+    eventType,
+    recipientEmail,
+    bounceType,
+    isHardBounce,
+  });
 }
