@@ -1,5 +1,5 @@
 import PageHeader from "@/components/page-header";
-import { getActivityFeed, getDistinctEventTypes, type FeedKind } from "@/lib/activity-feed";
+import { getActivityFeed, getDistinctEventTypes, type FeedKind, type FeedRow } from "@/lib/activity-feed";
 import OperationsClient from "./operations-client";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function OperationsPage({
   const fromDate = sp.from || null;
   const toDate = sp.to || null;
 
-  const [feed, allEventTypes] = await Promise.all([
+  const [feedResult, typesResult] = await Promise.all([
     getActivityFeed({
       kind,
       page,
@@ -46,15 +46,23 @@ export default async function OperationsPage({
     getDistinctEventTypes(kind),
   ]);
 
+  const feedError = feedResult.ok ? null : feedResult.error;
+  const feedRows: FeedRow[] = feedResult.ok ? feedResult.rows : [];
+  const feedTotal = feedResult.ok ? feedResult.total : 0;
+  const feedPage = feedResult.ok ? feedResult.page : page;
+  const feedPageSize = feedResult.ok ? feedResult.pageSize : PAGE_SIZE;
+  const allEventTypes = typesResult.ok ? typesResult.types : [];
+
   return (
     <div className="tv-container-admin">
       <PageHeader title="Activity" size="compact" />
       <OperationsClient
         kind={kind}
-        page={feed.page}
-        pageSize={feed.pageSize}
-        total={feed.total}
-        rows={feed.rows}
+        page={feedPage}
+        pageSize={feedPageSize}
+        total={feedTotal}
+        rows={feedRows}
+        feedError={feedError}
         allEventTypes={allEventTypes}
         eventTypes={eventTypes}
         actorMemberId={actorMemberId}

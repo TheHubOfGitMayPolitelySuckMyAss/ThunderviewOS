@@ -67,6 +67,14 @@ export type FeedPage = {
   pageSize: number;
 };
 
+export type FeedResult =
+  | ({ ok: true } & FeedPage)
+  | { ok: false; error: string };
+
+export type EventTypesResult =
+  | { ok: true; types: string[] }
+  | { ok: false; error: string };
+
 // People feed exclusion list (event_type prefixes/exact matches).
 // People feed = subset where a human acted AND event is human-meaningful.
 const PEOPLE_FEED_EXCLUDED_PREFIXES = ["cron.", "webhook.", "error."];
@@ -148,7 +156,7 @@ function labelFor(field: string): string {
  * excludes specific event types AND requires actor_id non-null AND a few
  * derived rules. We over-fetch and trim. At our scale this is fine.
  */
-export async function getActivityFeed(filters: FeedFilters): Promise<FeedPage> {
+export async function getActivityFeed(filters: FeedFilters): Promise<FeedResult> {
   const admin = createAdminClient();
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.max(1, filters.pageSize ?? 100);
@@ -208,19 +216,26 @@ export async function getActivityFeed(filters: FeedFilters): Promise<FeedPage> {
     .order("occurred_at", { ascending: false })
     .range(offset, offset + pageSize - 1);
 
-  const { data: rows, count, error } = await q;
-  if (error) {
-    console.error("[activity-feed] query failed:", error.message);
-    return { rows: [], total: 0, page, pageSize };
-  }
+  try {
+    const { data: rows, count, error } = await q;
+    if (error) {
+      console.error("[activity-feed] query failed:", error.message);
+      return { ok: false, error: error.message };
+    }
 
-  const enriched = await enrichRows((rows ?? []) as FeedRowRaw[]);
-  return {
-    rows: enriched,
-    total: count ?? 0,
-    page,
-    pageSize,
-  };
+    const enriched = await enrichRows((rows ?? []) as FeedRowRaw[]);
+    return {
+      ok: true,
+      rows: enriched,
+      total: count ?? 0,
+      page,
+      pageSize,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[activity-feed] unexpected error:", message);
+    return { ok: false, error: message };
+  }
 }
 
 async function enrichRows(rows: FeedRowRaw[]): Promise<FeedRow[]> {
@@ -724,31 +739,41 @@ function refineEmailTemplates(
  * filter dropdown on the operations page. Honors the kind filter so the
  * People dropdown doesn't include cron/webhook/error types.
  */
-export async function getDistinctEventTypes(kind: FeedKind): Promise<string[]> {
+export async function getDistinctEventTypes(kind: FeedKind): Promise<EventTypesResult> {
   // Fixed-scope feeds return their inclusion list directly so the dropdown
   // shows the relevant types even before any have fired.
   if (kind === "system") {
-    return [...SYSTEM_FEED_INCLUDED_TYPES].sort();
+    return { ok: true, types: [...SYSTEM_FEED_INCLUDED_TYPES].sort() };
   }
   if (kind === "marketing") {
-    return ["page.viewed"];
+    return { ok: true, types: ["page.viewed"] };
   }
 
-  const admin = createAdminClient();
-  let q = admin.from("activity_feed").select("event_type");
-  q = q.not("actor_id", "is", null).neq("source", "email_events");
-  for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {
-    q = q.not("event_type", "like", `${p}%`);
+  try {
+    const admin = createAdminClient();
+    let q = admin.from("activity_feed").select("event_type");
+    q = q.not("actor_id", "is", null).neq("source", "email_events");
+    for (const p of PEOPLE_FEED_EXCLUDED_PREFIXES) {
+      q = q.not("event_type", "like", `${p}%`);
+    }
+    for (const t of PEOPLE_FEED_EXCLUDED_TYPES) {
+      q = q.neq("event_type", t);
+    }
+    const { data, error } = await q.limit(5000);
+    if (error) {
+      console.error("[activity-feed] getDistinctEventTypes failed:", error.message);
+      return { ok: false, error: error.message };
+    }
+    const set = new Set<string>();
+    for (const r of (data ?? []) as { event_type: string }[]) {
+      set.add(r.event_type);
+    }
+    return { ok: true, types: Array.from(set).sort() };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[activity-feed] getDistinctEventTypes unexpected error:", message);
+    return { ok: false, error: message };
   }
-  for (const t of PEOPLE_FEED_EXCLUDED_TYPES) {
-    q = q.neq("event_type", t);
-  }
-  const { data } = await q.limit(5000);
-  const set = new Set<string>();
-  for (const r of (data ?? []) as { event_type: string }[]) {
-    set.add(r.event_type);
-  }
-  return Array.from(set).sort();
 }
 
 export { isHumanMeaningful };

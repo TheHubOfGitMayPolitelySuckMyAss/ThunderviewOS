@@ -6,12 +6,14 @@ import { Pill } from "@/components/ui/pill";
 import { Button } from "@/components/ui/button";
 import { fetchMemberHistory } from "./member-history-actions";
 import type { FeedRow } from "@/lib/activity-feed";
+import { FeedError } from "@/app/admin/operations/operations-client";
 import { formatTimestamp } from "@/lib/format";
 
 type Props = {
   memberId: string;
   initialRows: FeedRow[];
   initialTotal: number;
+  initialError: string | null;
   pageSize: number;
   allEventTypes: string[];
 };
@@ -19,6 +21,7 @@ type Props = {
 export default function MemberHistoryClient(props: Props) {
   const [rows, setRows] = useState<FeedRow[]>(props.initialRows);
   const [total, setTotal] = useState(props.initialTotal);
+  const [error, setError] = useState<string | null>(props.initialError);
   const [page, setPage] = useState(1);
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [eventTypeOpen, setEventTypeOpen] = useState(false);
@@ -34,6 +37,11 @@ export default function MemberHistoryClient(props: Props) {
         pageSize: props.pageSize,
         eventTypes: nextEvents,
       });
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setError(null);
       setRows(r.rows);
       setTotal(r.total);
       setPage(nextPage);
@@ -101,6 +109,9 @@ export default function MemberHistoryClient(props: Props) {
       </div>
 
       {/* Table */}
+      {error ? (
+        <FeedError message={error} />
+      ) : (
       <div className="rounded-md border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-bg-tinted text-fg2 text-[12.5px] uppercase tracking-wide">
@@ -158,6 +169,7 @@ export default function MemberHistoryClient(props: Props) {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between mt-tight">

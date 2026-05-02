@@ -15,7 +15,7 @@ const PAGE_SIZE = 25;
 export default async function MemberHistory({ memberId }: { memberId: string }) {
   // Initial render: page 1, no filters. Client component handles
   // pagination + filtering via the fetchMemberHistory server action.
-  const [feed, allEventTypes] = await Promise.all([
+  const [feedResult, typesResult] = await Promise.all([
     getActivityFeed({
       kind: "people",
       page: 1,
@@ -30,10 +30,11 @@ export default async function MemberHistory({ memberId }: { memberId: string }) 
       <h2 className="tv-h3 mb-tight">Member History</h2>
       <MemberHistoryClient
         memberId={memberId}
-        initialRows={feed.rows}
-        initialTotal={feed.total}
+        initialRows={feedResult.ok ? feedResult.rows : []}
+        initialTotal={feedResult.ok ? feedResult.total : 0}
+        initialError={feedResult.ok ? null : feedResult.error}
         pageSize={PAGE_SIZE}
-        allEventTypes={allEventTypes}
+        allEventTypes={typesResult.ok ? typesResult.types : []}
       />
     </section>
   );

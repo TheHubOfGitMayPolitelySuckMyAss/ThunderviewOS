@@ -16,6 +16,7 @@ type Props = {
   pageSize: number;
   total: number;
   rows: FeedRow[];
+  feedError: string | null;
   allEventTypes: string[];
   eventTypes: string[];
   actorMemberId: string | null;
@@ -216,7 +217,11 @@ export default function OperationsClient(props: Props) {
       </div>
 
       {/* Table */}
-      <FeedTable rows={props.rows} />
+      {props.feedError ? (
+        <FeedError message={props.feedError} />
+      ) : (
+        <FeedTable rows={props.rows} />
+      )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between mt-tight">
@@ -242,6 +247,15 @@ export default function OperationsClient(props: Props) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function FeedError({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-border bg-bg p-6 text-center space-y-2">
+      <p className="text-sm font-medium text-fg1">Could not load this feed</p>
+      <p className="text-xs text-fg3 font-mono">{message}</p>
     </div>
   );
 }
