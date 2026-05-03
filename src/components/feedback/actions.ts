@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { formatName } from "@/lib/format";
 import { sendFeedbackNotification } from "@/lib/email-feedback";
 import { logSystemEvent } from "@/lib/system-events";
@@ -44,25 +45,18 @@ export async function submitFeedback(input: FeedbackInput): Promise<{ success: b
   let role = "anonymous";
 
   if (user?.email) {
-    const { data: memberEmail } = await admin
-      .from("member_emails")
-      .select("email, member_id, members!inner(id, first_name, last_name, is_team)")
-      .eq("email", user.email)
-      .eq("is_primary", true)
-      .limit(1)
-      .single();
+    const lookup = await findMemberByAnyEmail<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      is_team: boolean;
+    }>(admin, user.email, "id, first_name, last_name, is_team");
 
-    if (memberEmail) {
-      const m = memberEmail.members as unknown as {
-        id: string;
-        first_name: string;
-        last_name: string;
-        is_team: boolean;
-      };
-
+    if (lookup) {
+      const m = lookup.member;
       memberId = m.id;
       submitterName = formatName(m.first_name, m.last_name);
-      submitterEmail = memberEmail.email;
+      submitterEmail = lookup.matchedEmail;
 
       const isAdmin = user.email === "eric@marcoullier.com";
       role = isAdmin ? "admin" : m.is_team ? "team" : "member";

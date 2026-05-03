@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import { getTicketInfo } from "@/lib/ticket-assignment";
 import { formatDinnerDisplay } from "@/lib/format";
@@ -24,23 +25,19 @@ export async function purchaseTicket(formData: FormData) {
 
   const admin = createAdminClient("read-only");
 
-  // Look up member
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select(
-      "email, members!inner(id, attendee_stagetypes, has_community_access, kicked_out)"
-    )
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  // Look up member by ANY of their registered emails — auth via secondary
+  // address must work. See findMemberByAnyEmail for the canonical pattern.
+  const result = await findMemberByAnyEmail<{
     id: string;
     attendee_stagetypes: string[];
     has_community_access: boolean;
     kicked_out: boolean;
-  } | null;
+  }>(
+    admin,
+    user.email!,
+    "id, attendee_stagetypes, has_community_access, kicked_out"
+  );
+  const member = result?.member ?? null;
 
   if (
     !member ||
@@ -97,7 +94,7 @@ export async function purchaseTicket(formData: FormData) {
       quantity: String(quantity),
       amount_paid: String(amountPaid),
     },
-    customer_email: memberEmail!.email,
+    customer_email: result!.matchedEmail,
     success_url: `${origin}/portal?purchased=true`,
     cancel_url: `${origin}/portal/tickets`,
   });

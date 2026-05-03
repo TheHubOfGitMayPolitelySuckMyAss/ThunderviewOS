@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { type Attendee, getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
@@ -45,21 +46,15 @@ export async function sendTestEmail(
 
   const admin = createAdminClient("read-only");
 
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("email, members!inner(id, first_name, last_name)")
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-
-  if (!memberEmail) return { success: false, error: "Member not found" };
-
-  const member = memberEmail.members as unknown as {
+  const lookup = await findMemberByAnyEmail<{
     id: string;
     first_name: string;
     last_name: string;
-  };
+  }>(admin, user.email!, "id, first_name, last_name");
+
+  if (!lookup) return { success: false, error: "Member not found" };
+
+  const member = lookup.member;
 
   const result = await getNextDinnerWithAttendees(admin);
   if (!result) return { success: false, error: "No upcoming dinner found" };
@@ -81,7 +76,7 @@ export async function sendTestEmail(
 
   const { error } = await resend.emails.send({
     from: EMAIL_FROM,
-    to: memberEmail.email,
+    to: lookup.matchedEmail,
     subject: renderedSubject,
     html: fullHtml,
   });
@@ -103,21 +98,15 @@ export async function sendToAllAttendees(
   const admin = await createAdminClientForCurrentActor();
 
   // Get sender's member record
-  const { data: senderEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id, first_name, last_name)")
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-
-  if (!senderEmail) return { success: false, error: "Member not found" };
-
-  const sender = senderEmail.members as unknown as {
+  const senderLookup = await findMemberByAnyEmail<{
     id: string;
     first_name: string;
     last_name: string;
-  };
+  }>(admin, user.email!, "id, first_name, last_name");
+
+  if (!senderLookup) return { success: false, error: "Member not found" };
+
+  const sender = senderLookup.member;
 
   // Get dinner details
   const { data: dinner } = await admin
@@ -238,21 +227,15 @@ export async function saveTemplate(
 
   const admin = await createAdminClientForCurrentActor();
 
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id, first_name, last_name)")
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-
-  if (!memberEmail) return { success: false, error: "Member not found" };
-
-  const member = memberEmail.members as unknown as {
+  const lookup = await findMemberByAnyEmail<{
     id: string;
     first_name: string;
     last_name: string;
-  };
+  }>(admin, user.email!, "id, first_name, last_name");
+
+  if (!lookup) return { success: false, error: "Member not found" };
+
+  const member = lookup.member;
 
   const { error } = await admin
     .from("email_templates")

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { EMAIL_FROM } from "@/lib/email";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import { renderMondayBeforeEmail } from "@/lib/email-templates/monday-before";
@@ -25,17 +26,14 @@ async function getAuthMember() {
   if (!user) return null;
 
   const admin = createAdminClient("system-internal");
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select("email, members!inner(id, first_name, last_name)")
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
+  const lookup = await findMemberByAnyEmail<{
+    id: string;
+    first_name: string;
+    last_name: string;
+  }>(admin, user.email!, "id, first_name, last_name");
 
-  if (!memberEmail) return null;
-  const member = memberEmail.members as unknown as { id: string; first_name: string; last_name: string };
-  return { email: memberEmail.email, ...member };
+  if (!lookup) return null;
+  return { email: lookup.matchedEmail, ...lookup.member };
 }
 
 // ============================================================
@@ -492,14 +490,14 @@ export { isTestingMode };
 export async function getTeamMembers(): Promise<{ id: string; name: string }[]> {
   const admin = createAdminClient("system-internal");
 
-  // Admin + team members
-  const { data: adminEmail } = await admin
-    .from("member_emails")
-    .select("members!inner(id, first_name, last_name, is_team, kicked_out)")
-    .eq("email", "eric@marcoullier.com")
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
+  // Admin + team members. Look up admin by ANY of their emails — the admin
+  // role is owned by whoever has eric@marcoullier.com on file, regardless
+  // of whether it is currently flagged primary.
+  const adminLookup = await findMemberByAnyEmail<{
+    id: string;
+    first_name: string;
+    last_name: string;
+  }>(admin, "eric@marcoullier.com", "id, first_name, last_name");
 
   const { data: teamMembers } = await admin
     .from("members")
@@ -511,8 +509,8 @@ export async function getTeamMembers(): Promise<{ id: string; name: string }[]> 
   const seen = new Set<string>();
 
   // Add admin first
-  if (adminEmail) {
-    const m = adminEmail.members as unknown as { id: string; first_name: string; last_name: string };
+  if (adminLookup) {
+    const m = adminLookup.member;
     result.push({ id: m.id, name: formatName(m.first_name, m.last_name) });
     seen.add(m.id);
   }

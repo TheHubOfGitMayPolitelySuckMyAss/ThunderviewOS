@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 
 /**
  * EMAIL_MODE controls marketing email recipient scope.
@@ -41,23 +42,23 @@ export async function getMarketingRecipients(): Promise<RecipientRow[]> {
       .eq("member_emails.email_status", "active")
       .or("is_team.eq.true");
 
-    // Also include admin by email
-    const { data: adminData } = await admin
-      .from("member_emails")
-      .select("members!inner(id, first_name, is_team, kicked_out), email")
-      .eq("email", "eric@marcoullier.com")
-      .eq("is_primary", true)
-      .limit(1)
-      .single();
+    // Also include admin. Look up by ANY email — if eric@marcoullier.com
+    // is ever moved off primary, the admin role still belongs to whoever
+    // has that address registered.
+    const adminLookup = await findMemberByAnyEmail<{
+      id: string;
+      first_name: string;
+      kicked_out: boolean;
+    }>(admin, "eric@marcoullier.com", "id, first_name, kicked_out");
 
     const rows = (data ?? []) as unknown as RecipientRow[];
     const seen = new Set(rows.map((r) => r.id));
 
     // Add admin if not already in team list
-    if (adminData) {
-      const m = adminData.members as unknown as { id: string; first_name: string; kicked_out: boolean };
+    if (adminLookup) {
+      const m = adminLookup.member;
       if (!m.kicked_out && !seen.has(m.id)) {
-        rows.push({ id: m.id, first_name: m.first_name, member_emails: [{ email: adminData.email }] });
+        rows.push({ id: m.id, first_name: m.first_name, member_emails: [{ email: adminLookup.matchedEmail }] });
       }
     }
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
@@ -17,23 +18,18 @@ export default async function TicketSelectionPage() {
 
   const admin = createAdminClient("read-only");
 
-  // Look up member by auth email
-  const { data: memberEmail } = await admin
-    .from("member_emails")
-    .select(
-      "email, members!inner(id, attendee_stagetypes, has_community_access, kicked_out)"
-    )
-    .eq("email", user.email!)
-    .eq("is_primary", true)
-    .limit(1)
-    .single();
-
-  const member = memberEmail?.members as unknown as {
+  // Auth lookup must match against ANY of the member's registered emails.
+  const result = await findMemberByAnyEmail<{
     id: string;
     attendee_stagetypes: string[];
     has_community_access: boolean;
     kicked_out: boolean;
-  } | null;
+  }>(
+    admin,
+    user.email!,
+    "id, attendee_stagetypes, has_community_access, kicked_out"
+  );
+  const member = result?.member ?? null;
 
   // Kicked out or not a member → back to portal
   if (!member || member.kicked_out) {
@@ -144,7 +140,7 @@ export default async function TicketSelectionPage() {
           defaultDinnerId={defaultDinnerId}
           ticketLabel={label}
           ticketPrice={price}
-          memberEmail={memberEmail!.email}
+          memberEmail={result!.matchedEmail}
         />
       </Card>
     </div>
