@@ -4,6 +4,7 @@ import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-acto
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { sendFulfillmentEmail } from "@/lib/email-send";
+import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
 
@@ -109,6 +110,10 @@ export async function addMemberEmail(
   });
 
   if (error) return { success: false, error: error.message };
+
+  // GoTrue needs an auth.users row per email; without this, signInWithOtp
+  // against the new secondary fails with "Signups not allowed for otp".
+  await ensureAuthUsersForMember(memberId);
 
   await safePushMember(memberId, "email_change");
   return { success: true };

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
+import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
 import sharp from "sharp";
@@ -253,6 +254,10 @@ export async function saveProfile(formData: FormData) {
         if (swapError)
           return { success: false, error: swapError.message };
       }
+
+      // GoTrue needs an auth.users row per email; without this, signInWithOtp
+      // against a newly-added email fails with "Signups not allowed for otp".
+      await ensureAuthUsersForMember(member.id);
     }
   }
 

@@ -36,3 +36,30 @@ export async function ensureAuthUser(email: string): Promise<void> {
     });
   }
 }
+
+/**
+ * Ensure auth.users rows exist for ALL of a member's emails.
+ *
+ * Multi-email login (member_emails secondary rows) requires an auth.users
+ * row per email — GoTrue doesn't know about member_emails, so signInWithOtp
+ * against a secondary fails with "Signups not allowed for otp" if no auth
+ * row exists for that address. Every code path that inserts into
+ * member_emails MUST end with this call. Idempotent: ensureAuthUser swallows
+ * "already registered".
+ */
+export async function ensureAuthUsersForMember(memberId: string): Promise<void> {
+  const admin = createAdminClient("system-internal");
+  const { data, error } = await admin
+    .from("member_emails")
+    .select("email")
+    .eq("member_id", memberId);
+
+  if (error) {
+    console.error(`ensureAuthUsersForMember failed to load emails for ${memberId}:`, error.message);
+    return;
+  }
+
+  for (const row of data ?? []) {
+    await ensureAuthUser(row.email);
+  }
+}

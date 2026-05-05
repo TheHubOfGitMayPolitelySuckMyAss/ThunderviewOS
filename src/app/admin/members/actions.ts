@@ -3,7 +3,7 @@
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
-import { ensureAuthUser } from "@/lib/ensure-auth-user";
+import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
 
@@ -86,8 +86,9 @@ export async function addMember(formData: {
     return { success: false, error: error.message };
   }
 
-  // Ensure auth.users row exists so the member can log in
-  await ensureAuthUser(formData.email);
+  // Ensure an auth.users row exists for every email on file so the member
+  // can log in via any of them.
+  await ensureAuthUsersForMember(data as string);
 
   await safePushMember(data as string, "add_member");
 
