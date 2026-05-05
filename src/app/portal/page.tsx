@@ -12,6 +12,7 @@ import PortalForm from "./portal-form";
 import TicketPurchase from "./tickets/ticket-purchase";
 import PurchaseConfetti from "./purchase-confetti";
 import DinnerDetailsBlock from "./dinner-details-block";
+import PrimaryEmailPrompt from "./primary-email-prompt";
 
 export default async function PortalPage({
   searchParams,
@@ -52,6 +53,30 @@ export default async function PortalPage({
   const member = result?.member ?? null;
 
   const isMember = member !== null && member.kicked_out === false;
+
+  // Detect primary-email mismatch: if the user logged in via a secondary,
+  // surface a one-click prompt to make their login email the new primary.
+  let primaryMismatch: { loginEmail: string; primaryEmail: string } | null = null;
+  if (isMember) {
+    const { data: emails } = await admin
+      .from("member_emails")
+      .select("email, is_primary, email_status")
+      .eq("member_id", member.id);
+
+    const primary = emails?.find((e) => e.is_primary);
+    const authRow = emails?.find(
+      (e) => e.email.toLowerCase() === email.toLowerCase(),
+    );
+
+    if (
+      primary &&
+      authRow &&
+      !authRow.is_primary &&
+      authRow.email_status === "active"
+    ) {
+      primaryMismatch = { loginEmail: authRow.email, primaryEmail: primary.email };
+    }
+  }
 
   // Fetch next future ticket for banner
   let bannerDinnerDate: string | null = null;
@@ -203,6 +228,12 @@ export default async function PortalPage({
 
   return (
     <div className="tv-container-narrow tv-page-gutter py-7">
+      {primaryMismatch && (
+        <PrimaryEmailPrompt
+          loginEmail={primaryMismatch.loginEmail}
+          primaryEmail={primaryMismatch.primaryEmail}
+        />
+      )}
       <H1 className="mb-6">
         {member?.first_name ? `Welcome back, ${member.first_name}.` : "Portal"}
       </H1>
