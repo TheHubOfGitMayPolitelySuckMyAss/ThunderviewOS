@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { formatName, formatStageType } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
 import CommunityTable from "./community-table";
+import PrimaryEmailPrompt from "./primary-email-prompt";
 import Link from "next/link";
 
 export default async function CommunityPage() {
@@ -23,6 +24,30 @@ export default async function CommunityPage() {
   if (user?.email) {
     const viewerLookup = await findMemberByAnyEmail(admin, user.email);
     viewerMemberId = viewerLookup?.memberId ?? null;
+  }
+
+  // Detect primary-email mismatch: if the user logged in via a secondary,
+  // surface a one-click prompt to make their login email the new primary.
+  let primaryMismatch: { loginEmail: string; primaryEmail: string } | null = null;
+  if (viewerMemberId && user?.email) {
+    const { data: emails } = await admin
+      .from("member_emails")
+      .select("email, is_primary, email_status")
+      .eq("member_id", viewerMemberId);
+
+    const primary = emails?.find((e) => e.is_primary);
+    const authRow = emails?.find(
+      (e) => e.email.toLowerCase() === user.email!.toLowerCase(),
+    );
+
+    if (
+      primary &&
+      authRow &&
+      !authRow.is_primary &&
+      authRow.email_status === "active"
+    ) {
+      primaryMismatch = { loginEmail: authRow.email, primaryEmail: primary.email };
+    }
   }
 
   // Featured member: all three fields filled, attended in last 6 months,
@@ -89,6 +114,12 @@ export default async function CommunityPage() {
 
   return (
     <div className="tv-container-portal tv-page-gutter py-7">
+      {primaryMismatch && (
+        <PrimaryEmailPrompt
+          loginEmail={primaryMismatch.loginEmail}
+          primaryEmail={primaryMismatch.primaryEmail}
+        />
+      )}
       <H1 className="mb-1.5">Community</H1>
       <Lede className="mb-6">{members.length} members of the Thunderview community.</Lede>
 
