@@ -3,9 +3,10 @@ import { Eyebrow } from "@/components/ui/typography";
 import { Pill } from "@/components/ui/pill";
 import PageHeader from "@/components/page-header";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatDateFriendly, getTodayMT } from "@/lib/format";
+import { formatDateFriendly, formatTimestamp, getTodayMT } from "@/lib/format";
 import CreateMondayBeforeButton from "./create-monday-before-button";
 import CreateMondayAfterButton from "./create-monday-after-button";
+import CreateOneOffBlastButton from "./create-one-off-blast-button";
 
 const transactionalEmails = [
   {
@@ -83,6 +84,13 @@ export default async function EmailsPage() {
 
   const nextDinnerLabel = nextDinner ? formatDateFriendly(nextDinner.date) : null;
   const lastDinnerLabel = lastDinner ? formatDateFriendly(lastDinner.date) : null;
+
+  // One Off Blast: recent drafts + sends, newest first, capped at 10
+  const { data: recentBlasts } = await admin
+    .from("one_off_blast_emails")
+    .select("id, subject, status, sent_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
 
   return (
     <div className="max-w-[720px]">
@@ -189,6 +197,45 @@ export default async function EmailsPage() {
                 </Link>
               )}
             </div>
+          </div>
+
+          {/* One Off Blast */}
+          <div>
+            <Link
+              href="/admin/emails/one-off-blast"
+              className="text-sm font-medium text-accent-hover no-underline hover:underline"
+            >
+              One Off Blast Template
+            </Link>
+            <p className="mt-0.5 text-sm text-fg3">
+              Used for sending a one-time marketing message to the entire community
+            </p>
+            <div className="mt-2">
+              <CreateOneOffBlastButton />
+            </div>
+            {recentBlasts && recentBlasts.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {recentBlasts.map((b) => {
+                  const ts = b.status === "sent" ? b.sent_at : b.created_at;
+                  return (
+                    <li key={b.id}>
+                      <Link
+                        href={`/admin/emails/one-off-blast/${b.id}`}
+                        className="inline-flex items-center gap-2 text-sm no-underline hover:underline"
+                      >
+                        <Pill variant={b.status === "sent" ? "success" : "warn"}>
+                          {b.status === "sent" ? "Sent" : "Draft"}
+                        </Pill>
+                        <span className={b.status === "sent" ? "text-fg3" : "text-accent-hover"}>
+                          {b.subject || "(no subject)"}
+                        </span>
+                        {ts && <span className="text-xs text-fg3">{formatTimestamp(ts)}</span>}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
 
         </div>
