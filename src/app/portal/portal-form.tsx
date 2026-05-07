@@ -72,8 +72,8 @@ export default function PortalForm({
       <H4>Your intro &amp; ask for this dinner</H4>
       <p className="text-sm text-fg2 leading-[1.55] mb-form-row">
         Every attendee gets the full list the morning of dinner. People use it to find
-        you&nbsp;&mdash; they&rsquo;ll walk up and say &ldquo;you&rsquo;re the one who needs help
-        with fundraising&rdquo; or &ldquo;I saw you&rsquo;re building in climate tech.&rdquo;
+        you&nbsp;&mdash; they&rsquo;ll walk up and say &ldquo;you&rsquo;re the one looking for
+        a new CRM&rdquo; or &ldquo;I saw you&rsquo;re building in climate tech.&rdquo;
         The more specific you are, the more useful the room becomes.
       </p>
 

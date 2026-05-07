@@ -19,6 +19,13 @@ const team = [
     bio: "Danny Newman loves Denver. He\u2019s lived here his whole life and is passionate about helping the city grow while making sure we save what makes this city special. Danny now owns My Brother\u2019s Bar and Mercury Cafe. In addition, he started Roximity in 2011 (acquired by Verve in 2016) and now runs Switchboard, a mobile phone answering system for restaurants.",
   },
   {
+    name: "Rich Maloy",
+    title: "Director",
+    photo: "/brand/photos/rich.webp",
+    photoPosition: "center 25%",
+    bio: "Rich Maloy is a Managing Partner at SpringTime Ventures and whose mission is to rebuild the American dream through entrepreneurship. He respects all people who drive to start up: people who build something out of nothing, create financial independence, and solve problems. He believes this drive is universal and all people everywhere deserve the right to start.",
+  },
+  {
     name: "Megan Hanson",
     title: "Director",
     photo: "/brand/photos/megan.webp",
