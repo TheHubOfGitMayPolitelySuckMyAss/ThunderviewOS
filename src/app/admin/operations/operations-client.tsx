@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { searchMembersForActor } from "./actions";
 import type { FeedRow, FeedKind } from "@/lib/activity-feed";
 import { formatTimestamp } from "@/lib/format";
+import { ChevronDown } from "lucide-react";
 
 type Props = {
   kind: FeedKind;
@@ -118,7 +119,7 @@ export default function OperationsClient(props: Props) {
                 ? "All events"
                 : `${props.eventTypes.length} selected`}
             </span>
-            <span className="text-fg3">▾</span>
+            <ChevronDown aria-hidden="true" className="h-4 w-4 text-fg2" />
           </button>
           {eventTypeOpen && (
             <>

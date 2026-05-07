@@ -241,7 +241,7 @@ General rules that apply to every component primitive. For surface-specific comp
 | `Card` | `ui/card.tsx` | Variants: default, elevated, feature (candle-glow), photo. 20px inner padding. |
 | `Input` | `ui/input.tsx` | Text input. `error` flag toggles ember border. |
 | `Textarea` | `ui/textarea.tsx` | Multi-line. Min-height 90px, resize-y. |
-| `Select` | `ui/select.tsx` | Dropdown with inline chevron SVG background. |
+| `Select` | `ui/select.tsx` | Native `<select>` with Lucide chevron-down overlay (pointer-events-none). |
 | `Label` | `ui/label.tsx` | Form label, 13px, fg2. `required` flag renders a clay asterisk. |
 | `FieldHelp` | `ui/field-help.tsx` | Helper text under inputs; `error` flag switches to ember. |
 | `Pill` | `ui/pill.tsx` | Variants: stage, neutral, accent, success, warn, danger. Optional leading `dot`. |

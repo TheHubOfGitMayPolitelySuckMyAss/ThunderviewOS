@@ -8,6 +8,7 @@ import { fetchMemberHistory } from "./member-history-actions";
 import type { FeedRow } from "@/lib/activity-feed";
 import { FeedError } from "@/app/admin/operations/operations-client";
 import { formatTimestamp } from "@/lib/format";
+import { ChevronDown } from "lucide-react";
 
 type Props = {
   memberId: string;
@@ -74,7 +75,7 @@ export default function MemberHistoryClient(props: Props) {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-bg text-sm hover:bg-bg-tinted min-w-[180px] justify-between"
           >
             <span>{eventTypes.length === 0 ? "All events" : `${eventTypes.length} selected`}</span>
-            <span className="text-fg3">▾</span>
+            <ChevronDown aria-hidden="true" className="h-4 w-4 text-fg2" />
           </button>
           {eventTypeOpen && (
             <>
