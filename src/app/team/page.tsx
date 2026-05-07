@@ -19,18 +19,18 @@ const team = [
     bio: "Danny Newman loves Denver. He\u2019s lived here his whole life and is passionate about helping the city grow while making sure we save what makes this city special. Danny now owns My Brother\u2019s Bar and Mercury Cafe. In addition, he started Roximity in 2011 (acquired by Verve in 2016) and now runs Switchboard, a mobile phone answering system for restaurants.",
   },
   {
-    name: "Rich Maloy",
-    title: "Director",
-    photo: "/brand/photos/rich.webp",
-    photoPosition: "center 25%",
-    bio: "Rich Maloy is a Managing Partner at SpringTime Ventures and whose mission is to rebuild the American dream through entrepreneurship. He respects all people who drive to start up: people who build something out of nothing, create financial independence, and solve problems. He believes this drive is universal and all people everywhere deserve the right to start.",
-  },
-  {
     name: "Megan Hanson",
     title: "Director",
     photo: "/brand/photos/megan.webp",
     photoPosition: "center 25%",
     bio: "Megan Hanson is a professional communicator with more than a decade of work in public relations, publicity, and copywriting. Her clients span a variety of industries, including real estate, travel & hospitality, technology, startups, non-profits, and beyond. She is a storyteller who helps her clients express their vision and mission to customers and partners. She has extensive experience developing and executing public relations campaigns, securing placements across a variety of mediums including print, digital, television, radio, and podcasts in local, national, and international markets. She has also worked with clients to develop influencer relationships and ambassador programs, as well as craft concise and cohesive brand messaging through blog posts and other marketing materials.",
+  },
+  {
+    name: "Rich Maloy",
+    title: "Director",
+    photo: "/brand/photos/rich.webp",
+    photoPosition: "center 25%",
+    bio: "Rich Maloy is a Managing Partner at SpringTime Ventures and whose mission is to rebuild the American dream through entrepreneurship. He respects all people who drive to start up: people who build something out of nothing, create financial independence, and solve problems. He believes this drive is universal and all people everywhere deserve the right to start.",
   },
 ];
 
