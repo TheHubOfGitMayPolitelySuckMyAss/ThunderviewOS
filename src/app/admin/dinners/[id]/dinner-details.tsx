@@ -134,7 +134,7 @@ function InlineTextField({
       className="cursor-pointer group"
     >
       <span className="text-xs font-medium uppercase text-fg3">{label}</span>
-      <p className="text-sm text-fg1 mt-0.5 group-hover:text-fg2 group-hover:underline">
+      <p className="text-sm text-fg1 mt-0.5 whitespace-pre-line group-hover:text-fg2 group-hover:underline">
         {current || <span className="text-fg4 italic">Click to add {label.toLowerCase()}</span>}
       </p>
     </div>
