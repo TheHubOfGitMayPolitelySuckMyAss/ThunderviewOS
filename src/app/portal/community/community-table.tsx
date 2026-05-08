@@ -17,6 +17,7 @@ type Member = {
   attendee_stagetypes: string[];
   current_intro: string | null;
   current_ask: string | null;
+  current_give: string | null;
   contact_preference: string | null;
   profile_pic_url: string | null;
 };
@@ -62,6 +63,7 @@ export default function CommunityTable({ members }: { members: Member[] }) {
           (m.linkedin_profile || "").toLowerCase().includes(s) ||
           (m.current_intro || "").toLowerCase().includes(s) ||
           (m.current_ask || "").toLowerCase().includes(s) ||
+          (m.current_give || "").toLowerCase().includes(s) ||
           (m.contact_preference || "").toLowerCase().includes(s) ||
           m.attendee_stagetypes.some((st) => st.toLowerCase().includes(s))
         );
