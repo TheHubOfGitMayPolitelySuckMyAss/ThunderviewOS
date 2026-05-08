@@ -178,7 +178,6 @@ export default function DashboardAccordions({
         count={emailIssues.length}
         pillVariant={emailIssues.length > 0 ? "warn" : "neutral"}
         pillLabel={`${emailIssues.length}`}
-        defaultOpen={emailIssues.length > 0}
         meta="last 30 days"
       >
         {emailIssues.length === 0 ? (
