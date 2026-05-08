@@ -89,7 +89,7 @@ export default async function ThisMonthsDinner() {
 
         {hasSpeakers && (
           <>
-            <H2 className="mt-section mb-stack">Speaking</H2>
+            <H2 className="mt-stack mb-stack">Speaking</H2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-7 gap-x-6">
               {speakers.map((s) => {
               const name = formatName(s.first_name, s.last_name);
