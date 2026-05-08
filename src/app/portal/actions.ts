@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
+import { safePushMember } from "@/lib/streak/safe-push";
 
 export async function savePortalProfile(formData: FormData) {
   const supabase = await createClient();
@@ -105,6 +106,8 @@ export async function promoteAuthEmailToPrimary(): Promise<
     p_new_primary_email_id: target.id,
   });
   if (error) return { success: false, error: error.message };
+
+  await safePushMember(lookup.member.id, "promote_auth_email_to_primary");
 
   return { success: true };
 }
