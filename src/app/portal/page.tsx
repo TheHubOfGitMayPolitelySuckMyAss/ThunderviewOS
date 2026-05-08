@@ -263,7 +263,7 @@ export default async function PortalPage({
         </Card>
       ) : isMember && ticketPurchaseData ? (
         <>
-        <Eyebrow className="mb-3 mt-stack">Join This Dinner</Eyebrow>
+        <Eyebrow className="mb-3 mt-section">Join This Dinner</Eyebrow>
         <Card>
           <TicketPurchase
             dinnerOptions={ticketPurchaseData.dinnerOptions}
