@@ -46,7 +46,7 @@ The flow is standard Supabase magic link. The non-obvious parts:
 
 - **PKCE uses `/auth/confirm` (token_hash), not `/auth/callback` (code).** Both routes exist; `/auth/callback` is fallback. Both create their own `createServerClient` inline with direct `cookieStore` access — do NOT use `lib/supabase/server.ts` in auth routes (cookies don't propagate on redirects).
 - **Magic link template MUST use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`.** Not `{{ .ConfirmationURL }}` (verifies at Supabase's endpoint, never establishes session). Not `{{ .SiteURL }}` (hardcodes production, breaks preview deploys). Configured via Supabase Management API, not dashboard.
-- **Supabase URL allow-list needs preview wildcard:** `https://thunderview-os-git-*-erics-projects-*.vercel.app/**`. Without it, preview-targeted magic links silently fall back to Site URL.
+- **Supabase Redirect URLs allow-list controls magic link URLs — production needs both apex AND www patterns.** When `emailRedirectTo` (passed by `signInWithOtp` as `${window.location.origin}/auth/confirm`) doesn't match any allow-list entry, Supabase silently falls back to Site URL. The visible symptom: user clicks the link, lands at `/?token_hash=...&type=email&email=...` instead of `/auth/confirm`, and no auth flow fires. Allow-list MUST include both `https://thunderviewceodinners.com/**` AND `https://www.thunderviewceodinners.com/**` because either origin can produce the login form. Same shape applies to preview deploys → vercel.app wildcard.
 - **Every email in `member_emails` needs its own `auth.users` row.** GoTrue stores one row per email; `signInWithOtp({email})` checks the typed email, so a secondary without an `auth.users` row fails with "Signups not allowed for otp" before any magic link is generated. The invariant: any code path that inserts into `member_emails` MUST call `ensureAuthUsersForMember(memberId)` from `src/lib/ensure-auth-user.ts` afterward — it loops every email on the member and ensures GoTrue is in sync. Idempotent. Single-email `ensureAuthUser(email)` still exists but new call sites should prefer the per-member helper. Member can't log in? Check whether their email is in `auth.users`, not just `member_emails`.
 - **`ensureAuthUser` patches GoTrue NULL columns.** Supabase's `admin.createUser()` leaves `email_change` and `email_change_token_new` NULL, GoTrue scans them into non-nullable strings, OTP request fails with "Database error finding user". Fix is the `updateUserById` call inside `ensureAuthUser`.
 - **Proxy uses service-role client for member lookups** (team check, community access). Session client there subjects the query to RLS, blocks non-admin login. Hardcoded admin email check bypasses, so it would silently work for Eric only.
@@ -112,11 +112,11 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 - **Sent-lock triggers are strict.** Once `status = 'sent'`, ALL UPDATEs on the email + image tables are rejected. The send action's final UPDATE succeeds because `OLD.status` is still `'draft'` at that point. Sent emails are immutable by design.
 - **Audience snapshot frozen as JSONB at send time** so the recipient list survives subsequent member changes.
 - **Image pipeline (`src/lib/email-image-pipeline.ts`) hard ceiling 500KB.** Iterative quality reduction (85→40), rejects if quality 40 still over.
-- **`NEXT_PUBLIC_EMAIL_MODE`:** `"testing"` (default) restricts marketing sends to admin + team. `"live"` sends to all `marketing_opted_in = true`. **Flip to `live` before launch.**
+- **`NEXT_PUBLIC_EMAIL_MODE`:** `"testing"` restricts marketing sends to admin + team; `"live"` sends to all `marketing_opted_in = true`. Production is `live`.
 - **Resend webhook is account-scoped — handler filters by sender domain.** Every app on Eric's Resend account POSTs to `/api/webhooks/resend` with a valid svix signature. Handler parses `data.from`, drops anything not `thunderviewceodinners.com` (200 response, no event row, no log — Resend won't retry on 200). New Thunderview-owned sending domain? Update `THUNDERVIEW_DOMAIN` in `src/app/api/webhooks/resend/route.ts`.
 - **Hard vs soft bounces are distinguished.** Only `bounce.type = 'Permanent'` flips `email_status='bounced'`, runs secondary promotion, and pushes Streak. `'Transient'`/`'Undetermined'`/unknown: row persisted for visibility but no member state changes.
 - **Receipt emails: using Stripe's built-in.** Custom kit design exists in `design-system/ui_kits/` but won't be built. Don't propose building it.
-- **Stripe sandbox does NOT auto-send receipts** despite `receipt_email` set on the Checkout Session and the dashboard toggle enabled. Integration is correct — auto-send will be validated at live cutover. Don't debug.
+- **Stripe receipt auto-send is gated by the Live-mode dashboard toggle** at Settings → Customer emails → "Successful payments." Sandbox and Live each have their own toggle; flipping the sandbox one doesn't affect Live. The toggle is bypassed if you pass `receipt_email` on the API call (we don't — Checkout Sessions use `customer_email` instead). If receipts ever stop, check the Activity timeline of a recent payment in the Stripe dashboard before assuming code regression.
 
 ## Crons (Vercel)
 
@@ -132,27 +132,43 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_SITE_URL` — **always `.trim()` when reading** (trailing newline in Vercel env has caused Stripe URL bugs).
-- `STRIPE_SECRET_KEY` (sk_test, sandbox), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (pk_test, currently unused client-side), `STRIPE_WEBHOOK_SECRET` (production endpoint: `we_1TOKwXBZUujGbd3L93xKwlDl`)
+- `STRIPE_SECRET_KEY` (sk_live), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (pk_live, currently unused client-side), `STRIPE_WEBHOOK_SECRET` (Live destination, subscribed only to `checkout.session.completed`)
 - `RESEND_API_KEY` (Production + Preview + local), `RESEND_WEBHOOK_SECRET` (svix, Production)
 - `STREAK_API_KEY`, `STREAK_WEBHOOK_SECRET` (32-byte hex) — Production + Preview
 - `UNSUBSCRIBE_SECRET` — HMAC for unsubscribe tokens, Production. Generate with `openssl rand -hex 32`. Without it, hardcoded default = forgeable tokens.
 - `CRON_SECRET` — checked by every `/api/cron/*` route via `Authorization: Bearer ${CRON_SECRET}`. Vercel cron invocations send this automatically. Without it, an unauthenticated request can fire any cron.
-- `NEXT_PUBLIC_EMAIL_MODE` — `"testing"` (default) or `"live"`.
+- `NEXT_PUBLIC_EMAIL_MODE` — `"testing"` or `"live"`. Production is `live`.
 
 **Adding env vars to Vercel Preview scope: use the REST API, not the CLI.** All-preview-branches requires `gitBranch: null`. The CLI's interactive flow falls into a `git_branch_required` action_required loop. `PATCH /v9/projects/{id}/env/{id}` with `{"gitBranch": null}` to fix an existing entry, or `POST /v10/projects/{id}/env` with `target: ["preview"]` and no `gitBranch` for fresh.
 
 ## Supabase config (manual, not in code)
 
-- **Site URL:** `https://thunderview-os.vercel.app`
-- **Redirect URLs allow-list:** prod, localhost, AND `https://thunderview-os-git-*-erics-projects-*.vercel.app/**`.
+- **Site URL:** `https://thunderviewceodinners.com` (no trailing slash, no path).
+- **Redirect URLs allow-list — apex AND www are BOTH required:**
+  - `https://thunderviewceodinners.com/**`
+  - `https://www.thunderviewceodinners.com/**`
+  - `https://thunderview-os-git-*-erics-projects-*.vercel.app/**` (preview deploys)
+  - `http://localhost:3000/**`
 - **SMTP:** Resend custom (`team@thunderviewceodinners.com`). Default rate limit 30/hour.
 - **Auth email templates:** customized via Management API (not dashboard UI). See Auth gotchas above for the required template URL.
 - **Storage buckets:**
   - `profile-pics` (public-read, authenticated-write, RLS path is `{member_id}.webp`).
   - `email-images` (public-read).
 
+## Domain configuration
+
+Live at `thunderviewceodinners.com` (apex + www). Cutover from `thunderview-os.vercel.app` happened 2026-05-08.
+
+- **DNS managed by Squarespace's domain registrar** (legacy from the Google Domains acquisition). Site hosting is Vercel; only DNS lives at Squarespace.
+- **Squarespace "Connected Domain" mode auto-reverts TTL changes** — TTL stays locked at 4 hours regardless of attempts to lower it. A record edits DO commit, but only after deleting all conflicting Squarespace IPs in one save (Squarespace warns about the conflict, then accepts the change).
+- **Apex A records → Vercel:** `216.150.1.1` and `216.150.16.1`.
+- **www CNAME → Vercel:** `cname.vercel-dns.com`. The `www` subdomain is added on the Vercel project; Vercel auto-redirects www → apex.
+- **Squarespace did NOT bundle the domain with hosting** — it's a Google-Domains-acquired registration that survives the hosting cancellation as a paid domain-only registration. No risk of DNS going dark when the Squarespace site is fully torn down.
+
 ## Codebase conventions
 
+- **Public application submissions short-circuit when email matches an active member.** `src/app/apply/actions.ts` checks `member_emails` before insert. If an active (non-kicked-out) member owns the email, the action returns `{ success: true, alreadyMember: true }` — no application row, no admin notification, no Streak push — and the form redirects to `/apply/already-member` (a "Hooray! You're already a member, just sign in" page). Kicked-out re-applications fall through to the normal pending flow and are flagged in the admin queue with a red "Removed-member re-application" pill.
+- **Admin batch Streak push at `POST /api/admin/streak-push`** — auth via `Authorization: Bearer ${CRON_SECRET}`, body `{ member_ids: string[], op?: string }`. Calls `safePushMember` on each. Use this when raw SQL has bypassed app-layer push (CSV imports, batch state changes) so Streak gets resynced without hand-rolling the push pipeline.
 - **Next.js 16 uses `proxy.ts`, not `middleware.ts`.** File is `src/proxy.ts`, function is `export async function proxy(request)`. The `middleware` convention is deprecated.
 - **Server action body limit raised to 5MB** in `next.config.ts` (default 1MB). Required for profile pic upload (PNG blob from client crop canvas).
 - **Photo upload is decoupled from profile save.** Portal: `portalUpdateProfilePic`. Admin: `adminUploadProfilePic`. Neither passes other profile fields. Prevents silent data loss when a new field is added but not threaded through the photo handler's FormData.
@@ -193,14 +209,10 @@ pgTAP suites in `supabase/tests/` covering the four most load-bearing trigger/RP
 - Fulfill ticket button (manual fulfillment for tickets not auto-fulfilled).
 - `has_community_access` revoke checkbox on refund flow.
 - LinkedIn URL matching for duplicate detection across applications and members.
-- Side-by-side comparison when re-application differs from existing member record.
-- Automatic member field updates from re-application data.
+- Side-by-side comparison when re-application differs from existing member record (now narrowed scope: active members short-circuit at submission, so this only matters for kicked-out re-applications that land in the pending queue).
+- Automatic member field updates from re-application data (same narrowed scope).
 - CoachingOS sync.
 - Custom receipt email (using Stripe's built-in).
 - Reconciliation/retry queue for failed Streak pushes.
 - Integration test for the `activity_feed` view.
 
-## Pre-launch checklist
-
-- [ ] Flip `NEXT_PUBLIC_EMAIL_MODE` from `testing` to `live` in Vercel Production.
-- [ ] Swap Stripe Production scope to live-mode keys (currently sandbox in both scopes).
