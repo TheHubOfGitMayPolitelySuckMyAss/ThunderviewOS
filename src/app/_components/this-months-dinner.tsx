@@ -87,22 +87,11 @@ export default async function ThisMonthsDinner() {
           </p>
         )}
 
-        <div className="mb-stack">
-          {isAuthenticated ? (
-            <Button size="md" asChild>
-              <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
-            </Button>
-          ) : (
-            <Button size="md" asChild>
-              <Link href="/apply">Apply For {formatDinnerShort(dinner.date)}</Link>
-            </Button>
-          )}
-          <Small className="mt-2 text-fg3">40 seats. Closes when full.</Small>
-        </div>
-
         {hasSpeakers && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-7 gap-x-6 mt-section">
-            {speakers.map((s) => {
+          <>
+            <H2 className="mt-section mb-stack">Speaking</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-7 gap-x-6">
+              {speakers.map((s) => {
               const name = formatName(s.first_name, s.last_name);
               const hasLinks = s.linkedin_profile || s.company_website;
 
@@ -147,8 +136,22 @@ export default async function ThisMonthsDinner() {
                 </article>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
+
+        <div className="mt-section mb-stack">
+          {isAuthenticated ? (
+            <Button size="md" asChild>
+              <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
+            </Button>
+          ) : (
+            <Button size="md" asChild>
+              <Link href="/apply">Apply For {formatDinnerShort(dinner.date)}</Link>
+            </Button>
+          )}
+          <Small className="mt-2 text-fg3">40 seats. Closes when full.</Small>
+        </div>
       </div>
     </section>
   );

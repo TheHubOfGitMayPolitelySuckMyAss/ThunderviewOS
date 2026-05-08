@@ -48,8 +48,12 @@ export default function DinnerDetailsBlock({ details }: { details: DinnerDetails
             <p className="text-sm text-fg2 leading-relaxed whitespace-pre-line">{details.description}</p>
           )}
           {hasSpeakers && (
-            <div className="space-y-2 pt-1">
-              {details.speakers.map((s) => {
+            <>
+              <h2 className="font-display font-medium text-xl text-fg1 pt-3" style={{ fontVariationSettings: '"opsz" 72' }}>
+                Speaking
+              </h2>
+              <div className="space-y-2 pt-1">
+                {details.speakers.map((s) => {
                 const name = formatName(s.first_name, s.last_name);
                 const hasLinks = s.linkedin_profile || s.company_website;
 
@@ -94,7 +98,8 @@ export default function DinnerDetailsBlock({ details }: { details: DinnerDetails
                   </div>
                 );
               })}
-            </div>
+              </div>
+            </>
           )}
         </div>
       )}
