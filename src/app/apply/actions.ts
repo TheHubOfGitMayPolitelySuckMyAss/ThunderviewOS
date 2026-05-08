@@ -17,13 +17,32 @@ export async function submitApplication(formData: {
   attendeeStagetype: string;
   iAmCeo: string | null;
   isNotServices: string | null;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; alreadyMember?: boolean; error?: string }> {
   const admin = createAdminClient("public-flow");
+  const normalizedEmail = formData.email.trim().toLowerCase();
+
+  // Pre-check: if email already maps to an active (non-kicked-out) member,
+  // short-circuit to a "you're already a member" response — no application
+  // row, no admin notification, no Streak push. Kicked-out re-applications
+  // fall through to the normal flow so they land in the pending queue with
+  // a flag for manual review.
+  const { data: existingEmail } = await admin
+    .from("member_emails")
+    .select("member_id, members(kicked_out)")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (existingEmail) {
+    const member = existingEmail.members as unknown as { kicked_out: boolean } | null;
+    if (member && !member.kicked_out) {
+      return { success: true, alreadyMember: true };
+    }
+  }
 
   const { data, error } = await admin.from("applications").insert({
     first_name: formData.firstName.trim(),
     last_name: formData.lastName.trim(),
-    email: formData.email.trim().toLowerCase(),
+    email: normalizedEmail,
     linkedin_profile: formData.linkedinProfile.trim(),
     gender: formData.gender,
     race: formData.race,
@@ -47,7 +66,7 @@ export async function submitApplication(formData: {
     id: data.id,
     firstName: formData.firstName.trim(),
     lastName: formData.lastName.trim(),
-    email: formData.email.trim().toLowerCase(),
+    email: normalizedEmail,
     companyName: formData.companyName.trim(),
     companyWebsite: formData.companyWebsite.trim(),
     linkedinProfile: formData.linkedinProfile.trim(),

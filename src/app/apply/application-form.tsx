@@ -82,7 +82,7 @@ export default function ApplicationForm() {
       });
 
       if (result.success) {
-        router.push("/apply/thanks");
+        router.push(result.alreadyMember ? "/apply/already-member" : "/apply/thanks");
       } else {
         setError(result.error || "Something went wrong. Please try again.");
       }

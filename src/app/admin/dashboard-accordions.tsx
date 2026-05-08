@@ -11,6 +11,7 @@ type PendingApp = {
   name: string;
   company_name: string;
   submitted_on: string;
+  kickedOutReapplication: boolean;
 };
 
 type OptOut = {
@@ -127,7 +128,13 @@ export default function DashboardAccordions({
                     </Link>
                   </td>
                   <td className="px-3.5 py-3 text-[14px] text-fg2">{app.company_name}</td>
-                  <td className="px-3.5 py-3"><Pill variant="warn" dot>Pending</Pill></td>
+                  <td className="px-3.5 py-3">
+                    {app.kickedOutReapplication ? (
+                      <Pill variant="danger" dot>Removed-member re-application</Pill>
+                    ) : (
+                      <Pill variant="warn" dot>Pending</Pill>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

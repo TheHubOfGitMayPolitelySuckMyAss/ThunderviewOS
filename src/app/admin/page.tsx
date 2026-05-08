@@ -59,9 +59,26 @@ export default async function DashboardPage() {
   // Pending applications
   const { data: pendingApps } = await supabase
     .from("applications")
-    .select("id, first_name, last_name, company_name, submitted_on")
+    .select("id, first_name, last_name, company_name, submitted_on, email")
     .eq("status", "pending")
     .order("submitted_on", { ascending: false });
+
+  // Flag any pending applications whose email belongs to a kicked-out member.
+  // Public submission already short-circuits matches against active members,
+  // so anything that lands here with an existing-email match is a re-application
+  // from someone we previously removed and needs deliberate review.
+  const pendingEmails = (pendingApps || []).map((a) => a.email.toLowerCase());
+  const kickedOutEmails = new Set<string>();
+  if (pendingEmails.length > 0) {
+    const { data: emailRows } = await supabase
+      .from("member_emails")
+      .select("email, members(kicked_out)")
+      .in("email", pendingEmails);
+    for (const row of emailRows || []) {
+      const m = row.members as unknown as { kicked_out: boolean } | null;
+      if (m?.kicked_out) kickedOutEmails.add(row.email.toLowerCase());
+    }
+  }
 
   // Active community members
   const { count: communityCount } = await supabase
@@ -138,6 +155,7 @@ export default async function DashboardPage() {
           name: formatName(a.first_name, a.last_name),
           company_name: a.company_name,
           submitted_on: a.submitted_on,
+          kickedOutReapplication: kickedOutEmails.has(a.email.toLowerCase()),
         }))}
         optOuts={
           (optOuts || []).map((m) => ({
