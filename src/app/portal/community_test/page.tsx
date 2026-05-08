@@ -37,6 +37,9 @@ export default async function CommunityTestPage() {
       )
       .eq("has_community_access", true)
       .eq("kicked_out", false)
+      .or(
+        "current_intro_short.not.is.null,current_ask_short.not.is.null,current_give_short.not.is.null",
+      )
       .order("first_name", { ascending: true })
       .range(from, to),
   );
