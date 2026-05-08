@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown } from "lucide-react";
 import { formatName } from "@/lib/format";
 import MemberAvatar from "@/components/member-avatar";
 import { Input } from "@/components/ui/input";
@@ -25,13 +25,21 @@ type Member = {
   profile_pic_url: string | null;
 };
 
-type SortKey = "name" | "company";
+type SortKey = "first_name" | "last_name" | "company";
 type SortDir = "asc" | "desc";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "first_name", label: "First name" },
+  { key: "last_name", label: "Last name" },
+  { key: "company", label: "Company" },
+];
 
 function getSortValue(member: Member, key: SortKey): string {
   switch (key) {
-    case "name":
-      return formatName(member.first_name, member.last_name).toLowerCase();
+    case "first_name":
+      return (member.first_name || "").toLowerCase();
+    case "last_name":
+      return (member.last_name || "").toLowerCase();
     case "company":
       return (member.company_name || "").toLowerCase();
   }
@@ -39,16 +47,30 @@ function getSortValue(member: Member, key: SortKey): string {
 
 export default function CommunityTestTable({ members }: { members: Member[] }) {
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey, setSortKey] = useState<SortKey>("first_name");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLTableCellElement>(null);
 
-  function toggleSort(key: SortKey) {
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onClick(e: MouseEvent) {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [menuOpen]);
+
+  function pickSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
       setSortKey(key);
       setSortDir("asc");
     }
+    setMenuOpen(false);
   }
 
   const filtered = search
@@ -78,23 +100,7 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return null;
-    return sortDir === "asc" ? (
-      <ArrowUp size={12} className="inline ml-1" />
-    ) : (
-      <ArrowDown size={12} className="inline ml-1" />
-    );
-  }
-
-  type ColDef = { key: string; label: string; sortKey?: SortKey };
-  const cols: ColDef[] = [
-    { key: "name", label: "Name", sortKey: "name" },
-    { key: "company", label: "Company", sortKey: "company" },
-    { key: "intro", label: "Intro" },
-    { key: "ask", label: "Ask" },
-    { key: "give", label: "Give" },
-  ];
+  const headerLabels = ["Name/Company", "Intro", "Ask", "Give"];
 
   return (
     <div>
@@ -112,17 +118,51 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {cols.map((col) => (
+              <th
+                ref={headerRef}
+                onClick={() => setMenuOpen((v) => !v)}
+                className="relative text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-4 py-3 bg-bg-elevated border-b border-border select-none sticky top-0 z-10 cursor-pointer hover:text-fg2 w-[280px]"
+              >
+                <span className="inline-flex items-center gap-1">
+                  Name/Company
+                  <ChevronDown size={12} />
+                  {sortDir === "asc" ? (
+                    <ArrowUp size={12} className="ml-1" />
+                  ) : (
+                    <ArrowDown size={12} className="ml-1" />
+                  )}
+                </span>
+                {menuOpen && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute left-3 top-full mt-1 w-44 rounded-lg border border-border bg-bg shadow-lg overflow-hidden normal-case tracking-normal font-normal text-[13px] text-fg2"
+                  >
+                    {SORT_OPTIONS.map((opt) => {
+                      const active = sortKey === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => pickSort(opt.key)}
+                          className={
+                            "w-full text-left px-3 py-2 hover:bg-bg-elevated flex items-center justify-between " +
+                            (active ? "text-fg1 font-medium" : "")
+                          }
+                        >
+                          <span>{opt.label}</span>
+                          {active && (sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </th>
+              {headerLabels.slice(1).map((label) => (
                 <th
-                  key={col.key}
-                  onClick={col.sortKey ? () => toggleSort(col.sortKey!) : undefined}
-                  className={
-                    "text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-4 py-3 bg-bg-elevated border-b border-border select-none sticky top-0 z-10 " +
-                    (col.sortKey ? "cursor-pointer hover:text-fg2" : "")
-                  }
+                  key={label}
+                  className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-4 py-3 bg-bg-elevated border-b border-border select-none sticky top-0 z-10"
                 >
-                  {col.label}
-                  {col.sortKey && <SortIcon col={col.sortKey} />}
+                  {label}
                 </th>
               ))}
             </tr>
@@ -131,19 +171,23 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
             {sorted.map((member) => (
               <tr
                 key={member.id}
-                className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated"
+                className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated align-top"
               >
-                <td className="px-4 py-3.5 text-sm">
+                <td className="px-4 py-3.5">
                   <Link
                     href={`/portal/members/${member.id}`}
-                    className="flex items-center gap-3 text-fg1 font-medium no-underline after:absolute after:inset-0"
+                    className="flex items-start gap-3 no-underline after:absolute after:inset-0"
                   >
                     <MemberAvatar member={member} size="sm" />
-                    {formatName(member.first_name, member.last_name)}
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-sm font-semibold text-fg1">
+                        {formatName(member.first_name, member.last_name)}
+                      </span>
+                      <span className="text-[12px] text-fg3 mt-0.5">
+                        {member.company_name || ""}
+                      </span>
+                    </div>
                   </Link>
-                </td>
-                <td className="px-4 py-3.5 text-[13px] text-fg2">
-                  {member.company_name || "—"}
                 </td>
                 <td className="px-4 py-3.5 text-[13px] text-fg2">
                   {member.current_intro_short || ""}
@@ -158,7 +202,7 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
             ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={cols.length} className="px-4 py-8 text-center text-sm text-fg4">
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-fg4">
                   No members found.
                 </td>
               </tr>
