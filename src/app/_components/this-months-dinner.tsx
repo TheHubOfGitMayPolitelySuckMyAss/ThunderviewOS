@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Globe } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT, formatDinnerDisplay, formatDinnerShort, formatName } from "@/lib/format";
 import { Eyebrow, H2, H3, Small } from "@/components/ui/typography";
@@ -17,6 +18,10 @@ type Speaker = {
 };
 
 export default async function ThisMonthsDinner() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isAuthenticated = !!user;
+
   const admin = createAdminClient("public-flow");
   const todayMT = getTodayMT();
 
@@ -83,9 +88,15 @@ export default async function ThisMonthsDinner() {
         )}
 
         <div className="mb-stack">
-          <Button size="md" asChild>
-            <Link href="/apply">Apply For {formatDinnerShort(dinner.date)}</Link>
-          </Button>
+          {isAuthenticated ? (
+            <Button size="md" asChild>
+              <Link href="/portal/tickets">Buy A Dinner Ticket</Link>
+            </Button>
+          ) : (
+            <Button size="md" asChild>
+              <Link href="/apply">Apply For {formatDinnerShort(dinner.date)}</Link>
+            </Button>
+          )}
           <Small className="mt-2 text-fg3">40 seats. Closes when full.</Small>
         </div>
 
