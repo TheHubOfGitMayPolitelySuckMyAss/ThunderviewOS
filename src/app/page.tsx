@@ -85,11 +85,10 @@ export default async function HomePage() {
           {/* Hero photo */}
           <div className="relative aspect-video rounded-[16px] overflow-hidden shadow-lg">
             <Image
-              src="/brand/photos/dinner-03-two-guys-pointing.webp"
-              alt="Two CEOs at a Thunderview dinner"
+              src="/brand/photos/hero.jpg"
+              alt="Two speakers at a Thunderview dinner"
               fill
               className="object-cover"
-              style={{ objectPosition: "30% 40%" }}
               priority
             />
           </div>
@@ -141,22 +140,22 @@ export default async function HomePage() {
           <H2 className="mb-7">Scenes from the last three years.</H2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
-              <Image src="/brand/photos/dinner-10-laughing-pair.webp" alt="Two CEOs laughing" fill className="!relative object-cover w-full h-full" />
+              <Image src="/brand/photos/topleft.jpg" alt="Audience at a Thunderview dinner" fill className="!relative object-cover w-full h-full" />
             </figure>
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
-              <Image src="/brand/photos/dinner-01-conversation.webp" alt="Candid conversation at dinner" fill className="!relative object-cover w-full h-full" style={{ objectPosition: "left center" }} />
+              <Image src="/brand/photos/topmiddle.jpeg" alt="A CEO speaking at a Thunderview dinner" fill className="!relative object-cover w-full h-full" />
             </figure>
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
-              <Image src="/brand/photos/dinner-05-panel-audience.webp" alt="Audience at a Thunderview dinner" fill className="!relative object-cover w-full h-full" style={{ objectPosition: "center 40%" }} />
+              <Image src="/brand/photos/topright.jpeg" alt="CEOs in conversation at a Thunderview dinner" fill className="!relative object-cover w-full h-full" />
             </figure>
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
-              <Image src="/brand/photos/dinner-11-wave-hello.webp" alt="A wave hello" fill className="!relative object-cover w-full h-full" style={{ objectPosition: "center 45%" }} />
+              <Image src="/brand/photos/bottomleft.jpeg" alt="A CEO at a Thunderview dinner" fill className="!relative object-cover w-full h-full" />
             </figure>
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
-              <Image src="/brand/photos/dinner-12-bigfoot-mural.webp" alt="Bigfoot mural at the venue" fill className="!relative object-cover w-full h-full" style={{ objectPosition: "center 55%" }} />
+              <Image src="/brand/photos/bottommiddle.jpg" alt="Buffet line at a Thunderview dinner" fill className="!relative object-cover w-full h-full" />
             </figure>
             <figure className="m-0 aspect-[4/3] rounded-xl overflow-hidden border border-border bg-bg-elevated">
-              <Image src="/brand/photos/dinner-04-green-vest.webp" alt="CEO in a green vest" fill className="!relative object-cover w-full h-full" />
+              <Image src="/brand/photos/bottomright.jpg" alt="CEOs gathered around food at a Thunderview dinner" fill className="!relative object-cover w-full h-full" />
             </figure>
           </div>
         </div>
