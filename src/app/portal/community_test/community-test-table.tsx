@@ -48,8 +48,9 @@ function getSortValue(member: Member, key: SortKey): string {
 export default function CommunityTestTable({ members }: { members: Member[] }) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("first_name");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showIncomplete, setShowIncomplete] = useState(false);
   const headerRef = useRef<HTMLTableCellElement>(null);
 
   useEffect(() => {
@@ -73,8 +74,17 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
     setMenuOpen(false);
   }
 
+  const completeFiltered = showIncomplete
+    ? members
+    : members.filter(
+        (m) =>
+          m.current_intro_short ||
+          m.current_ask_short ||
+          m.current_give_short,
+      );
+
   const filtered = search
-    ? members.filter((m) => {
+    ? completeFiltered.filter((m) => {
         const s = search.toLowerCase();
         const fullName = formatName(m.first_name, m.last_name).toLowerCase();
         return (
@@ -91,7 +101,7 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
           m.attendee_stagetypes.some((st) => st.toLowerCase().includes(s))
         );
       })
-    : members;
+    : completeFiltered;
 
   const sorted = [...filtered].sort((a, b) => {
     const av = getSortValue(a, sortKey);
@@ -104,7 +114,7 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <Input
           type="text"
           placeholder="Search name, company, intro, ask, give…"
@@ -112,6 +122,26 @@ export default function CommunityTestTable({ members }: { members: Member[] }) {
           onChange={(e) => setSearch(e.target.value)}
           className="!max-w-sm"
         />
+        <label className="flex items-center gap-2 text-[13px] text-fg2 select-none cursor-pointer">
+          Show members without intros/asks
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showIncomplete}
+            onClick={() => setShowIncomplete((v) => !v)}
+            className={
+              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-[120ms] " +
+              (showIncomplete ? "bg-accent" : "bg-border")
+            }
+          >
+            <span
+              className={
+                "inline-block h-4 w-4 transform rounded-full bg-bg shadow transition-transform duration-[120ms] " +
+                (showIncomplete ? "translate-x-[18px]" : "translate-x-0.5")
+              }
+            />
+          </button>
+        </label>
       </div>
 
       <div className="rounded-xl border border-border bg-bg overflow-hidden">
