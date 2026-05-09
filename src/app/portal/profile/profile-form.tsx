@@ -37,6 +37,7 @@ const CONTACT_OPTIONS = [
 
 type ProfileFormProps = {
   returnTo?: string;
+  targetMemberId?: string | null;
   member: {
     firstName: string;
     lastName: string;
@@ -54,7 +55,7 @@ type ProfileFormProps = {
   };
 };
 
-export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
+export default function ProfileForm({ member, returnTo, targetMemberId }: ProfileFormProps) {
   const router = useRouter();
   const [firstName, setFirstName] = useState(member.firstName);
   const [lastName, setLastName] = useState(member.lastName);
@@ -114,6 +115,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
       setSavingPhoto(true);
       const formData = new FormData();
       formData.set("profile_pic", file);
+      if (targetMemberId) formData.set("target_member_id", targetMemberId);
       const result = await portalUpdateProfilePic(formData);
       setSavingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -139,6 +141,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("profile_pic", file);
+    if (targetMemberId) formData.set("target_member_id", targetMemberId);
 
     const result = await portalUpdateProfilePic(formData);
     setSavingPhoto(false);
@@ -168,6 +171,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("remove_pic", "true");
+    if (targetMemberId) formData.set("target_member_id", targetMemberId);
 
     const result = await portalUpdateProfilePic(formData);
     setSavingPhoto(false);
@@ -277,6 +281,9 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {targetMemberId && (
+          <input type="hidden" name="target_member_id" value={targetMemberId} />
+        )}
         <Card>
           <FormSection eyebrow="Profile details">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -449,7 +456,7 @@ export default function ProfileForm({ member, returnTo }: ProfileFormProps) {
                   const newVal = e.target.checked;
                   setTogglingMarketing(true);
                   setMarketingOptedIn(newVal);
-                  const result = await toggleMarketing(newVal);
+                  const result = await toggleMarketing(newVal, targetMemberId ?? undefined);
                   setTogglingMarketing(false);
                   if (!result.success) {
                     setMarketingOptedIn(!newVal);

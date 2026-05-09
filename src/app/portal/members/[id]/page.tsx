@@ -51,6 +51,11 @@ export default async function MemberProfilePage({
     const viewerLookup = await findMemberByAnyEmail(admin, user.email);
     isSelf = viewerLookup?.memberId === member.id;
   }
+  const isAdmin = user?.email === "eric@marcoullier.com";
+  const canEdit = isSelf || isAdmin;
+  const editHref = isSelf
+    ? `/portal/profile?from=member&id=${member.id}`
+    : `/portal/profile?member_id=${member.id}`;
 
   const name = formatName(member.first_name, member.last_name);
   const roles = (member.attendee_stagetypes ?? []) as string[];
@@ -84,8 +89,8 @@ export default async function MemberProfilePage({
           <p className="text-[13px] text-fg3 mt-1">
             {roles.length > 0 ? roles.map(formatStageType).join(" \u00B7 ") : "Member"}
           </p>
-          {isSelf && (
-            <Link href={`/portal/profile?from=member&id=${member.id}`} className="no-underline mt-2.5 inline-block">
+          {canEdit && (
+            <Link href={editHref} className="no-underline mt-2.5 inline-block">
               <Button variant="secondary" size="sm">Edit Profile</Button>
             </Link>
           )}

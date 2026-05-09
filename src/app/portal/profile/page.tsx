@@ -4,16 +4,17 @@ import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { H1, Body } from "@/components/ui/typography";
-import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/typography";
 import ProfileForm from "./profile-form";
+
+const ADMIN_EMAIL = "eric@marcoullier.com";
 
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; id?: string }>;
+  searchParams: Promise<{ from?: string; id?: string; member_id?: string }>;
 }) {
-  const { from, id: returnMemberId } = await searchParams;
+  const { from, id: returnMemberId, member_id: targetMemberIdParam } = await searchParams;
   const fromMember = from === "member" && returnMemberId;
   const supabase = await createClient();
   const {
@@ -22,51 +23,91 @@ export default async function ProfilePage({
 
   if (!user) redirect("/login");
 
+  const isAdmin = user.email === ADMIN_EMAIL;
   const admin = createAdminClient("read-only");
 
-  const result = await findMemberByAnyEmail<{
-    id: string;
-    first_name: string;
-    last_name: string;
-    company_name: string | null;
-    company_website: string | null;
-    linkedin_profile: string | null;
-    attendee_stagetypes: string[];
-    current_intro: string | null;
-    current_ask: string | null;
-    current_give: string | null;
-    contact_preference: string | null;
-    kicked_out: boolean;
-    profile_pic_url: string | null;
-    marketing_opted_in: boolean;
-  }>(
+  // Look up the viewer's own member row first (always need it for primary email
+  // fallback and to decide whether targetMemberIdParam refers to someone else).
+  const viewerLookup = await findMemberByAnyEmail<{ id: string }>(
     admin,
     user.email!,
-    "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, kicked_out, profile_pic_url, marketing_opted_in"
+    "id",
   );
+  const viewerMemberId = viewerLookup?.memberId ?? null;
 
-  const member = result?.member ?? null;
-  if (!member || member.kicked_out) redirect("/portal");
+  // Resolve target: if admin passed ?member_id=X and X != viewer's own id, edit
+  // that member. Non-admin attempts at ?member_id are silently ignored — the
+  // page will load the viewer's own profile.
+  const adminEditingOther =
+    !!targetMemberIdParam && isAdmin && targetMemberIdParam !== viewerMemberId;
 
-  // Get primary email
+  let memberId: string | null = null;
+  if (adminEditingOther) {
+    memberId = targetMemberIdParam!;
+  } else if (viewerMemberId) {
+    memberId = viewerMemberId;
+  }
+
+  if (!memberId) redirect("/portal");
+
+  const { data: member } = await admin
+    .from("members")
+    .select(
+      "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference, kicked_out, profile_pic_url, marketing_opted_in",
+    )
+    .eq("id", memberId)
+    .single();
+
+  if (!member || (!adminEditingOther && member.kicked_out)) redirect("/portal");
+
   const { data: emails } = await admin
     .from("member_emails")
     .select("email, is_primary")
     .eq("member_id", member.id);
 
   const primaryEmail =
-    emails?.find((e) => e.is_primary)?.email ?? user.email!;
+    emails?.find((e) => e.is_primary)?.email ??
+    (adminEditingOther ? "" : user.email!);
+
+  // Where to send the user back / redirect on save.
+  // - admin editing another member: back to that member's profile page
+  // - viewer with from=member&id=X: existing self-edit-from-member-page flow
+  //   (back link → /portal/community, post-save → /portal/members/X)
+  // - otherwise: portal home
+  const backHref = adminEditingOther
+    ? `/portal/members/${member.id}`
+    : fromMember
+      ? "/portal/community"
+      : "/portal";
+  const backLabel = adminEditingOther
+    ? `Back to ${member.first_name}'s profile`
+    : fromMember
+      ? "Community"
+      : "Portal home";
+  const returnTo = adminEditingOther
+    ? `/portal/members/${member.id}`
+    : fromMember
+      ? `/portal/members/${returnMemberId}`
+      : undefined;
 
   return (
     <div className="tv-container-portal tv-page-gutter py-7">
       <Link
-        href={fromMember ? "/portal/community" : "/portal"}
+        href={backHref}
         className="text-[13px] text-fg3 no-underline inline-flex items-center gap-1 mb-3"
       >
-        <ArrowLeft size={14} /> {fromMember ? "Community" : "Portal home"}
+        <ArrowLeft size={14} /> {backLabel}
       </Link>
+      {adminEditingOther && (
+        <div className="mb-4 rounded-lg border border-accent-soft bg-bg-elevated px-4 py-3 text-[13px] text-fg2">
+          <Eyebrow className="mb-1">Admin mode</Eyebrow>
+          You are editing {member.first_name} {member.last_name}&rsquo;s profile.
+          The change will be attributed to you in the activity feed.
+        </div>
+      )}
       <ProfileForm
-        returnTo={fromMember ? `/portal/members/${returnMemberId}` : undefined}
+        returnTo={returnTo}
+        targetMemberId={adminEditingOther ? member.id : null}
         member={{
           firstName: member.first_name,
           lastName: member.last_name,

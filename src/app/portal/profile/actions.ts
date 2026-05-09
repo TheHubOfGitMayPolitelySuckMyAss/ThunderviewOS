@@ -11,6 +11,8 @@ import sharp from "sharp";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
+const ADMIN_EMAIL = "eric@marcoullier.com";
+
 /**
  * Standalone portal profile pic upload/remove.
  * Only touches profile_pic_url — no other member fields.
@@ -27,12 +29,24 @@ export async function portalUpdateProfilePic(
 
   const admin = await createAdminClientForCurrentActor();
 
-  const result = await findMemberByAnyEmail<{
-    id: string;
-    profile_pic_url: string | null;
-  }>(admin, user.email!, "id, profile_pic_url");
+  const requestedTargetId = (formData.get("target_member_id") as string)?.trim() || null;
+  const isAdmin = user.email === ADMIN_EMAIL;
 
-  const member = result?.member ?? null;
+  let member: { id: string; profile_pic_url: string | null } | null = null;
+  if (requestedTargetId && isAdmin) {
+    const { data } = await admin
+      .from("members")
+      .select("id, profile_pic_url")
+      .eq("id", requestedTargetId)
+      .single();
+    member = (data as typeof member) ?? null;
+  } else {
+    const result = await findMemberByAnyEmail<{
+      id: string;
+      profile_pic_url: string | null;
+    }>(admin, user.email!, "id, profile_pic_url");
+    member = result?.member ?? null;
+  }
   if (!member) return { success: false, error: "Member not found" };
 
   const file = formData.get("profile_pic") as File | null;
@@ -102,6 +116,56 @@ const VALID_STAGETYPES = [
 
 const VALID_CONTACT = ["linkedin", "email"];
 
+type ProfileMember = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  company_name: string | null;
+  company_website: string | null;
+  linkedin_profile: string | null;
+  attendee_stagetypes: string[];
+  current_intro: string | null;
+  current_ask: string | null;
+  current_give: string | null;
+  contact_preference: string | null;
+};
+
+const PROFILE_SELECT =
+  "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference";
+
+/**
+ * Resolve the member whose profile is being edited.
+ *
+ * - No `target_member_id`, or non-admin viewer: edit self.
+ * - Admin viewer + `target_member_id` present: edit that member.
+ *
+ * Audit attribution is independent — `createAdminClientForCurrentActor()`
+ * stamps every write with the viewer's member_id, so admin saves on another
+ * member's row land as actor=admin, subject=that member.
+ */
+async function resolveTargetMember(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  viewerEmail: string,
+  requestedTargetId: string | null,
+): Promise<ProfileMember | null> {
+  const isAdmin = viewerEmail === ADMIN_EMAIL;
+  if (requestedTargetId && isAdmin) {
+    const { data } = await admin
+      .from("members")
+      .select(PROFILE_SELECT)
+      .eq("id", requestedTargetId)
+      .single();
+    return (data as ProfileMember) ?? null;
+  }
+  const result = await findMemberByAnyEmail<ProfileMember>(
+    admin,
+    viewerEmail,
+    PROFILE_SELECT,
+  );
+  return result?.member ?? null;
+}
+
 export async function saveProfile(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -112,25 +176,8 @@ export async function saveProfile(formData: FormData) {
 
   const admin = await createAdminClientForCurrentActor();
 
-  const result = await findMemberByAnyEmail<{
-    id: string;
-    first_name: string;
-    last_name: string;
-    company_name: string | null;
-    company_website: string | null;
-    linkedin_profile: string | null;
-    attendee_stagetypes: string[];
-    current_intro: string | null;
-    current_ask: string | null;
-    current_give: string | null;
-    contact_preference: string | null;
-  }>(
-    admin,
-    user.email!,
-    "id, first_name, last_name, company_name, company_website, linkedin_profile, attendee_stagetypes, current_intro, current_ask, current_give, contact_preference"
-  );
-
-  const member = result?.member ?? null;
+  const requestedTargetId = (formData.get("target_member_id") as string)?.trim() || null;
+  const member = await resolveTargetMember(admin, user.email!, requestedTargetId);
   if (!member) return { success: false, error: "Member not found" };
 
   // Parse form data
@@ -287,13 +334,18 @@ export async function saveProfile(formData: FormData) {
     if (error) return { success: false, error: error.message };
   }
 
-  await safePushMember(member.id, "portal_profile_save");
+  const op =
+    requestedTargetId && user.email === ADMIN_EMAIL
+      ? "admin_portal_profile_save"
+      : "portal_profile_save";
+  await safePushMember(member.id, op);
 
   return { success: true, noChanges: false };
 }
 
 export async function toggleMarketing(
-  value: boolean
+  value: boolean,
+  targetMemberId?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const {
@@ -304,19 +356,25 @@ export async function toggleMarketing(
 
   const admin = await createAdminClientForCurrentActor();
 
-  const result = await findMemberByAnyEmail(admin, user.email!);
-  const member = result ? { id: result.memberId } : null;
-  if (!member) return { success: false, error: "Member not found" };
+  const isAdmin = user.email === ADMIN_EMAIL;
+  let memberId: string | null = null;
+  if (targetMemberId && isAdmin) {
+    memberId = targetMemberId;
+  } else {
+    const result = await findMemberByAnyEmail(admin, user.email!);
+    memberId = result?.memberId ?? null;
+  }
+  if (!memberId) return { success: false, error: "Member not found" };
 
   const { error } = await admin
     .from("members")
     .update({ marketing_opted_in: value })
-    .eq("id", member.id);
+    .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
 
   await safePushMember(
-    member.id,
+    memberId,
     value ? "opt_back_in" : "portal_marketing_opt_out"
   );
 
