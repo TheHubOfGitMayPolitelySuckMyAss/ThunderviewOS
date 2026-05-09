@@ -9,6 +9,7 @@ type SearchParams = {
   page?: string;
   events?: string;
   actor?: string;
+  anon?: string;
   from?: string;
   to?: string;
 };
@@ -30,6 +31,7 @@ export default async function OperationsPage({
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const eventTypes = sp.events ? sp.events.split(",").filter(Boolean) : [];
   const actorMemberId = sp.actor || null;
+  const anonId = sp.anon || null;
   const fromDate = sp.from || null;
   const toDate = sp.to || null;
 
@@ -40,6 +42,7 @@ export default async function OperationsPage({
       pageSize: PAGE_SIZE,
       eventTypes: eventTypes.length > 0 ? eventTypes : undefined,
       actorMemberId,
+      anonId,
       fromDate,
       toDate,
     }),
@@ -66,6 +69,7 @@ export default async function OperationsPage({
         allEventTypes={allEventTypes}
         eventTypes={eventTypes}
         actorMemberId={actorMemberId}
+        anonId={anonId}
         fromDate={fromDate}
         toDate={toDate}
       />

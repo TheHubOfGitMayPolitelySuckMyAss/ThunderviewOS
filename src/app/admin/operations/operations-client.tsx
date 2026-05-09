@@ -21,9 +21,50 @@ type Props = {
   allEventTypes: string[];
   eventTypes: string[];
   actorMemberId: string | null;
+  anonId: string | null;
   fromDate: string | null;
   toDate: string | null;
 };
+
+function visitorHandle(anonId: string): { short: string; hue: number } {
+  const cleaned = anonId.replace(/-/g, "");
+  return {
+    short: cleaned.slice(0, 8),
+    hue: parseInt(cleaned.slice(0, 6), 16) % 360,
+  };
+}
+
+function VisitorChip({
+  anonId,
+  selected,
+  onClick,
+}: {
+  anonId: string;
+  selected?: boolean;
+  onClick?: () => void;
+}) {
+  const { short, hue } = visitorHandle(anonId);
+  const style = {
+    backgroundColor: `hsl(${hue} 70% ${selected ? 88 : 94}%)`,
+    color: `hsl(${hue} 70% 28%)`,
+    borderColor: `hsl(${hue} 50% ${selected ? 55 : 70}%)`,
+  };
+  const className =
+    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border font-mono text-[12px] " +
+    (onClick ? "cursor-pointer hover:brightness-95 transition" : "");
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className} style={style}>
+        Visitor {short}
+      </button>
+    );
+  }
+  return (
+    <span className={className} style={style}>
+      Visitor {short}
+    </span>
+  );
+}
 
 export default function OperationsClient(props: Props) {
   const router = useRouter();
@@ -82,6 +123,14 @@ export default function OperationsClient(props: Props) {
   function clearActor() {
     setActorName(null);
     setParam("actor", null);
+  }
+
+  function clearAnon() {
+    setParam("anon", null);
+  }
+
+  function selectAnon(anonId: string) {
+    setParam("anon", anonId);
   }
 
   const tabClasses = (active: boolean) =>
@@ -210,7 +259,27 @@ export default function OperationsClient(props: Props) {
           />
         </div>
 
-        {(props.eventTypes.length > 0 || props.actorMemberId || props.fromDate || props.toDate) && (
+        {props.anonId && (
+          <div>
+            <label className="block text-[12px] font-medium text-fg2 mb-1">Visitor</label>
+            <div className="flex items-center gap-2">
+              <VisitorChip anonId={props.anonId} selected />
+              <button
+                type="button"
+                onClick={clearAnon}
+                className="text-fg3 hover:text-fg1 text-sm"
+              >
+                clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(props.eventTypes.length > 0 ||
+          props.actorMemberId ||
+          props.anonId ||
+          props.fromDate ||
+          props.toDate) && (
           <Button variant="ghost" onClick={() => router.push("/admin/operations?tab=" + props.kind)}>
             Reset
           </Button>
@@ -221,7 +290,7 @@ export default function OperationsClient(props: Props) {
       {props.feedError ? (
         <FeedError message={props.feedError} />
       ) : (
-        <FeedTable rows={props.rows} />
+        <FeedTable rows={props.rows} selectedAnonId={props.anonId} onSelectAnon={selectAnon} />
       )}
 
       {/* Pagination */}
@@ -261,7 +330,15 @@ export function FeedError({ message }: { message: string }) {
   );
 }
 
-export function FeedTable({ rows }: { rows: FeedRow[] }) {
+export function FeedTable({
+  rows,
+  selectedAnonId,
+  onSelectAnon,
+}: {
+  rows: FeedRow[];
+  selectedAnonId?: string | null;
+  onSelectAnon?: (anonId: string) => void;
+}) {
   const formatted = useMemo(
     () =>
       rows.map((r) => ({
@@ -301,15 +378,30 @@ export function FeedTable({ rows }: { rows: FeedRow[] }) {
                 </td>
                 <td className="px-4 py-2.5">{r.summary}</td>
                 <td className="px-4 py-2.5">
-                  {r.actor_id ? (
-                    <Link className="text-accent hover:underline" href={`/admin/members/${r.actor_id}`}>
-                      {r.actor_name ?? "Unknown"}
-                    </Link>
-                  ) : r.actor_label ? (
-                    <span className="text-fg3 font-mono text-[12px]">{r.actor_label}</span>
-                  ) : (
-                    <span className="text-fg3">—</span>
-                  )}
+                  {(() => {
+                    if (r.actor_id) {
+                      return (
+                        <Link className="text-accent hover:underline" href={`/admin/members/${r.actor_id}`}>
+                          {r.actor_name ?? "Unknown"}
+                        </Link>
+                      );
+                    }
+                    const anonId =
+                      typeof r.metadata?.anon_id === "string" ? (r.metadata.anon_id as string) : null;
+                    if (anonId) {
+                      return (
+                        <VisitorChip
+                          anonId={anonId}
+                          selected={selectedAnonId === anonId}
+                          onClick={onSelectAnon ? () => onSelectAnon(anonId) : undefined}
+                        />
+                      );
+                    }
+                    if (r.actor_label) {
+                      return <span className="text-fg3 font-mono text-[12px]">{r.actor_label}</span>;
+                    }
+                    return <span className="text-fg3">—</span>;
+                  })()}
                 </td>
                 <td className="px-4 py-2.5">
                   {r.subject_member_id ? (

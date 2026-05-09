@@ -39,6 +39,8 @@ export type FeedFilters = {
   actorMemberId?: string | null;
   /** Member History scoping: include rows where actor_id = member OR subject_member_id = member */
   scopedToMemberId?: string | null;
+  /** Marketing feed: scope to a single anonymous visitor by anon_id. */
+  anonId?: string | null;
   fromDate?: string | null;
   toDate?: string | null;
 };

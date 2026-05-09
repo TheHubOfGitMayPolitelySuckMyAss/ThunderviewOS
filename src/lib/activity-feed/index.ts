@@ -92,6 +92,10 @@ export async function getActivityFeed(filters: FeedFilters): Promise<FeedResult>
       q = q.or(`actor_id.eq.${m},subject_member_id.eq.${m}`);
     }
 
+    if (filters.anonId) {
+      q = q.eq("metadata->>anon_id", filters.anonId);
+    }
+
     if (filters.fromDate) {
       q = q.gte("occurred_at", filters.fromDate);
     }
