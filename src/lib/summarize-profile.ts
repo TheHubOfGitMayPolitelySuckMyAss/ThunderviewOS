@@ -1,6 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic();
+let cachedClient: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!cachedClient) cachedClient = new Anthropic();
+  return cachedClient;
+}
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_OUTPUT_CHARS = 60;
@@ -46,7 +50,7 @@ Output only the summary, no quotes, no explanation.`;
 
 async function summarize(prompt: string, text: string): Promise<string | null> {
   try {
-    const response = await client.messages.create({
+    const response = await getClient().messages.create({
       model: MODEL,
       max_tokens: 100,
       messages: [{ role: "user", content: prompt.replace("{text}", text) }],
