@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 let cachedClient: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -7,6 +8,14 @@ function getClient(): Anthropic {
 }
 
 const MODEL = "claude-sonnet-4-6";
+
+type Field = "intro" | "ask" | "give";
+
+const FIELD_LABEL: Record<Field, string> = {
+  intro: "Intro",
+  ask: "Ask",
+  give: "Give",
+};
 
 const INTRO_PROMPT = `Compress this person's intro into a 3-7 word summary for a community directory. The reader sees their Name and Company in adjacent columns.
 
@@ -47,7 +56,39 @@ Give: {text}
 
 Output only the summary, no quotes, no explanation.`;
 
-async function summarize(prompt: string, text: string): Promise<string | null> {
+const PROMPT_BY_FIELD: Record<Field, string> = {
+  intro: INTRO_PROMPT,
+  ask: ASK_PROMPT,
+  give: GIVE_PROMPT,
+};
+
+async function logEvent(
+  type: string,
+  subjectMemberId: string | null,
+  summary: string,
+  metadata: Record<string, unknown>,
+) {
+  try {
+    const admin = createAdminClient("system-internal");
+    await admin.from("system_events").insert({
+      event_type: type,
+      subject_member_id: subjectMemberId,
+      summary,
+      metadata,
+    });
+  } catch (err) {
+    // Don't let a logging failure cascade. Stays in stdout for Vercel logs.
+    console.error("[summarize-profile] system_events insert failed:", err);
+  }
+}
+
+async function summarize(
+  field: Field,
+  text: string,
+  memberId: string,
+): Promise<string | null> {
+  const prompt = PROMPT_BY_FIELD[field];
+  const inputChars = text.length;
   try {
     const response = await getClient().messages.create({
       model: MODEL,
@@ -55,25 +96,52 @@ async function summarize(prompt: string, text: string): Promise<string | null> {
       messages: [{ role: "user", content: prompt.replace("{text}", text) }],
     });
     const block = response.content.find((b) => b.type === "text");
-    if (!block || block.type !== "text") return null;
+    if (!block || block.type !== "text") {
+      await logEvent("error.caught", memberId, `Summary returned no text (${field})`, {
+        source: "summarize-profile",
+        cause: "no_text_block",
+        field,
+        member_id: memberId,
+        model: MODEL,
+        input_chars: inputChars,
+      });
+      return null;
+    }
     const out = block.text.trim().replace(/^["'`]+|["'`]+$/g, "").replace(/\.$/, "");
-    return out || null;
+    if (!out) {
+      await logEvent("error.caught", memberId, `Summary was empty (${field})`, {
+        source: "summarize-profile",
+        cause: "empty_output",
+        field,
+        member_id: memberId,
+        model: MODEL,
+        input_chars: inputChars,
+      });
+      return null;
+    }
+    await logEvent("summary.generated", memberId, `${FIELD_LABEL[field]}: ${out}`, {
+      source: "summarize-profile",
+      field,
+      member_id: memberId,
+      model: MODEL,
+      input_chars: inputChars,
+      output_chars: out.length,
+    });
+    return out;
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error("[summarize-profile] API call failed:", err);
+    await logEvent("error.caught", memberId, `Summary API failed (${field}): ${msg.slice(0, 120)}`, {
+      source: "summarize-profile",
+      cause: "api_call_failed",
+      field,
+      member_id: memberId,
+      model: MODEL,
+      input_chars: inputChars,
+      error_message: msg,
+    });
     return null;
   }
-}
-
-export async function summarizeIntro(text: string) {
-  return summarize(INTRO_PROMPT, text);
-}
-
-export async function summarizeAsk(text: string) {
-  return summarize(ASK_PROMPT, text);
-}
-
-export async function summarizeGive(text: string) {
-  return summarize(GIVE_PROMPT, text);
 }
 
 export type ChangedFields = {
@@ -92,9 +160,15 @@ export type SummarizedFields = {
  * Generate shorts for any fields that were passed in. Empty/null source text
  * → null short. API failure → key omitted entirely so the caller's UPDATE
  * leaves the column alone (preserving the prior short rather than nulling it).
+ *
+ * Each call (success or failure) emits one row to system_events. The summary
+ * column on those rows is "Intro: ..." / "Ask: ..." / "Give: ..." so the
+ * People/System feed reads naturally without repeating the member name (the
+ * Subject column already shows it).
  */
 export async function summarizeChangedFields(
   changed: ChangedFields,
+  memberId: string,
 ): Promise<SummarizedFields> {
   const results: SummarizedFields = {};
   const tasks: Promise<void>[] = [];
@@ -105,7 +179,7 @@ export async function summarizeChangedFields(
         if (!changed.intro) {
           results.current_intro_short = null;
         } else {
-          const s = await summarizeIntro(changed.intro);
+          const s = await summarize("intro", changed.intro, memberId);
           if (s !== null) results.current_intro_short = s;
         }
       })(),
@@ -117,7 +191,7 @@ export async function summarizeChangedFields(
         if (!changed.ask) {
           results.current_ask_short = null;
         } else {
-          const s = await summarizeAsk(changed.ask);
+          const s = await summarize("ask", changed.ask, memberId);
           if (s !== null) results.current_ask_short = s;
         }
       })(),
@@ -129,7 +203,7 @@ export async function summarizeChangedFields(
         if (!changed.give) {
           results.current_give_short = null;
         } else {
-          const s = await summarizeGive(changed.give);
+          const s = await summarize("give", changed.give, memberId);
           if (s !== null) results.current_give_short = s;
         }
       })(),

@@ -256,11 +256,14 @@ export async function saveProfile(formData: FormData) {
   }
 
   if (introChanged || askChanged || giveChanged) {
-    const shorts = await summarizeChangedFields({
-      ...(introChanged ? { intro: newIntro } : {}),
-      ...(askChanged ? { ask: newAsk } : {}),
-      ...(giveChanged ? { give: newGive } : {}),
-    });
+    const shorts = await summarizeChangedFields(
+      {
+        ...(introChanged ? { intro: newIntro } : {}),
+        ...(askChanged ? { ask: newAsk } : {}),
+        ...(giveChanged ? { give: newGive } : {}),
+      },
+      member.id,
+    );
     Object.assign(updates, shorts);
     if (Object.keys(shorts).length > 0) anyChange = true;
   }

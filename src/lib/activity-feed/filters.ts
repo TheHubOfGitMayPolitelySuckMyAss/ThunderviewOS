@@ -12,6 +12,7 @@ export const SYSTEM_FEED_INCLUDED_TYPES = [
   "email.bounced",
   "email.complained",
   "email.failed",
+  "summary.generated",
 ];
 
 export function isHumanMeaningful(eventType: string): boolean {

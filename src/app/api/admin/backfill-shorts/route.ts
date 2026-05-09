@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      const shorts = await summarizeChangedFields(fields);
+      const shorts = await summarizeChangedFields(fields, m.id);
       if (Object.keys(shorts).length === 0) {
         failures.push({ id: m.id, error: "all summary calls failed" });
         return;

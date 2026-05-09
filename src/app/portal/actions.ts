@@ -80,11 +80,14 @@ export async function savePortalProfile(formData: FormData) {
   }
 
   if (introChanged || askChanged || giveChanged) {
-    const shorts = await summarizeChangedFields({
-      ...(introChanged ? { intro: normalizedIntro } : {}),
-      ...(askChanged ? { ask: normalizedAsk } : {}),
-      ...(giveChanged ? { give: normalizedGive } : {}),
-    });
+    const shorts = await summarizeChangedFields(
+      {
+        ...(introChanged ? { intro: normalizedIntro } : {}),
+        ...(askChanged ? { ask: normalizedAsk } : {}),
+        ...(giveChanged ? { give: normalizedGive } : {}),
+      },
+      member.id,
+    );
     Object.assign(updates, shorts);
   }
 
