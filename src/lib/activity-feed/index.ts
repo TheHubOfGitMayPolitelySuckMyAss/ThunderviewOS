@@ -74,9 +74,11 @@ export async function getActivityFeed(filters: FeedFilters): Promise<FeedResult>
     } else if (filters.kind === "system") {
       q = q.in("event_type", SYSTEM_FEED_INCLUDED_TYPES);
     } else if (filters.kind === "marketing") {
-      // Marketing tab = anonymous page views only. Authenticated page views
-      // belong in People.
-      q = q.eq("event_type", "page.viewed").is("actor_id", null);
+      // Marketing tab = anything carrying an anon_id cookie. That's the
+      // anonymous page views (actor_id null + metadata.anon_id) plus the
+      // auth.login bridge row that fires when a cookie-bearing browser
+      // becomes a member. The bridge row appears here AND in People.
+      q = q.not("metadata->>anon_id", "is", null);
     }
 
     if (filters.eventTypes && filters.eventTypes.length > 0) {
@@ -145,7 +147,7 @@ export async function getDistinctEventTypes(kind: FeedKind): Promise<EventTypesR
     return { ok: true, types: [...SYSTEM_FEED_INCLUDED_TYPES].sort() };
   }
   if (kind === "marketing") {
-    return { ok: true, types: ["page.viewed"] };
+    return { ok: true, types: ["page.viewed", "auth.login"] };
   }
 
   try {

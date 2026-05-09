@@ -379,24 +379,34 @@ export function FeedTable({
                 <td className="px-4 py-2.5">{r.summary}</td>
                 <td className="px-4 py-2.5">
                   {(() => {
-                    if (r.actor_id) {
-                      return (
-                        <Link className="text-accent hover:underline" href={`/admin/members/${r.actor_id}`}>
-                          {r.actor_name ?? "Unknown"}
-                        </Link>
-                      );
-                    }
                     const anonId =
                       typeof r.metadata?.anon_id === "string" ? (r.metadata.anon_id as string) : null;
-                    if (anonId) {
+                    const memberLink = r.actor_id ? (
+                      <Link
+                        className="text-accent hover:underline"
+                        href={`/admin/members/${r.actor_id}`}
+                      >
+                        {r.actor_name ?? "Unknown"}
+                      </Link>
+                    ) : null;
+                    const chip = anonId ? (
+                      <VisitorChip
+                        anonId={anonId}
+                        selected={selectedAnonId === anonId}
+                        onClick={onSelectAnon ? () => onSelectAnon(anonId) : undefined}
+                      />
+                    ) : null;
+                    if (chip && memberLink) {
                       return (
-                        <VisitorChip
-                          anonId={anonId}
-                          selected={selectedAnonId === anonId}
-                          onClick={onSelectAnon ? () => onSelectAnon(anonId) : undefined}
-                        />
+                        <span className="inline-flex items-center gap-1.5 flex-wrap">
+                          {chip}
+                          <span className="text-fg3">→</span>
+                          {memberLink}
+                        </span>
                       );
                     }
+                    if (memberLink) return memberLink;
+                    if (chip) return chip;
                     if (r.actor_label) {
                       return <span className="text-fg3 font-mono text-[12px]">{r.actor_label}</span>;
                     }

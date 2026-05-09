@@ -102,8 +102,11 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 
 - **Client component `src/components/page-view-logger.tsx`, mounted in three layouts.** Subscribes to `usePathname()` + `useSearchParams()`.
 - **Server-component instrumentation does NOT work in Next.js 16 App Router.** Layouts preserve state and don't rerender on intra-layout navigation, so a server component fires only on initial mount. Must be a client component.
-- **Authenticated visits omit `anon_id`** even if the cookie is still present from a pre-auth session.
-- **No PII, no IP, no UA, no fingerprinting.** Only path, search params (when non-empty), and the opaque cookie value (when anonymous).
+- **Authenticated `page.viewed` events omit `anon_id`** even if the cookie is still present from a pre-auth session. The bridge from anon to identified happens once, on the `auth.login` event (see below); afterwards authed page views are People-only.
+- **`auth.login` carries `anon_id` from the cookie when present.** `/auth/confirm` reads the `anon_id` cookie at OTP verification and includes it in `metadata.anon_id` alongside `actor_id = memberId`. That single bridge row links a visitor's anonymous session to the identified member without backfilling prior page views. `/auth/callback` (the rare PKCE fallback path) currently does NOT emit this bridge — hoist to a helper if that becomes load-bearing.
+- **Marketing feed = "any event with `metadata.anon_id` set."** Filter is `metadata->>anon_id IS NOT NULL`, not a hardcoded `event_type='page.viewed'`. That naturally captures anonymous page views AND the auth.login bridge. The bridge row appears in BOTH Marketing and People (it's a meaningful human event AND a visitor identification). Adding any future event type that carries an anon cookie automatically participates — no filter change required.
+- **Marketing UI renders bridged rows as `Visitor xxxxxxxx → Member Name`** in the Actor column. Visitor handle is the first 8 hex of the UUID, color hue derived from the same hex (deterministic per visitor). Click the chip to scope the feed to that visitor's events via `?anon=<uuid>`.
+- **No PII, no IP, no UA, no fingerprinting.** Only path, search params (when non-empty), and the opaque cookie value (when anonymous). Eric explicitly waived GDPR/CCPA concerns for this regional-CO program — design choice, not legal obligation.
 - **Skip list:** `/api/*`, `/auth/confirm`, `/auth/callback`, `/admin/operations`, `/dev/*`. Root layout's logger additionally skips `/portal` and `/admin` (those have own layouts; otherwise we'd double-log).
 
 ## Email systems

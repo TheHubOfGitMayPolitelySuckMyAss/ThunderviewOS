@@ -55,13 +55,18 @@ export async function GET(request: Request) {
       // Resolve member via the verified email (preferred) or the fallback param
       const verifiedEmail = verifyData?.user?.email ?? emailParam;
       const memberId = await memberIdForEmail(verifiedEmail);
+      // The anon_id cookie (set by page-view-logger pre-auth) bridges the
+      // anonymous browsing session to the now-identified member. Including it
+      // here is what makes the Marketing feed show "Visitor xxxx signed in as
+      // Member Y" at the moment of login.
+      const anonId = cookieStore.get("anon_id")?.value ?? null;
       await logSystemEvent({
         event_type: "auth.login",
         actor_id: memberId,
         actor_label: memberId ? null : verifiedEmail ?? "unknown",
         subject_member_id: memberId,
         summary: memberId ? null : `Login by unmatched email ${verifiedEmail ?? "(unknown)"}`,
-        metadata: { email: verifiedEmail ?? null },
+        metadata: { email: verifiedEmail ?? null, anon_id: anonId },
       });
 
       // Check for a stored redirect target
