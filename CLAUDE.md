@@ -165,7 +165,7 @@ Live at `thunderviewceodinners.com` (apex + www). Cutover from `thunderview-os.v
 - **DNS managed by Squarespace's domain registrar** (legacy from the Google Domains acquisition). Site hosting is Vercel; only DNS lives at Squarespace.
 - **Squarespace "Connected Domain" mode auto-reverts TTL changes** — TTL stays locked at 4 hours regardless of attempts to lower it. A record edits DO commit, but only after deleting all conflicting Squarespace IPs in one save (Squarespace warns about the conflict, then accepts the change).
 - **Apex A records → Vercel:** `216.150.1.1` and `216.150.16.1`.
-- **www CNAME → Vercel:** `cname.vercel-dns.com`. The `www` subdomain is added on the Vercel project; Vercel auto-redirects www → apex.
+- **www CNAME → Vercel:** `cname.vercel-dns.com`. The `www` subdomain is added on the Vercel project. **www → apex 308 redirect must be configured explicitly** via `PATCH /v9/projects/{id}/domains/www.thunderviewceodinners.com` with `{"redirect": "thunderviewceodinners.com", "redirectStatusCode": 308}` — without it, Vercel serves both domains directly with no redirect, which silently breaks auth (Supabase session cookies are scoped per-host, so a user authed on apex hits unauth'd state on www and vice versa).
 - **Squarespace did NOT bundle the domain with hosting** — it's a Google-Domains-acquired registration that survives the hosting cancellation as a paid domain-only registration. No risk of DNS going dark when the Squarespace site is fully torn down.
 
 ## Codebase conventions
