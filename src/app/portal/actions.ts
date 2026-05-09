@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
+import { summarizeChangedFields } from "@/lib/summarize-profile";
 
 export async function savePortalProfile(formData: FormData) {
   const supabase = await createClient();
@@ -19,19 +20,22 @@ export async function savePortalProfile(formData: FormData) {
     id: string;
     current_intro: string | null;
     current_ask: string | null;
+    current_give: string | null;
     contact_preference: string | null;
-  }>(admin, user.email!, "id, current_intro, current_ask, contact_preference");
+  }>(admin, user.email!, "id, current_intro, current_ask, current_give, contact_preference");
 
   const member = result?.member ?? null;
   if (!member) return { success: false, error: "Member not found" };
 
   const newIntro = formData.get("current_intro") as string | null;
   const newAsk = formData.get("current_ask") as string | null;
+  const newGive = formData.get("current_give") as string | null;
   const newContact = formData.get("contact_preference") as string | null;
 
   // Normalize: treat empty strings as null, enforce length limits
   const normalizedIntro = newIntro?.trim() || null;
   const normalizedAsk = newAsk?.trim() || null;
+  const normalizedGive = newGive?.trim() || null;
 
   if (normalizedIntro && normalizedIntro.length > 1000) {
     return { success: false, error: "Intro must be 1,000 characters or fewer" };
@@ -39,17 +43,22 @@ export async function savePortalProfile(formData: FormData) {
   if (normalizedAsk && normalizedAsk.length > 250) {
     return { success: false, error: "Ask must be 250 characters or fewer" };
   }
+  if (normalizedGive && normalizedGive.length > 500) {
+    return { success: false, error: "Give must be 500 characters or fewer" };
+  }
   const normalizedContact = newContact?.trim() || null;
 
   const oldIntro = member.current_intro?.trim() || null;
   const oldAsk = member.current_ask?.trim() || null;
+  const oldGive = member.current_give?.trim() || null;
   const oldContact = member.contact_preference?.trim() || null;
 
   const introChanged = normalizedIntro !== oldIntro;
   const askChanged = normalizedAsk !== oldAsk;
+  const giveChanged = normalizedGive !== oldGive;
   const contactChanged = normalizedContact !== oldContact;
 
-  if (!introChanged && !askChanged && !contactChanged) {
+  if (!introChanged && !askChanged && !giveChanged && !contactChanged) {
     return { success: true, noChanges: true };
   }
 
@@ -63,8 +72,20 @@ export async function savePortalProfile(formData: FormData) {
     updates.current_ask = normalizedAsk;
     updates.ask_updated_at = new Date().toISOString();
   }
+  if (giveChanged) {
+    updates.current_give = normalizedGive;
+  }
   if (contactChanged) {
     updates.contact_preference = normalizedContact;
+  }
+
+  if (introChanged || askChanged || giveChanged) {
+    const shorts = await summarizeChangedFields({
+      ...(introChanged ? { intro: normalizedIntro } : {}),
+      ...(askChanged ? { ask: normalizedAsk } : {}),
+      ...(giveChanged ? { give: normalizedGive } : {}),
+    });
+    Object.assign(updates, shorts);
   }
 
   const { error } = await admin

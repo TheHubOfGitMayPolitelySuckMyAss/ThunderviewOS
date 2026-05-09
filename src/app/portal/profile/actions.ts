@@ -5,6 +5,7 @@ import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-acto
 import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { safePushMember } from "@/lib/streak/safe-push";
+import { summarizeChangedFields } from "@/lib/summarize-profile";
 import sharp from "sharp";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -173,9 +174,11 @@ export async function saveProfile(formData: FormData) {
   const norm = (v: string | null) => v?.trim() || null;
   const oldIntro = norm(member.current_intro);
   const oldAsk = norm(member.current_ask);
+  const oldGive = norm(member.current_give);
 
   const introChanged = newIntro !== oldIntro;
   const askChanged = newAsk !== oldAsk;
+  const giveChanged = newGive !== oldGive;
 
   const updates: Record<string, unknown> = {};
   let anyChange = false;
@@ -195,7 +198,7 @@ export async function saveProfile(formData: FormData) {
   maybeUpdate("attendee_stagetypes", newStagetypes, member.attendee_stagetypes);
   maybeUpdate("current_intro", newIntro, oldIntro);
   maybeUpdate("current_ask", newAsk, oldAsk);
-  maybeUpdate("current_give", newGive, norm(member.current_give));
+  maybeUpdate("current_give", newGive, oldGive);
   maybeUpdate("contact_preference", newContact, member.contact_preference);
 
   if (introChanged) {
@@ -203,6 +206,16 @@ export async function saveProfile(formData: FormData) {
   }
   if (askChanged) {
     updates.ask_updated_at = new Date().toISOString();
+  }
+
+  if (introChanged || askChanged || giveChanged) {
+    const shorts = await summarizeChangedFields({
+      ...(introChanged ? { intro: newIntro } : {}),
+      ...(askChanged ? { ask: newAsk } : {}),
+      ...(giveChanged ? { give: newGive } : {}),
+    });
+    Object.assign(updates, shorts);
+    if (Object.keys(shorts).length > 0) anyChange = true;
   }
 
   // Handle primary email change

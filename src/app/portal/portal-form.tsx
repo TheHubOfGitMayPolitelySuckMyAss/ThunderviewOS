@@ -11,6 +11,7 @@ import Field from "@/components/field";
 const CONTACT_OPTIONS = ["linkedin", "email"];
 const INTRO_MAX = 1000;
 const ASK_MAX = 250;
+const GIVE_MAX = 500;
 
 function counterClass(len: number, max: number): string {
   if (len >= max) return "text-danger";
@@ -21,18 +22,21 @@ function counterClass(len: number, max: number): string {
 export default function PortalForm({
   initialIntro,
   initialAsk,
+  initialGive,
   initialContact,
   bannerDinnerDate,
   bannerIntroAskFresh,
 }: {
   initialIntro: string | null;
   initialAsk: string | null;
+  initialGive: string | null;
   initialContact: string | null;
   bannerDinnerDate: string | null;
   bannerIntroAskFresh: boolean;
 }) {
   const [intro, setIntro] = useState(initialIntro ?? "");
   const [ask, setAsk] = useState(initialAsk ?? "");
+  const [give, setGive] = useState(initialGive ?? "");
   const [contact, setContact] = useState(initialContact ?? "linkedin");
   const [saving, setSaving] = useState(false);
   const [introAskFresh, setIntroAskFresh] = useState(bannerIntroAskFresh);
@@ -69,7 +73,7 @@ export default function PortalForm({
 
   return (
     <div className="flex flex-col gap-tight">
-      <H4>Your intro &amp; ask for this dinner</H4>
+      <H4>Your intro, ask &amp; give for this dinner</H4>
       <p className="text-sm text-fg2 leading-[1.55] mb-form-row">
         Every attendee gets the full list the morning of dinner. People use it to find
         you&nbsp;&mdash; they&rsquo;ll walk up and say &ldquo;you&rsquo;re the one looking for
@@ -116,6 +120,27 @@ export default function PortalForm({
             />
             <div className={`text-xs text-right ${counterClass(ask.length, ASK_MAX)}`}>
               {ask.length}/{ASK_MAX}
+            </div>
+          </Field>
+        </div>
+
+        <div className="flex flex-col gap-label-input">
+          <Field label="Give">
+            <p className="text-sm text-fg3 italic leading-[1.5]">
+              What can you do to help Thunderview members build their own
+              startups?
+            </p>
+            <Textarea
+              id="current_give"
+              name="current_give"
+              rows={3}
+              maxLength={GIVE_MAX}
+              value={give}
+              onChange={(e) => setGive(e.target.value)}
+              placeholder="I can help with..."
+            />
+            <div className={`text-xs text-right ${counterClass(give.length, GIVE_MAX)}`}>
+              {give.length}/{GIVE_MAX}
             </div>
           </Field>
         </div>

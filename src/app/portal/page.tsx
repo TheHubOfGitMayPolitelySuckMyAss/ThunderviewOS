@@ -40,6 +40,7 @@ export default async function PortalPage({
     kicked_out: boolean;
     current_intro: string | null;
     current_ask: string | null;
+    current_give: string | null;
     contact_preference: string | null;
     intro_updated_at: string | null;
     ask_updated_at: string | null;
@@ -47,7 +48,7 @@ export default async function PortalPage({
   }>(
     admin,
     email,
-    "id, first_name, attendee_stagetypes, has_community_access, kicked_out, current_intro, current_ask, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended"
+    "id, first_name, attendee_stagetypes, has_community_access, kicked_out, current_intro, current_ask, current_give, contact_preference, intro_updated_at, ask_updated_at, last_dinner_attended"
   );
 
   const member = result?.member ?? null;
@@ -256,6 +257,7 @@ export default async function PortalPage({
           <PortalForm
             initialIntro={member.current_intro}
             initialAsk={member.current_ask}
+            initialGive={member.current_give}
             initialContact={member.contact_preference}
             bannerDinnerDate={formatDinnerDisplay(bannerDinnerDate)}
             bannerIntroAskFresh={introAskFresh}
