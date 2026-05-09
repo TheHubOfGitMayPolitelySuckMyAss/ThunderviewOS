@@ -7,7 +7,6 @@ function getClient(): Anthropic {
 }
 
 const MODEL = "claude-sonnet-4-6";
-const MAX_OUTPUT_CHARS = 60;
 
 const INTRO_PROMPT = `Compress this person's intro into a 3-7 word summary for a community directory. The reader sees their Name and Company in adjacent columns.
 
@@ -58,7 +57,7 @@ async function summarize(prompt: string, text: string): Promise<string | null> {
     const block = response.content.find((b) => b.type === "text");
     if (!block || block.type !== "text") return null;
     const out = block.text.trim().replace(/^["'`]+|["'`]+$/g, "").replace(/\.$/, "");
-    return out.length > MAX_OUTPUT_CHARS ? out.slice(0, MAX_OUTPUT_CHARS) : out || null;
+    return out || null;
   } catch (err) {
     console.error("[summarize-profile] API call failed:", err);
     return null;
