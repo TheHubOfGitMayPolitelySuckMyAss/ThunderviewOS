@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTimeShort } from "@/lib/format";
 import { Pill } from "@/components/ui/pill";
 
 type PendingApp = {
@@ -26,6 +26,13 @@ type EmailIssue = {
   recipientEmail: string;
   memberId: string | null;
   memberName: string | null;
+  occurredAt: string;
+};
+
+type MemberVisit = {
+  id: string;
+  memberId: string;
+  name: string;
   occurredAt: string;
 };
 
@@ -75,10 +82,12 @@ export default function DashboardAccordions({
   pendingApps,
   optOuts,
   emailIssues,
+  memberVisits,
 }: {
   pendingApps: PendingApp[];
   optOuts: OptOut[];
   emailIssues: EmailIssue[];
+  memberVisits: MemberVisit[];
 }) {
   // Find oldest pending app age
   const oldestDays = pendingApps.length > 0
@@ -134,6 +143,44 @@ export default function DashboardAccordions({
                     ) : (
                       <Pill variant="warn" dot>Pending</Pill>
                     )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Accordion>
+
+      {/* Member visits */}
+      <Accordion
+        title="Member visits"
+        count={memberVisits.length}
+        pillLabel={`${memberVisits.length}`}
+        meta="last 7 days"
+      >
+        {memberVisits.length === 0 ? (
+          <p className="py-4 text-sm text-fg4">No member visits in the last 7 days.</p>
+        ) : (
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Name</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Visited</th>
+              </tr>
+            </thead>
+            <tbody>
+              {memberVisits.map((v) => (
+                <tr key={v.id} className="group relative cursor-pointer border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated">
+                  <td className="px-3.5 py-3 text-[14px] text-fg1 font-medium">
+                    <Link
+                      href={`/admin/members/${v.memberId}`}
+                      className="no-underline text-fg1 after:absolute after:inset-0"
+                    >
+                      {v.name}
+                    </Link>
+                  </td>
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {formatDateTimeShort(v.occurredAt)}
                   </td>
                 </tr>
               ))}

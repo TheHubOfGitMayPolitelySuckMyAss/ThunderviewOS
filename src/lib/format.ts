@@ -58,6 +58,19 @@ export function formatTimestamp(dateString: string): string {
 }
 
 /**
+ * Compact date + time for table rows. "May 11, 4:32 PM" — no seconds.
+ */
+export function formatDateTimeShort(dateString: string): string {
+  return new Date(dateString).toLocaleString("en-US", {
+    timeZone: MT_TZ,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
  * Return today's date as YYYY-MM-DD in Mountain Time.
  */
 export function getTodayMT(): string {

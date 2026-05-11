@@ -1,9 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import DashboardAccordions from "./dashboard-accordions";
 import { formatDate, formatName, getTodayMT } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Body } from "@/components/ui/typography";
 import PageHeader from "@/components/page-header";
+
+const ADMIN_EMAIL = "eric@marcoullier.com";
+const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -117,6 +121,76 @@ export default async function DashboardPage() {
     return bounceType === "Permanent";
   });
 
+  // Member Visits (last 7 days). Each member contributes one row per "session,"
+  // where a new session starts when the gap from their previous page view
+  // exceeds 4 hours. Admin (eric@) and team members are excluded.
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Build the exclusion set: anyone with is_team=true, plus admin via email.
+  const { data: teamRows } = await supabase
+    .from("members")
+    .select("id")
+    .eq("is_team", true);
+  const { data: adminRow } = await supabase
+    .from("member_emails")
+    .select("member_id")
+    .eq("email", ADMIN_EMAIL)
+    .maybeSingle();
+  const excludedMemberIds = new Set<string>([
+    ...(teamRows ?? []).map((m) => m.id as string),
+    ...(adminRow?.member_id ? [adminRow.member_id as string] : []),
+  ]);
+
+  // Walk authenticated page views ASC, collapsing into 4-hour sessions per
+  // member. fetchAll because a busy week can blow past the 1k PostgREST cap.
+  const visitRows = await fetchAll<{ actor_id: string; occurred_at: string }>(
+    (from, to) =>
+      supabase
+        .from("system_events")
+        .select("actor_id, occurred_at")
+        .eq("event_type", "page.viewed")
+        .not("actor_id", "is", null)
+        .gte("occurred_at", sevenDaysAgo)
+        .order("occurred_at", { ascending: true })
+        .range(from, to)
+  );
+
+  const lastVisitMsByMember = new Map<string, number>();
+  const sessionEvents: { memberId: string; occurredAt: string }[] = [];
+  for (const row of visitRows) {
+    const aid = row.actor_id;
+    if (!aid || excludedMemberIds.has(aid)) continue;
+    const ms = new Date(row.occurred_at).getTime();
+    const prev = lastVisitMsByMember.get(aid);
+    if (prev === undefined || ms - prev > FOUR_HOURS_MS) {
+      sessionEvents.push({ memberId: aid, occurredAt: row.occurred_at });
+    }
+    lastVisitMsByMember.set(aid, ms);
+  }
+
+  // Name lookup for the unique member ids that appeared.
+  const sessionMemberIds = Array.from(new Set(sessionEvents.map((s) => s.memberId)));
+  const { data: visitMembers } = sessionMemberIds.length
+    ? await supabase
+        .from("members")
+        .select("id, first_name, last_name")
+        .in("id", sessionMemberIds)
+    : { data: [] as { id: string; first_name: string; last_name: string }[] };
+  const nameById = new Map(
+    (visitMembers ?? []).map((m) => [m.id, formatName(m.first_name, m.last_name)] as const)
+  );
+
+  // Display order: most recent first.
+  const memberVisits = sessionEvents
+    .slice()
+    .reverse()
+    .map((s) => ({
+      id: `${s.memberId}-${s.occurredAt}`,
+      memberId: s.memberId,
+      name: nameById.get(s.memberId) ?? "Unknown",
+      occurredAt: s.occurredAt,
+    }));
+
   return (
     <div className="tv-container-admin">
       <PageHeader
@@ -191,6 +265,7 @@ export default async function DashboardPage() {
             };
           })
         }
+        memberVisits={memberVisits}
       />
     </div>
   );
