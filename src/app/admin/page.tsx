@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import DashboardAccordions from "./dashboard-accordions";
@@ -201,36 +202,44 @@ export default async function DashboardPage() {
       {/* Key stats */}
       {nextDinner ? (
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <Card>
-            <div className="tv-eyebrow mb-2">Days until</div>
-            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
-              {daysUntil === 0 ? "Today" : daysUntil}
-            </div>
-            <div className="text-[12px] text-fg3">
-              {formatDate(nextDinner.date, { month: "short", day: "numeric" })} &middot; {nextDinner.venue || "ID345"}
-            </div>
-          </Card>
-          <Card>
-            <div className="tv-eyebrow mb-2">Tickets sold</div>
-            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
-              {ticketsSold}
-            </div>
-            <div className="text-[12px] text-fg3">for next dinner</div>
-          </Card>
-          <Card>
-            <div className="tv-eyebrow mb-2">New apps</div>
-            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
-              {newAppsSinceLastDinner}
-            </div>
-            <div className="text-[12px] text-fg3">pending review</div>
-          </Card>
-          <Card>
-            <div className="tv-eyebrow mb-2">Community</div>
-            <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
-              {communityCount ?? 0}
-            </div>
-            <div className="text-[12px] text-fg3">active members</div>
-          </Card>
+          <Link href={`/admin/dinners/${nextDinner.id}`} className="block">
+            <Card className="cursor-pointer">
+              <div className="tv-eyebrow mb-2">Days until</div>
+              <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
+                {daysUntil === 0 ? "Today" : daysUntil}
+              </div>
+              <div className="text-[12px] text-fg3">
+                {formatDate(nextDinner.date, { month: "short", day: "numeric" })} &middot; {nextDinner.venue || "ID345"}
+              </div>
+            </Card>
+          </Link>
+          <Link href="/admin/tickets" className="block">
+            <Card className="cursor-pointer">
+              <div className="tv-eyebrow mb-2">Tickets sold</div>
+              <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
+                {ticketsSold}
+              </div>
+              <div className="text-[12px] text-fg3">for next dinner</div>
+            </Card>
+          </Link>
+          <Link href="/admin/applications" className="block">
+            <Card className="cursor-pointer">
+              <div className="tv-eyebrow mb-2">New apps</div>
+              <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
+                {newAppsSinceLastDinner}
+              </div>
+              <div className="text-[12px] text-fg3">pending review</div>
+            </Card>
+          </Link>
+          <Link href="/admin/members" className="block">
+            <Card className="cursor-pointer">
+              <div className="tv-eyebrow mb-2">Community</div>
+              <div className="font-display font-medium text-[40px] leading-none text-fg1 mb-1" style={{ fontVariationSettings: '"opsz" 72' }}>
+                {communityCount ?? 0}
+              </div>
+              <div className="text-[12px] text-fg3">active members</div>
+            </Card>
+          </Link>
         </div>
       ) : (
         <Body className="text-fg3 mb-6">No upcoming dinners found.</Body>
