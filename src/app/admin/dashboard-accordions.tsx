@@ -36,6 +36,13 @@ type MemberVisit = {
   occurredAt: string;
 };
 
+type TicketSold = {
+  id: string;
+  name: string;
+  dinnerDate: string | null;
+  purchasedAt: string;
+};
+
 function Accordion({
   title,
   count,
@@ -83,11 +90,13 @@ export default function DashboardAccordions({
   optOuts,
   emailIssues,
   memberVisits,
+  ticketsSoldRecent,
 }: {
   pendingApps: PendingApp[];
   optOuts: OptOut[];
   emailIssues: EmailIssue[];
   memberVisits: MemberVisit[];
+  ticketsSoldRecent: TicketSold[];
 }) {
   // Find oldest pending app age
   const oldestDays = pendingApps.length > 0
@@ -143,6 +152,41 @@ export default function DashboardAccordions({
                     ) : (
                       <Pill variant="warn" dot>Pending</Pill>
                     )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Accordion>
+
+      {/* Tickets sold */}
+      <Accordion
+        title="Tickets sold"
+        count={ticketsSoldRecent.length}
+        pillLabel={`${ticketsSoldRecent.length}`}
+        meta="last 30 days"
+      >
+        {ticketsSoldRecent.length === 0 ? (
+          <p className="py-4 text-sm text-fg4">No tickets sold in the last 30 days.</p>
+        ) : (
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Name</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Dinner</th>
+                <th className="text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3.5 py-2.5 bg-bg-elevated border-b border-border">Purchased</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ticketsSoldRecent.map((t) => (
+                <tr key={t.id} className="group relative border-b border-border-subtle last:border-b-0 hover:bg-bg-elevated">
+                  <td className="px-3.5 py-3 text-[14px] text-fg1 font-medium">{t.name}</td>
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {t.dinnerDate ? formatDate(t.dinnerDate, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                  </td>
+                  <td className="px-3.5 py-3 text-[14px] text-fg2">
+                    {formatDate(t.purchasedAt, { month: "short", day: "numeric", year: "numeric" })}
                   </td>
                 </tr>
               ))}

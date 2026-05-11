@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import DashboardAccordions from "./dashboard-accordions";
-import { formatDate, formatName, getTodayMT } from "@/lib/format";
+import { formatDate, formatName, formatTicketName, getTodayMT } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Body } from "@/components/ui/typography";
 import PageHeader from "@/components/page-header";
@@ -120,6 +120,25 @@ export default async function DashboardPage() {
     const bounceType =
       (e.raw_payload as { data?: { bounce?: { type?: string } } } | null)?.data?.bounce?.type ?? null;
     return bounceType === "Permanent";
+  });
+
+  // Tickets sold (last 30 days). Most-recent-first by purchase date.
+  // Name uses formatTicketName so multi-quantity purchases read "Bob +1".
+  const { data: ticketRows } = await supabase
+    .from("tickets")
+    .select("id, purchased_at, quantity, members(first_name, last_name), dinners(date)")
+    .gte("purchased_at", thirtyDaysAgo)
+    .order("purchased_at", { ascending: false });
+  const ticketsSoldRecent = (ticketRows ?? []).map((t) => {
+    const m = t.members as unknown as { first_name: string; last_name: string } | null;
+    const d = t.dinners as unknown as { date: string } | null;
+    const baseName = m ? formatName(m.first_name, m.last_name) : "—";
+    return {
+      id: t.id as string,
+      name: formatTicketName(baseName, t.quantity ?? 1),
+      dinnerDate: d?.date ?? null,
+      purchasedAt: t.purchased_at as string,
+    };
   });
 
   // Member Visits (last 7 days). Each member contributes one row per "session,"
@@ -275,6 +294,7 @@ export default async function DashboardPage() {
           })
         }
         memberVisits={memberVisits}
+        ticketsSoldRecent={ticketsSoldRecent}
       />
     </div>
   );
