@@ -12,6 +12,10 @@ export const SYSTEM_FEED_INCLUDED_TYPES = [
   "email.bounced",
   "email.complained",
   "email.failed",
+  "email.status_set_bounced",
+  "email.primary_promoted",
+  "email.no_secondary_available",
+  "streak.bounce_synced",
   "summary.generated",
 ];
 

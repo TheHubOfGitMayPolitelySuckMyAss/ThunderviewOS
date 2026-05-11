@@ -263,14 +263,29 @@ async function handleResendWebhook(req: Request) {
         .update({ email_status: "bounced" })
         .eq("id", memberEmail.id);
 
+      await logSystemEvent({
+        event_type: "email.status_set_bounced",
+        actor_label: "webhook:resend",
+        subject_member_id: memberEmail.member_id,
+        summary: `Marked ${recipientEmail} as bounced on ${memberName ?? "member"}`,
+        metadata: {
+          recipient_email: recipientEmail,
+          member_email_id: memberEmail.id,
+          was_primary: memberEmail.is_primary,
+        },
+      });
+
       // Auto-promote a non-bounced secondary to primary when the bounced
       // email was the primary. Must run BEFORE safePushMember so the next
       // Streak push picks up the new primary (Streak's contacts array uses
       // replace-semantics, so the old contact gets dropped).
+      let promotedEmail: string | null = null;
+      let streakOutcome: "primary_rotated" | "no_secondary_unreachable" | "secondary_retired" =
+        memberEmail.is_primary ? "no_secondary_unreachable" : "secondary_retired";
       if (memberEmail.is_primary) {
         const { data: candidates } = await admin
           .from("member_emails")
-          .select("id")
+          .select("id, email")
           .eq("member_id", memberEmail.member_id)
           .eq("email_status", "active")
           .neq("id", memberEmail.id)
@@ -297,11 +312,55 @@ async function handleResendWebhook(req: Request) {
                 message: rpcError.message,
               },
             });
+          } else {
+            promotedEmail = promotion.email;
+            streakOutcome = "primary_rotated";
+            await logSystemEvent({
+              event_type: "email.primary_promoted",
+              actor_label: "webhook:resend",
+              subject_member_id: memberEmail.member_id,
+              summary: `Promoted ${promotion.email} to primary on ${memberName ?? "member"} (replacing bounced ${recipientEmail})`,
+              metadata: {
+                member_id: memberEmail.member_id,
+                bounced_email: recipientEmail,
+                promoted_member_email_id: promotion.id,
+                promoted_email: promotion.email,
+              },
+            });
           }
+        } else {
+          await logSystemEvent({
+            event_type: "email.no_secondary_available",
+            actor_label: "webhook:resend",
+            subject_member_id: memberEmail.member_id,
+            summary: `${memberName ?? "Member"} has no deliverable email — ${recipientEmail} was their only active address`,
+            metadata: {
+              member_id: memberEmail.member_id,
+              bounced_email: recipientEmail,
+            },
+          });
         }
       }
 
       await safePushMember(memberEmail.member_id, "resend_bounce");
+      const outcomeSummary =
+        streakOutcome === "primary_rotated"
+          ? `Streak resynced: primary email rotated to ${promotedEmail}`
+          : streakOutcome === "no_secondary_unreachable"
+            ? `Streak resynced: member moved to Bounced stage (no deliverable email)`
+            : `Streak resynced: secondary email retired (member still reachable)`;
+      await logSystemEvent({
+        event_type: "streak.bounce_synced",
+        actor_label: "webhook:resend",
+        subject_member_id: memberEmail.member_id,
+        summary: outcomeSummary,
+        metadata: {
+          member_id: memberEmail.member_id,
+          outcome: streakOutcome,
+          bounced_email: recipientEmail,
+          promoted_email: promotedEmail,
+        },
+      });
     } else if (eventType === "complained") {
       await admin
         .from("member_emails")
