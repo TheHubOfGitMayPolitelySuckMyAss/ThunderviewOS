@@ -147,9 +147,10 @@ export default function DashboardAccordions({
         title="Marketing opt-outs"
         count={optOuts.length}
         pillLabel={`${optOuts.length}`}
+        meta="last 30 days"
       >
         {optOuts.length === 0 ? (
-          <p className="py-4 text-sm text-fg4">No marketing opt-outs.</p>
+          <p className="py-4 text-sm text-fg4">No marketing opt-outs in the last 30 days.</p>
         ) : (
           <table className="w-full border-collapse">
             <thead>
