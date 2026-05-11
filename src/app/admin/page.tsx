@@ -94,14 +94,23 @@ export default async function DashboardPage() {
     .not("marketing_opted_out_at", "is", null)
     .order("marketing_opted_out_at", { ascending: false });
 
-  // Email issues (bounces + complaints in last 30 days)
+  // Email issues (HARD bounces + complaints in last 30 days). Soft
+  // bounces (raw_payload.bounce.type != 'Permanent') are operational
+  // noise — they're still in email_events and the scoped Member History,
+  // just excluded from this dashboard surface.
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: emailEvents } = await supabase
+  const { data: emailEventsRaw } = await supabase
     .from("email_events")
-    .select("id, event_type, recipient_email, member_id, occurred_at, members(id, first_name, last_name)")
+    .select("id, event_type, recipient_email, member_id, occurred_at, raw_payload, members(id, first_name, last_name)")
     .in("event_type", ["bounced", "complained"])
     .gte("occurred_at", thirtyDaysAgo)
     .order("occurred_at", { ascending: false });
+  const emailEvents = (emailEventsRaw ?? []).filter((e) => {
+    if (e.event_type !== "bounced") return true;
+    const bounceType =
+      (e.raw_payload as { data?: { bounce?: { type?: string } } } | null)?.data?.bounce?.type ?? null;
+    return bounceType === "Permanent";
+  });
 
   return (
     <div className="tv-container-admin">
