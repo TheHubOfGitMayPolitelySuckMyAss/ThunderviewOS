@@ -126,6 +126,20 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 - **Receipt emails: using Stripe's built-in.** Custom kit design exists in `design-system/ui_kits/` but won't be built. Don't propose building it.
 - **Stripe receipt auto-send is gated by the Live-mode dashboard toggle** at Settings → Customer emails → "Successful payments." Sandbox and Live each have their own toggle; flipping the sandbox one doesn't affect Live. The toggle is bypassed if you pass `receipt_email` on the API call (we don't — Checkout Sessions use `customer_email` instead). If receipts ever stop, check the Activity timeline of a recent payment in the Stripe dashboard before assuming code regression.
 
+### Audience vs community — don't conflate
+
+- **"Community" ≠ "marketing audience" — they're different magnitudes.** "Community" (`members WHERE has_community_access = true AND kicked_out = false`) is the dinner-going population — small, currently ~40, varies slowly. "Marketing audience" (`members WHERE marketing_opted_in = true` AND `members.id` has at least one `member_emails` row with `email_status = 'active'`) is much larger — applications that never became members, kicked-out members who never opted out, etc. Today's send shape is ~400+ recipients vs ~40 community members; future sends will diverge differently. **Never infer audience size from CLAUDE.md or memory — query for it.** The "~40-member" line in this doc's intro describes the dinner program, not the send list.
+- **For a specific past send, the canonical record is `audience_snapshot`** (JSONB column on `monday_before_emails`, `monday_after_emails`, `one_off_blast_emails`). Frozen at send time, survives subsequent member changes. `jsonb_array_length(audience_snapshot)` is the recipient count for that send.
+
+### Deliverability — what we can and can't know
+
+- **Resend webhooks expose accept/reject, NOT inbox placement.** The events we get tell us whether the receiving mail server accepted the message (`delivered`), bounced it (`bounced` / `failed` / `delivery_delayed`), or whether the recipient flagged it as spam after the fact (`complained`). Receiving servers do NOT tell senders where they filed an accepted message — Gmail Primary vs Promotions vs Spam, Outlook Focused vs Other, all opaque from our side. There is no API, webhook, or vendor that can tell you "this specific message landed in the Promotions tab." Don't claim otherwise.
+- **We don't subscribe to `email.delivered`** — only `bounced`, `complained`, `failed`, `delivery_delayed` (see `EVENT_TYPE_MAP` in `src/app/api/webhooks/resend/route.ts`). Resend's own dashboard at resend.com retains delivered counts; we don't store them locally. Open and click tracking are deliberately not wired (Apple Mail Privacy Protection prefetches every tracking pixel, corporate AV scanners do the same, image-blocking clients hide real opens — the signal is unreliable industry-wide and we don't want to misuse it).
+- **Inbox placement is measured externally, not via Resend.** Two recommended paths:
+  - **Google Postmaster Tools** (`postmaster.google.com`) — free, domain-level aggregate from Gmail. Spam rate, IP/domain reputation, authentication pass rate, delivery errors. Doesn't tell you per-campaign placement but tells you whether Gmail trusts the domain over time. Setup once: add a DNS TXT record to verify the domain.
+  - **Seed-list tools** (GlockApps, Mail-Tester, Litmus) — paid per-campaign. Add their test addresses across providers as additional recipients on a send, they report back where the message landed at each provider.
+- **The dumb-but-cheap shortcut:** ask a handful of known recipients across providers (Gmail consumer, Gmail Workspace, Outlook, Yahoo) where the message landed. For a single big send this is often the right amount of effort. Don't propose building any of this; just answer the operator's question correctly.
+
 ## Crons (Vercel)
 
 Each emits one heartbeat row to `system_events`.
