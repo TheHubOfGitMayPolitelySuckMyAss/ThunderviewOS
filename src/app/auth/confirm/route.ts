@@ -85,15 +85,32 @@ export async function GET(request: Request) {
     }
 
     // Failure — log only when the email param matches a known member_emails row
+    // AND the member did NOT just successfully log in. PKCE tokens are
+    // single-use; hitting /auth/confirm again (back-button, double-click,
+    // email-client prefetch) replays an already-consumed token and produces a
+    // non-actionable "Email link is invalid or has expired" error. Suppress
+    // those by checking for a recent successful auth.login for the same member.
     const memberId = await memberIdForEmail(emailParam);
     if (memberId) {
-      await logSystemEvent({
-        event_type: "auth.login_failed",
-        actor_id: memberId,
-        subject_member_id: memberId,
-        summary: `Login attempt failed: ${error.message}`,
-        metadata: { email: emailParam, error: error.message },
-      });
+      const sixtySecondsAgo = new Date(Date.now() - 60 * 1000).toISOString();
+      const { data: recentSuccess } = await createAdminClient("public-flow")
+        .from("system_events")
+        .select("id")
+        .eq("event_type", "auth.login")
+        .eq("subject_member_id", memberId)
+        .gte("occurred_at", sixtySecondsAgo)
+        .limit(1)
+        .maybeSingle();
+
+      if (!recentSuccess) {
+        await logSystemEvent({
+          event_type: "auth.login_failed",
+          actor_id: memberId,
+          subject_member_id: memberId,
+          summary: `Login attempt failed: ${error.message}`,
+          metadata: { email: emailParam, error: error.message },
+        });
+      }
     }
   }
 
