@@ -87,18 +87,23 @@ export default async function DashboardPage() {
     .eq("has_community_access", true)
     .eq("kicked_out", false);
 
-  // Marketing opt-outs
+  // 30-day window shared by Marketing opt-outs and Email issues cards.
+  // Historical events (e.g. opt-outs imported from the prior CRM, backdated
+  // for separation) fall off the dashboard and are still queryable in SQL.
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Marketing opt-outs (last 30 days)
   const { data: optOuts } = await supabase
     .from("members")
     .select("id, first_name, last_name, marketing_opted_out_at")
     .not("marketing_opted_out_at", "is", null)
+    .gte("marketing_opted_out_at", thirtyDaysAgo)
     .order("marketing_opted_out_at", { ascending: false });
 
   // Email issues (HARD bounces + complaints in last 30 days). Soft
   // bounces (raw_payload.bounce.type != 'Permanent') are operational
   // noise — they're still in email_events and the scoped Member History,
   // just excluded from this dashboard surface.
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: emailEventsRaw } = await supabase
     .from("email_events")
     .select("id, event_type, recipient_email, member_id, occurred_at, raw_payload, members(id, first_name, last_name)")
