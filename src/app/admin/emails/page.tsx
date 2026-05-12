@@ -37,6 +37,12 @@ const transactionalEmails = [
     description:
       "Morning-of-dinner email \u2014 intros & asks for tonight\u2019s attendees only",
   },
+  {
+    href: "/admin/emails/prompt-intro-ask",
+    label: "Prompt for Intro/Ask",
+    description:
+      "Tuesday 2 days before a dinner \u2014 nudge ticketed members missing or with a stale Intro/Ask",
+  },
 ];
 
 export default async function EmailsPage() {

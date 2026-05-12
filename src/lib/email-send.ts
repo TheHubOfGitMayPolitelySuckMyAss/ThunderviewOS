@@ -231,6 +231,87 @@ export async function sendFulfillmentEmail(
 /**
  * Send notification to admin(s) when a new application is submitted.
  */
+/**
+ * "Prompt for Intro/Ask" — fires 2 days before a dinner for ticketed members
+ * who either (a) lack both intro AND ask, or (b) have a stale ask. The cron
+ * resolves the situation per recipient and passes it here. Two slugs back
+ * one logical email; choose at send time. throwOnError mirrors fulfillment
+ * so the cron can retry on next run if a single send fails.
+ */
+export async function sendPromptIntroAskEmail(
+  memberId: string,
+  dinnerId: string,
+  situation: "missing" | "stale",
+  options?: { throwOnError?: boolean }
+): Promise<void> {
+  const slug =
+    situation === "missing" ? "prompt-intro-ask-missing" : "prompt-intro-ask-stale";
+  try {
+    const admin = createAdminClient("system-internal");
+
+    const recipient = await getRecipient(memberId);
+    if (!recipient) {
+      const msg = `No primary email for member ${memberId}`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
+
+    const { data: dinner } = await admin
+      .from("dinners")
+      .select("date, venue, address")
+      .eq("id", dinnerId)
+      .single();
+
+    if (!dinner) {
+      const msg = `Dinner ${dinnerId} not found`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
+
+    const template = await getTemplate(slug);
+    if (!template) {
+      const msg = `Email template "${slug}" not found`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
+
+    const render = (text: string) =>
+      text
+        .replace(/\[member\.firstname\]/g, recipient.first_name)
+        .replace(/\[dinner\.date\]/g, formatDateFriendly(dinner.date))
+        .replace(/\[dinner\.venue\]/g, dinner.venue)
+        .replace(/\[dinner\.address\]/g, dinner.address);
+
+    const { error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: recipient.email,
+      subject: render(template.subject),
+      html: bodyToHtml(render(template.body)),
+    });
+
+    if (error) throw new Error(`Resend error: ${error.message}`);
+
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      subject_member_id: memberId,
+      summary: `Sent prompt-intro-ask (${situation}) to ${recipient.email}`,
+      metadata: {
+        template: slug,
+        recipient: recipient.email,
+        member_id: memberId,
+        dinner_id: dinnerId,
+        situation,
+      },
+    });
+  } catch (err) {
+    if (options?.throwOnError) throw err;
+    console.error(`[email] Failed to send ${slug}:`, err);
+  }
+}
+
 export async function sendNewApplicationNotification(application: {
   id: string;
   firstName: string;

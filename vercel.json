@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/fulfill-tickets",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/prompt-intro-ask",
+      "schedule": "0 14 * * *"
     }
   ]
 }
