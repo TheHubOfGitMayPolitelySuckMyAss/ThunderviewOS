@@ -179,6 +179,7 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 - **Storage buckets:**
   - `profile-pics` (public-read, authenticated-write, RLS path is `{member_id}.webp`).
   - `email-images` (public-read).
+  - `email-downloads` (public-read). Static documents linked from marketing emails (PDFs, DOCX, etc.). Upload via service-role to `POST /storage/v1/object/email-downloads/{filename}`; public URL is `${NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/email-downloads/{filename}`. Re-uploading the same filename overwrites in place, so URLs are stable across content swaps.
 
 ## Domain configuration
 
