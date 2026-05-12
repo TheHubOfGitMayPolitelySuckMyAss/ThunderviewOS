@@ -188,6 +188,33 @@ export async function linkApplicationToMember(
   };
 }
 
+/**
+ * Hard-delete an application row. Used ONLY for spam — the normal flow is
+ * Reject (which keeps the row as part of the suppression list and sends a
+ * rejection email). Spam shouldn't suppress (don't want to let real future
+ * applicants slip through if they coincidentally share an email) and
+ * shouldn't email the spammer.
+ *
+ * Cleans up the Streak Applied-stage box if one exists, then DELETEs the
+ * application. Audit row is written by the trigger automatically.
+ */
+export async function deleteSpamApplication(
+  applicationId: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = await createAdminClientForCurrentActor();
+
+  await safeDeleteApplicationBox(applicationId, "spam_delete");
+
+  const { error } = await admin
+    .from("applications")
+    .delete()
+    .eq("id", applicationId);
+
+  if (error) return { success: false, error: error.message };
+
+  return { success: true };
+}
+
 export async function searchMembers(
   query: string
 ): Promise<

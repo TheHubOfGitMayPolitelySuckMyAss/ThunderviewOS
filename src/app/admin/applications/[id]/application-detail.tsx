@@ -9,6 +9,7 @@ import {
   approveApplication,
   rejectApplication,
   linkApplicationToMember,
+  deleteSpamApplication,
   searchMembers,
 } from "./actions";
 import { Pill } from "@/components/ui/pill";
@@ -65,6 +66,7 @@ export default function ApplicationDetail({
   } | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showDeleteSpamModal, setShowDeleteSpamModal] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -106,6 +108,7 @@ export default function ApplicationDetail({
   const showApprove = app.status === "pending" || app.status === "rejected";
   const showReject = app.status === "pending";
   const showLink = app.status === "pending" && !app.member_id;
+  const showDeleteSpam = app.status === "pending";
 
   return (
     <div>
@@ -201,6 +204,15 @@ export default function ApplicationDetail({
                   Reject…
                 </Button>
               )}
+              {showDeleteSpam && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowDeleteSpamModal(true)}
+                  className="w-full justify-center !text-fg3 hover:!text-ember-600"
+                >
+                  Delete as spam…
+                </Button>
+              )}
             </div>
             <p className="text-[12.5px] text-fg3 mt-4 leading-[1.5]">
               Approving creates a member record, grants community access, and sends the approval email template.
@@ -231,6 +243,20 @@ export default function ApplicationDetail({
           onKickedOut={(name, memberId) => {
             setShowLinkModal(false);
             setKickedOutWarning({ name, memberId });
+          }}
+        />
+      )}
+
+      {/* Delete-as-spam confirmation */}
+      {showDeleteSpamModal && (
+        <DeleteSpamModal
+          applicationId={app.id}
+          name={fullName}
+          email={app.email}
+          onClose={() => setShowDeleteSpamModal(false)}
+          onDeleted={() => {
+            setShowDeleteSpamModal(false);
+            router.push("/admin/applications");
           }}
         />
       )}
@@ -318,6 +344,72 @@ function RejectModal({
             disabled={isPending || (reason === "Other" && !customReason.trim())}
           >
             {isPending ? "Rejecting\u2026" : "Reject"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete-as-Spam Modal ──
+
+function DeleteSpamModal({
+  applicationId,
+  name,
+  email,
+  onClose,
+  onDeleted,
+}: {
+  applicationId: string;
+  name: string;
+  email: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleDelete() {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteSpamApplication(applicationId);
+      if (result.success) {
+        onDeleted();
+      } else {
+        setError(result.error ?? "Delete failed.");
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-md rounded-lg bg-bg border border-border p-6 shadow-lg">
+        <h3 className="tv-h4 mb-2">Delete as spam</h3>
+        <p className="text-[13.5px] text-fg2 mb-4 leading-[1.5]">
+          Permanently remove the application from <strong>{name}</strong> (<span className="font-mono text-[12.5px]">{email}</span>).
+        </p>
+        <div className="rounded-md border border-border bg-bg-tinted p-3 text-[12.5px] text-fg2 leading-[1.55] mb-4">
+          <strong className="text-fg1">This is different from Reject.</strong> Rejected
+          applications stay on file as a suppression list, so a re-application from the
+          same email lands flagged in your queue. A spam delete <em>removes the row entirely</em> —
+          if the same email applies again, the new application will hit your queue fresh, no email
+          is sent, and there&rsquo;s no audit-feed link back to this one (only an audit row with
+          the snapshot before deletion).
+        </div>
+        {error && (
+          <p className="text-[12.5px] text-ember-600 mb-3">{error}</p>
+        )}
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            className="!bg-ember-600 hover:!bg-ember-600/90"
+            onClick={handleDelete}
+            disabled={isPending}
+          >
+            {isPending ? "Deleting…" : "Delete permanently"}
           </Button>
         </div>
       </div>
