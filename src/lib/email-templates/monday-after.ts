@@ -17,7 +17,13 @@ interface MondayAfterEmailProps {
   ourMission: string;
   introsAsksHeader: string;
   partnershipBoilerplate: string;
-  dinner: { date: string; venue: string; address: string };
+  /**
+   * The next upcoming dinner — the one the "Buy A Ticket" CTA promotes.
+   * NOT the anchor dinner being recapped (that one's already in the past on
+   * Monday After). Nullable in case the dinner-generation cron hasn't run
+   * yet — when null, the entire CTA block is omitted.
+   */
+  upcomingDinner: { date: string; venue: string; address: string } | null;
   images: { groupNumber: number; publicUrl: string; displayOrder: number }[];
   introsAsksHtml: string;
   recipientFirstName: string;
@@ -87,14 +93,20 @@ export function renderMondayAfterEmail(props: MondayAfterEmailProps): string {
     ourMission,
     introsAsksHeader,
     partnershipBoilerplate,
-    dinner,
+    upcomingDinner,
     images,
     introsAsksHtml,
     recipientFirstName,
     unsubscribeUrl,
   } = props;
 
-  const dinnerDateFormatted = formatDinnerDate(dinner.date);
+  const ctaBlock = upcomingDinner
+    ? `<!-- Buy a Ticket CTA + dinner details -->
+<tr><td style="padding:24px 36px 0;text-align:center;">
+<a href="${SITE_URL}/portal/tickets" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">Buy A Ticket</a>
+<p style="margin:16px 0 0;font-size:14px;color:#75695B;line-height:1.5;">${formatDinnerDate(upcomingDinner.date)} from 6p to 9p @ ${upcomingDinner.venue} // ${upcomingDinner.address}</p>
+</td></tr>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -136,11 +148,7 @@ ${imageSectionIfContent(images, 1)}
 ${inlineLinks(openingText)}
 </td></tr>
 
-<!-- Buy a Ticket CTA + dinner details -->
-<tr><td style="padding:24px 36px 0;text-align:center;">
-<a href="${SITE_URL}/portal/tickets" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">Buy A Ticket</a>
-<p style="margin:16px 0 0;font-size:14px;color:#75695B;line-height:1.5;">${dinnerDateFormatted} from 6p to 9p @ ${dinner.venue} // ${dinner.address}</p>
-</td></tr>
+${ctaBlock}
 
 <!-- Image group 2 -->
 ${imageSectionIfContent(images, 2)}

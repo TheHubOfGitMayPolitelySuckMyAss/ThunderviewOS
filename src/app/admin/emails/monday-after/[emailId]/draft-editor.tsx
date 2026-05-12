@@ -30,7 +30,9 @@ interface DraftEditorProps {
   initialIntrosAsksHeader: string;
   initialPartnershipBoilerplate: string;
   testSentAfterLastEdit: boolean;
-  dinner: { date: string; venue: string; address: string };
+  /** The next upcoming dinner — the one the CTA promotes. Null if no
+   * future dinner is on the calendar yet (the CTA hides in that case). */
+  upcomingDinner: { date: string; venue: string; address: string } | null;
   initialImages: ImageData[];
   recipientCount: number;
   testingMode: boolean;
@@ -59,7 +61,7 @@ export default function DraftEditor({
   initialRecapText, initialTeamShoutouts, initialOurMission,
   initialIntrosAsksHeader, initialPartnershipBoilerplate,
   testSentAfterLastEdit: initialTestSent,
-  dinner, initialImages, recipientCount, testingMode, attendeeCount,
+  upcomingDinner, initialImages, recipientCount, testingMode, attendeeCount,
   sentAt, sentByName, audienceCount,
 }: DraftEditorProps) {
   const [status, setStatus] = useState(initialStatus);
@@ -213,8 +215,16 @@ export default function DraftEditor({
 
       <div className="rounded-lg border border-border bg-bg-elevated p-4 mb-6">
         <div className="text-center">
-          <span className="inline-block bg-accent text-cream-50 font-semibold text-sm px-5 py-2.5 rounded-lg">Buy A Ticket</span>
-          <p className="mt-3 text-sm text-fg3">{formatDinnerLine(dinner)}</p>
+          {upcomingDinner ? (
+            <>
+              <span className="inline-block bg-accent text-cream-50 font-semibold text-sm px-5 py-2.5 rounded-lg">Buy A Ticket</span>
+              <p className="mt-3 text-sm text-fg3">{formatDinnerLine(upcomingDinner)}</p>
+            </>
+          ) : (
+            <p className="text-sm text-fg3 italic">
+              CTA hidden — no upcoming dinner on the calendar. Generate the next dinner before sending.
+            </p>
+          )}
         </div>
       </div>
 

@@ -38,6 +38,27 @@ async function getAuthMember() {
   return { email: lookup.matchedEmail, ...lookup.member };
 }
 
+/**
+ * Resolve the next upcoming dinner (date >= today MT) for the CTA in the
+ * Monday After email. Independent of the anchor dinner the email recaps —
+ * by the time Monday After sends, the anchor is in the past. Returns null
+ * when no future dinner exists yet (e.g. dinner-generation cron hasn't
+ * run); the renderer hides the CTA block in that case.
+ */
+async function getNextUpcomingDinner(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<{ date: string; venue: string; address: string } | null> {
+  const today = getTodayMT();
+  const { data } = await admin
+    .from("dinners")
+    .select("date, venue, address")
+    .gte("date", today)
+    .order("date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data ?? null;
+}
+
 // ============================================================
 // Macro template actions
 // ============================================================
@@ -303,6 +324,8 @@ export async function sendTestEmail(emailId: string): Promise<{ success: boolean
   const attendees = await getDinnerAttendees(dinner.id, admin);
   const introsAsksHtml = buildAttendeeHtml(attendees);
 
+  const upcomingDinner = await getNextUpcomingDinner(admin);
+
   const html = renderMondayAfterEmail({
     subject: email.subject,
     preheader: email.preheader,
@@ -313,7 +336,7 @@ export async function sendTestEmail(emailId: string): Promise<{ success: boolean
     ourMission: email.our_mission,
     introsAsksHeader: email.intros_asks_header,
     partnershipBoilerplate: email.partnership_boilerplate,
-    dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
+    upcomingDinner,
     images: (images ?? []).map((img: { group_number: number; public_url: string; display_order: number }) => ({
       groupNumber: img.group_number, publicUrl: img.public_url, displayOrder: img.display_order,
     })),
@@ -370,6 +393,8 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
     groupNumber: img.group_number, publicUrl: img.public_url, displayOrder: img.display_order,
   }));
 
+  const upcomingDinner = await getNextUpcomingDinner(admin);
+
   // Query recipients (scoped by EMAIL_MODE: testing = team only, live = all opted-in)
   const allRecipients = await getMarketingRecipients();
 
@@ -393,7 +418,7 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
       ourMission: email.our_mission,
       introsAsksHeader: email.intros_asks_header,
       partnershipBoilerplate: email.partnership_boilerplate,
-      dinner: { date: dinner.date, venue: dinner.venue, address: dinner.address },
+      upcomingDinner,
       images: imageData,
       introsAsksHtml,
       recipientFirstName: r.first_name,

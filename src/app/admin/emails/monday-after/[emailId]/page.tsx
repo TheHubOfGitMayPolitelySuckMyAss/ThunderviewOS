@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatDateFriendly, formatName } from "@/lib/format";
+import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { getDinnerAttendees } from "@/lib/email-intros-asks";
 import DraftEditor from "./draft-editor";
 import { getRecipientCount, isTestingMode } from "../actions";
@@ -36,6 +36,18 @@ export default async function MondayAfterDraftPage({
   // Fetch attendees for intros/asks preview
   const attendees = await getDinnerAttendees(dinner.id, admin);
 
+  // The CTA in the rendered email points to the NEXT upcoming dinner, not
+  // the anchor (which is in the past by the time Monday After sends).
+  const today = getTodayMT();
+  const { data: upcomingDinnerRow } = await admin
+    .from("dinners")
+    .select("date, venue, address")
+    .gte("date", today)
+    .order("date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const upcomingDinner = upcomingDinnerRow ?? null;
+
   let sentByName: string | null = null;
   if (email.sent_by) {
     const { data: sender } = await admin.from("members").select("first_name, last_name").eq("id", email.sent_by).single();
@@ -68,7 +80,7 @@ export default async function MondayAfterDraftPage({
         initialIntrosAsksHeader={email.intros_asks_header}
         initialPartnershipBoilerplate={email.partnership_boilerplate}
         testSentAfterLastEdit={email.test_sent_after_last_edit}
-        dinner={{ date: dinner.date, venue: dinner.venue, address: dinner.address }}
+        upcomingDinner={upcomingDinner}
         initialImages={(images ?? []).map((img: { id: string; group_number: number; display_order: number; public_url: string }) => ({
           id: img.id, groupNumber: img.group_number, displayOrder: img.display_order, publicUrl: img.public_url,
         }))}
