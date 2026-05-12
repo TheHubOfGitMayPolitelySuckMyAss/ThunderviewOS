@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTargetDinner } from "@/lib/ticket-assignment";
-import { sendFulfillmentEmail } from "@/lib/email-send";
+import { sendFulfillmentEmail, sendTicketPurchasedNotification } from "@/lib/email-send";
 import { logSystemEvent } from "@/lib/system-events";
 import { safePushMember } from "@/lib/streak/safe-push";
 
@@ -167,6 +167,7 @@ async function handleStripeWebhook(request: NextRequest) {
 
     // Only auto-fulfill if this ticket is for the next upcoming dinner
     const nextDinner = await getTargetDinner(metadata.member_id, admin);
+    let autoFulfilled = false;
     if (nextDinner && metadata.dinner_id === nextDinner.id) {
       const { error: updateError } = await admin
         .from("tickets")
@@ -200,9 +201,20 @@ async function handleStripeWebhook(request: NextRequest) {
 
       // Send fulfillment email (dinner details)
       await sendFulfillmentEmail(metadata.member_id, metadata.dinner_id);
+      autoFulfilled = true;
     }
 
     await safePushMember(metadata.member_id, "stripe_webhook");
+
+    // Admin alert (best-effort; never blocks the webhook)
+    await sendTicketPurchasedNotification({
+      memberId: metadata.member_id,
+      dinnerId: metadata.dinner_id,
+      quantity: parseInt(metadata.quantity, 10),
+      amountPaidCents: parseInt(metadata.amount_paid, 10),
+      autoFulfilled,
+      stripeSessionId: session.id,
+    });
   }
 
   // For all other events (checkout.session.expired, etc.), acknowledge receipt

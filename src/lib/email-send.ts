@@ -370,6 +370,87 @@ export async function sendComplaintNotification(opts: {
 }
 
 /**
+ * Notify admin when a portal ticket purchase lands. Looks up member name +
+ * primary email and dinner date so the message reads like a receipt summary.
+ * Failures are swallowed — never block the Stripe webhook on a notification.
+ */
+export async function sendTicketPurchasedNotification(opts: {
+  memberId: string;
+  dinnerId: string;
+  quantity: number;
+  amountPaidCents: number;
+  autoFulfilled: boolean;
+  stripeSessionId: string;
+}): Promise<void> {
+  try {
+    const admin = createAdminClient("system-internal");
+
+    const [{ data: member }, { data: dinner }, { data: emailRow }] = await Promise.all([
+      admin
+        .from("members")
+        .select("first_name, last_name")
+        .eq("id", opts.memberId)
+        .single(),
+      admin
+        .from("dinners")
+        .select("date, venue")
+        .eq("id", opts.dinnerId)
+        .single(),
+      admin
+        .from("member_emails")
+        .select("email")
+        .eq("member_id", opts.memberId)
+        .eq("is_primary", true)
+        .maybeSingle(),
+    ]);
+
+    const memberName = member
+      ? `${member.first_name} ${member.last_name}`.trim()
+      : "(unknown member)";
+    const memberEmail = emailRow?.email ?? "(no primary email)";
+    const dinnerDate = dinner?.date ?? "(unknown date)";
+    const dinnerVenue = dinner?.venue ?? null;
+    const amountDollars = (opts.amountPaidCents / 100).toFixed(2);
+
+    const bodyText = [
+      `${memberName} bought ${opts.quantity} ticket${opts.quantity === 1 ? "" : "s"} for the ${dinnerDate}${dinnerVenue ? ` (${dinnerVenue})` : ""} dinner.`,
+      ``,
+      `Member: ${memberName} <${memberEmail}>`,
+      `Dinner: ${dinnerDate}${dinnerVenue ? ` · ${dinnerVenue}` : ""}`,
+      `Quantity: ${opts.quantity}`,
+      `Amount paid: $${amountDollars}`,
+      `Auto-fulfilled (dinner-details email sent): ${opts.autoFulfilled ? "yes" : "no"}`,
+      ``,
+      `Stripe session: ${opts.stripeSessionId}`,
+    ].join("\n");
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ["eric@marcoullier.com"],
+      subject: `Ticket sold: ${memberName} · ${dinnerDate}`,
+      html: bodyToHtml(bodyText),
+    });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      subject_member_id: opts.memberId,
+      summary: `Sent ticket-purchased notification (${memberName})`,
+      metadata: {
+        template: "admin-ticket-purchased-notification",
+        recipient: "eric@marcoullier.com",
+        member_id: opts.memberId,
+        dinner_id: opts.dinnerId,
+        quantity: opts.quantity,
+        amount_paid_cents: opts.amountPaidCents,
+        auto_fulfilled: opts.autoFulfilled,
+        stripe_session_id: opts.stripeSessionId,
+      },
+    });
+  } catch (err) {
+    console.error("[email] Failed to send ticket-purchased notification:", err);
+  }
+}
+
+/**
  * Notify admin of an email send failure from Resend webhook.
  */
 export async function sendSendFailureNotification(opts: {

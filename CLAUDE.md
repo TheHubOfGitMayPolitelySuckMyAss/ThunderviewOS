@@ -125,6 +125,7 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 - **Hard vs soft bounces are distinguished.** Only `bounce.type = 'Permanent'` flips `email_status='bounced'`, runs secondary promotion, and pushes Streak. `'Transient'`/`'Undetermined'`/unknown: row persisted for visibility but no member state changes.
 - **Receipt emails: using Stripe's built-in.** Custom kit design exists in `design-system/ui_kits/` but won't be built. Don't propose building it.
 - **Stripe receipt auto-send is gated by the Live-mode dashboard toggle** at Settings → Customer emails → "Successful payments." Sandbox and Live each have their own toggle; flipping the sandbox one doesn't affect Live. The toggle is bypassed if you pass `receipt_email` on the API call (we don't — Checkout Sessions use `customer_email` instead). If receipts ever stop, check the Activity timeline of a recent payment in the Stripe dashboard before assuming code regression.
+- **Admin alerts on portal ticket purchases.** The Stripe webhook calls `sendTicketPurchasedNotification` after a successful ticket insert. Comp / credit / historical ticket creation does NOT fire this alert — only `payment_source='portal'` (Stripe checkout) does, because the hook lives in the Stripe webhook handler, not on the ticket INSERT trigger. Best-effort: failure is logged and swallowed so the webhook still 200s.
 
 ### Audience vs community — don't conflate
 
