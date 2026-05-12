@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { formatTimestamp } from "@/lib/format";
+import { useUnsavedChangesGuard } from "@/lib/use-unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Field from "@/components/field";
@@ -44,6 +45,7 @@ export default function DraftEditor({
   const [body, setBody] = useState(initialBody);
   const [testSentAfterLastEdit, setTestSentAfterLastEdit] = useState(initialTestSent);
   const [hasEdited, setHasEdited] = useState(false);
+  const [editVersion, setEditVersion] = useState(0);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showSendModal, setShowSendModal] = useState(false);
 
@@ -56,6 +58,7 @@ export default function DraftEditor({
   function markEdited() {
     setHasEdited(true);
     setTestSentAfterLastEdit(false);
+    setEditVersion((v) => v + 1);
   }
 
   function handleSave() {
@@ -70,6 +73,17 @@ export default function DraftEditor({
       }
     });
   }
+
+  async function autoSave() {
+    const result = await saveDraft(emailId, { subject, body });
+    if (result.success) setHasEdited(false);
+  }
+
+  useUnsavedChangesGuard({
+    enabled: hasEdited && !isSent,
+    version: editVersion,
+    onAutosave: autoSave,
+  });
 
   function handleSendTest() {
     startTesting(async () => {

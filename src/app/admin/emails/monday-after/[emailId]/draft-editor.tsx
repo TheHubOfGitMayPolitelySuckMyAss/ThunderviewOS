@@ -3,6 +3,7 @@
 import { useState, useTransition, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { formatTimestamp } from "@/lib/format";
+import { useUnsavedChangesGuard } from "@/lib/use-unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Field from "@/components/field";
@@ -76,6 +77,7 @@ export default function DraftEditor({
   const [partnershipBoilerplate, setPartnershipBoilerplate] = useState(initialPartnershipBoilerplate);
   const [testSentAfterLastEdit, setTestSentAfterLastEdit] = useState(initialTestSent);
   const [hasEdited, setHasEdited] = useState(false);
+  const [editVersion, setEditVersion] = useState(0);
   const [images, setImages] = useState<ImageData[]>(initialImages);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -86,7 +88,11 @@ export default function DraftEditor({
 
   const isSent = status === "sent";
 
-  function markEdited() { setHasEdited(true); setTestSentAfterLastEdit(false); }
+  function markEdited() {
+    setHasEdited(true);
+    setTestSentAfterLastEdit(false);
+    setEditVersion((v) => v + 1);
+  }
 
   const groupImages = (n: number) => images.filter((i) => i.groupNumber === n).sort((a, b) => a.displayOrder - b.displayOrder);
   const g1 = groupImages(1), g2 = groupImages(2), g3 = groupImages(3), g4 = groupImages(4), g5 = groupImages(5);
@@ -153,6 +159,20 @@ export default function DraftEditor({
       else setMessage({ type: "error", text: result.error || "Failed to save" });
     });
   }
+
+  // Silent auto-save: same payload as handleSave but no UI message, no
+  // useTransition wrapping. Resets hasEdited on success so beforeunload
+  // stops warning and the Save Draft button reflects the synced state.
+  async function autoSave() {
+    const result = await saveDraft(emailId, buildSaveFields());
+    if (result.success) setHasEdited(false);
+  }
+
+  useUnsavedChangesGuard({
+    enabled: hasEdited && !isSent,
+    version: editVersion,
+    onAutosave: autoSave,
+  });
 
   function handleSendTest() {
     startTesting(async () => {
