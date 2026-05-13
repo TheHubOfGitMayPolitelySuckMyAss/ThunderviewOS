@@ -459,7 +459,7 @@ export async function sendTicketPurchasedNotification(opts: {
   memberId: string;
   dinnerId: string;
   quantity: number;
-  amountPaidCents: number;
+  amountPaidDollars: number;
   autoFulfilled: boolean;
   stripeSessionId: string;
 }): Promise<void> {
@@ -491,7 +491,7 @@ export async function sendTicketPurchasedNotification(opts: {
     const memberEmail = emailRow?.email ?? "(no primary email)";
     const dinnerDate = dinner?.date ?? "(unknown date)";
     const dinnerVenue = dinner?.venue ?? null;
-    const amountDollars = (opts.amountPaidCents / 100).toFixed(2);
+    const amountDollars = opts.amountPaidDollars.toFixed(2);
 
     const bodyText = [
       `${memberName} bought ${opts.quantity} ticket${opts.quantity === 1 ? "" : "s"} for the ${dinnerDate}${dinnerVenue ? ` (${dinnerVenue})` : ""} dinner.`,
@@ -521,7 +521,7 @@ export async function sendTicketPurchasedNotification(opts: {
         member_id: opts.memberId,
         dinner_id: opts.dinnerId,
         quantity: opts.quantity,
-        amount_paid_cents: opts.amountPaidCents,
+        amount_paid_dollars: opts.amountPaidDollars,
         auto_fulfilled: opts.autoFulfilled,
         stripe_session_id: opts.stripeSessionId,
       },

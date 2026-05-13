@@ -211,7 +211,7 @@ async function handleStripeWebhook(request: NextRequest) {
       memberId: metadata.member_id,
       dinnerId: metadata.dinner_id,
       quantity: parseInt(metadata.quantity, 10),
-      amountPaidCents: parseInt(metadata.amount_paid, 10),
+      amountPaidDollars: parseInt(metadata.amount_paid, 10),
       autoFulfilled,
       stripeSessionId: session.id,
     });
