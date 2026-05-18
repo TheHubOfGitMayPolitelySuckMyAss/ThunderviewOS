@@ -35,17 +35,26 @@ export async function POST(req: NextRequest) {
     return unauthorizedResponse();
   }
 
+  const rawBody = await req.text();
   let body: unknown;
   try {
-    body = await req.json();
+    body = rawBody ? JSON.parse(rawBody) : null;
   } catch {
-    await logWebhookFailure({ source: SOURCE, cause: "malformed_body" });
+    await logWebhookFailure({
+      source: SOURCE,
+      cause: "malformed_body",
+      raw_body: rawBody.slice(0, 4000),
+    });
     return malformedResponse();
   }
 
   const boxKey = extractBoxKey(body);
   if (!boxKey) {
-    await logWebhookFailure({ source: SOURCE, cause: "malformed_body" });
+    await logWebhookFailure({
+      source: SOURCE,
+      cause: "malformed_body",
+      raw_body: rawBody.slice(0, 4000),
+    });
     return malformedResponse();
   }
 

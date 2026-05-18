@@ -54,6 +54,7 @@ export async function logWebhookFailure(args: {
   box_key?: string | null;
   member_id?: string | null;
   message?: string;
+  raw_body?: string | null;
 }): Promise<void> {
   await logSystemEvent({
     event_type: "error.caught",
@@ -65,6 +66,7 @@ export async function logWebhookFailure(args: {
       box_key: args.box_key ?? null,
       member_id: args.member_id ?? null,
       message: args.message ?? null,
+      raw_body: args.raw_body ?? null,
     },
   });
 }
