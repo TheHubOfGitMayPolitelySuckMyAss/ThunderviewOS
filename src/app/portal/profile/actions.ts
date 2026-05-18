@@ -9,7 +9,10 @@ import { summarizeChangedFields } from "@/lib/summarize-profile";
 import sharp from "sharp";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+// HEIC is converted to JPEG client-side via heic2any before reaching the
+// server (sharp's prebuilt binary on Vercel doesn't include libheif). So the
+// server only ever accepts already-decoded formats.
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const ADMIN_EMAIL = "eric@marcoullier.com";
 

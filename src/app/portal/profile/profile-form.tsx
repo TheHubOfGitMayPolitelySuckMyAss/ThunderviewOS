@@ -109,23 +109,36 @@ export default function ProfileForm({ member, returnTo, targetMemberId }: Profil
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      /\.(heic|heif)$/i.test(file.name);
+
     if (isHeic) {
-      // HEIC can't be cropped client-side — upload directly, server does center-crop
+      // iPhone Camera Roll default. sharp's prebuilt binary on Vercel doesn't
+      // include libheif, so we convert to JPEG in the browser via heic2any
+      // (WASM-libheif) before handing off to the normal crop flow. Dynamic
+      // import keeps ~250KB of WASM out of the bundle for non-HEIC uploads.
       setSavingPhoto(true);
-      const formData = new FormData();
-      formData.set("profile_pic", file);
-      if (targetMemberId) formData.set("target_member_id", targetMemberId);
-      const result = await portalUpdateProfilePic(formData);
-      setSavingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      if (!result.success) {
-        showToast(result.error || "Upload failed", "error");
-        return;
+      try {
+        const heic2any = (await import("heic2any")).default;
+        const converted = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+        const jpegBlob = Array.isArray(converted) ? converted[0] : converted;
+        setCropImageUrl(URL.createObjectURL(jpegBlob));
+      } catch (err) {
+        const message =
+          err instanceof Error && err.message
+            ? `Couldn't read this HEIC file: ${err.message}`
+            : "Couldn't read this HEIC file. Try exporting it as JPEG.";
+        showToast(message, "error");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } finally {
+        setSavingPhoto(false);
       }
-      showToast("Photo saved!", "success");
-      if (result.profilePicUrl) setProfilePicUrl(result.profilePicUrl);
-      router.refresh();
       return;
     }
 
@@ -143,20 +156,27 @@ export default function ProfileForm({ member, returnTo, targetMemberId }: Profil
     formData.set("profile_pic", file);
     if (targetMemberId) formData.set("target_member_id", targetMemberId);
 
-    const result = await portalUpdateProfilePic(formData);
-    setSavingPhoto(false);
-
-    if (!result.success) {
-      showToast(result.error || "Upload failed", "error");
-      return;
+    try {
+      const result = await portalUpdateProfilePic(formData);
+      if (!result.success) {
+        showToast(result.error || "Upload failed", "error");
+        return;
+      }
+      showToast("Photo saved!", "success");
+      if (result.profilePicUrl) {
+        setProfilePicUrl(result.profilePicUrl);
+      }
+      setPicPreview(null);
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? `Upload failed: ${err.message}`
+          : "Upload failed. Try again, or use a smaller image.";
+      showToast(message, "error");
+    } finally {
+      setSavingPhoto(false);
     }
-
-    showToast("Photo saved!", "success");
-    if (result.profilePicUrl) {
-      setProfilePicUrl(result.profilePicUrl);
-    }
-    setPicPreview(null);
-    router.refresh();
   }
 
   function handleCropCancel() {
@@ -173,17 +193,24 @@ export default function ProfileForm({ member, returnTo, targetMemberId }: Profil
     formData.set("remove_pic", "true");
     if (targetMemberId) formData.set("target_member_id", targetMemberId);
 
-    const result = await portalUpdateProfilePic(formData);
-    setSavingPhoto(false);
-
-    if (!result.success) {
-      showToast(result.error || "Remove failed", "error");
-      return;
+    try {
+      const result = await portalUpdateProfilePic(formData);
+      if (!result.success) {
+        showToast(result.error || "Remove failed", "error");
+        return;
+      }
+      showToast("Photo removed!", "success");
+      setProfilePicUrl(null);
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? `Remove failed: ${err.message}`
+          : "Remove failed. Try again.";
+      showToast(message, "error");
+    } finally {
+      setSavingPhoto(false);
     }
-
-    showToast("Photo removed!", "success");
-    setProfilePicUrl(null);
-    router.refresh();
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

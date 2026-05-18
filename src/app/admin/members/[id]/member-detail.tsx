@@ -312,13 +312,39 @@ function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const [picPreview, setPicPreview] = useState<string | null>(null);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      /\.(heic|heif)$/i.test(file.name);
+
     if (isHeic) {
-      uploadFile(file);
+      // Convert to JPEG in the browser via heic2any before cropping. sharp's
+      // prebuilt binary on Vercel doesn't include libheif, so the server
+      // can't decode HEIC directly.
+      setSavingPhoto(true);
+      try {
+        const heic2any = (await import("heic2any")).default;
+        const converted = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+        const jpegBlob = Array.isArray(converted) ? converted[0] : converted;
+        setCropImageUrl(URL.createObjectURL(jpegBlob));
+      } catch (err) {
+        alert(
+          err instanceof Error && err.message
+            ? `Couldn't read this HEIC file: ${err.message}`
+            : "Couldn't read this HEIC file. Try exporting it as JPEG.",
+        );
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } finally {
+        setSavingPhoto(false);
+      }
       return;
     }
 
@@ -342,12 +368,22 @@ function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("profile_pic", file);
-    const result = await adminUploadProfilePic(member.id, formData);
-    setSavingPhoto(false);
-
-    if (result.success && result.profilePicUrl !== undefined) {
-      onPicUpdated(result.profilePicUrl ?? null);
-      setPicPreview(null);
+    try {
+      const result = await adminUploadProfilePic(member.id, formData);
+      if (result.success && result.profilePicUrl !== undefined) {
+        onPicUpdated(result.profilePicUrl ?? null);
+        setPicPreview(null);
+      } else if (!result.success) {
+        alert(result.error || "Upload failed");
+      }
+    } catch (err) {
+      alert(
+        err instanceof Error && err.message
+          ? `Upload failed: ${err.message}`
+          : "Upload failed. Try again, or use a smaller image.",
+      );
+    } finally {
+      setSavingPhoto(false);
     }
   }
 
@@ -355,12 +391,22 @@ function Heading({ member, onPicUpdated }: { member: MemberData; onPicUpdated: (
     setSavingPhoto(true);
     const formData = new FormData();
     formData.set("remove_pic", "true");
-    const result = await adminUploadProfilePic(member.id, formData);
-    setSavingPhoto(false);
-
-    if (result.success) {
-      onPicUpdated(null);
-      setPicPreview(null);
+    try {
+      const result = await adminUploadProfilePic(member.id, formData);
+      if (result.success) {
+        onPicUpdated(null);
+        setPicPreview(null);
+      } else {
+        alert(result.error || "Remove failed");
+      }
+    } catch (err) {
+      alert(
+        err instanceof Error && err.message
+          ? `Remove failed: ${err.message}`
+          : "Remove failed. Try again.",
+      );
+    } finally {
+      setSavingPhoto(false);
     }
   }
 

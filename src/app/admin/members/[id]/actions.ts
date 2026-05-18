@@ -351,9 +351,10 @@ export async function adminUploadProfilePic(
     return { success: false, error: "Image must be under 5MB" };
   }
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+  // HEIC is converted to JPEG client-side via heic2any before reaching here.
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!allowedTypes.includes(file.type)) {
-    return { success: false, error: "Image must be JPEG, PNG, WebP, or HEIC" };
+    return { success: false, error: "Image must be JPEG, PNG, or WebP" };
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
