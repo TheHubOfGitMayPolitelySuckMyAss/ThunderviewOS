@@ -32,6 +32,7 @@ import {
 } from "@/lib/email-send";
 import { logSystemEvent } from "@/lib/system-events";
 import { safePushMember } from "@/lib/streak/safe-push";
+import { applyHardBounce } from "@/lib/email-bounce";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -229,7 +230,7 @@ async function handleResendWebhook(req: Request) {
   // recipientEmail is already bare + lowercased.
   const { data: memberEmail } = await admin
     .from("member_emails")
-    .select("id, member_id, is_primary")
+    .select("id, email, member_id, is_primary")
     .ilike("email", recipientEmail)
     .limit(1)
     .single();
@@ -258,108 +259,12 @@ async function handleResendWebhook(req: Request) {
 
     // Update member state based on event type
     if (eventType === "bounced" && isHardBounce) {
-      await admin
-        .from("member_emails")
-        .update({ email_status: "bounced" })
-        .eq("id", memberEmail.id);
-
-      await logSystemEvent({
-        event_type: "email.status_set_bounced",
-        actor_label: "webhook:resend",
-        subject_member_id: memberEmail.member_id,
-        summary: `Marked ${recipientEmail} as bounced on ${memberName ?? "member"}`,
-        metadata: {
-          recipient_email: recipientEmail,
-          member_email_id: memberEmail.id,
-          was_primary: memberEmail.is_primary,
-        },
-      });
-
-      // Auto-promote a non-bounced secondary to primary when the bounced
-      // email was the primary. Must run BEFORE safePushMember so the next
-      // Streak push picks up the new primary (Streak's contacts array uses
-      // replace-semantics, so the old contact gets dropped).
-      let promotedEmail: string | null = null;
-      let streakOutcome: "primary_rotated" | "no_secondary_unreachable" | "secondary_retired" =
-        memberEmail.is_primary ? "no_secondary_unreachable" : "secondary_retired";
-      if (memberEmail.is_primary) {
-        const { data: candidates } = await admin
-          .from("member_emails")
-          .select("id, email")
-          .eq("member_id", memberEmail.member_id)
-          .eq("email_status", "active")
-          .neq("id", memberEmail.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        const promotion = candidates?.[0];
-        if (promotion) {
-          const { error: rpcError } = await admin.rpc("swap_primary_email", {
-            p_member_id: memberEmail.member_id,
-            p_new_primary_email_id: promotion.id,
-          });
-          if (rpcError) {
-            console.error("[resend-webhook] swap_primary_email failed:", rpcError.message);
-            await logSystemEvent({
-              event_type: "error.caught",
-              actor_label: "webhook:resend",
-              summary: `swap_primary_email failed during bounce promotion: ${rpcError.message}`,
-              metadata: {
-                context: "webhook.resend",
-                cause: "promote_secondary_failed",
-                member_id: memberEmail.member_id,
-                bounced_member_email_id: memberEmail.id,
-                promoted_member_email_id: promotion.id,
-                message: rpcError.message,
-              },
-            });
-          } else {
-            promotedEmail = promotion.email;
-            streakOutcome = "primary_rotated";
-            await logSystemEvent({
-              event_type: "email.primary_promoted",
-              actor_label: "webhook:resend",
-              subject_member_id: memberEmail.member_id,
-              summary: `Promoted ${promotion.email} to primary on ${memberName ?? "member"} (replacing bounced ${recipientEmail})`,
-              metadata: {
-                member_id: memberEmail.member_id,
-                bounced_email: recipientEmail,
-                promoted_member_email_id: promotion.id,
-                promoted_email: promotion.email,
-              },
-            });
-          }
-        } else {
-          await logSystemEvent({
-            event_type: "email.no_secondary_available",
-            actor_label: "webhook:resend",
-            subject_member_id: memberEmail.member_id,
-            summary: `${memberName ?? "Member"} has no deliverable email — ${recipientEmail} was their only active address`,
-            metadata: {
-              member_id: memberEmail.member_id,
-              bounced_email: recipientEmail,
-            },
-          });
-        }
-      }
-
-      await safePushMember(memberEmail.member_id, "resend_bounce");
-      const outcomeSummary =
-        streakOutcome === "primary_rotated"
-          ? `Streak resynced: primary email rotated to ${promotedEmail}`
-          : streakOutcome === "no_secondary_unreachable"
-            ? `Streak resynced: member moved to Bounced stage (no deliverable email)`
-            : `Streak resynced: secondary email retired (member still reachable)`;
-      await logSystemEvent({
-        event_type: "streak.bounce_synced",
-        actor_label: "webhook:resend",
-        subject_member_id: memberEmail.member_id,
-        summary: outcomeSummary,
-        metadata: {
-          member_id: memberEmail.member_id,
-          outcome: streakOutcome,
-          bounced_email: recipientEmail,
-          promoted_email: promotedEmail,
-        },
+      await applyHardBounce({
+        admin,
+        memberEmail,
+        memberName,
+        actorLabel: "webhook:resend",
+        safePushReason: "resend_bounce",
       });
     } else if (eventType === "complained") {
       await admin

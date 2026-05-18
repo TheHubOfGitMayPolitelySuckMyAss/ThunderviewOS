@@ -38,14 +38,18 @@ export function extractBoxKey(body: unknown): string | null {
 export type WebhookFailureCause =
   | "malformed_body"
   | "no_member_for_box"
+  | "no_primary_email"
   | "downstream_db_failure";
 
 /**
  * Logs a streak webhook failure as `error.caught` with consistent metadata
- * shape across both webhook handlers.
+ * shape across the inbound webhook handlers.
  */
 export async function logWebhookFailure(args: {
-  source: "streak_opted_out_webhook" | "streak_not_this_one_webhook";
+  source:
+    | "streak_opted_out_webhook"
+    | "streak_not_this_one_webhook"
+    | "streak_bounced_webhook";
   cause: WebhookFailureCause;
   box_key?: string | null;
   member_id?: string | null;
