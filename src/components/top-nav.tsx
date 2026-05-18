@@ -105,6 +105,27 @@ export default function TopNav({ initials, isAdmin, isTeam, profilePicUrl }: Top
 
         {dropdownOpen && (
           <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-border bg-bg py-1 shadow-md">
+            {/* Section links — only visible below md, where the center nav is hidden */}
+            <div className="md:hidden">
+              {navLinks.map((link) => {
+                const active = link.href === "/admin"
+                  ? pathname.startsWith("/admin")
+                  : pathname.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setDropdownOpen(false)}
+                    className={`block px-4 py-2 text-sm no-underline hover:bg-bg-elevated ${
+                      active ? "text-fg1 font-medium" : "text-fg2"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+              <div className="my-1 border-t border-border" />
+            </div>
             <Link
               href="/portal/profile"
               onClick={() => setDropdownOpen(false)}
