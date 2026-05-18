@@ -109,7 +109,7 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 - **`auth.login` carries `anon_id` when the cookie is present.** `/auth/confirm` reads it at OTP verification and stuffs it into `metadata.anon_id` alongside `actor_id=memberId`. Single bridge row, no backfill of prior anonymous views. `/auth/callback` (rare PKCE fallback) does NOT emit the bridge — hoist to a helper if that ever matters.
 - **Marketing feed = `metadata->>anon_id IS NOT NULL`**, not a hardcoded event type. Naturally captures anonymous page views AND the auth.login bridge. The bridge appears in BOTH Marketing and People. Future event types carrying an anon cookie auto-participate.
 - **Marketing UI renders bridged rows as `Visitor xxxxxxxx → Member Name`** in the Actor column. Handle = first 8 hex of UUID, hue derived from same hex (deterministic per visitor). Click chip to scope feed via `?anon=<uuid>`.
-- **No PII, no IP, no UA, no fingerprinting.** Path + search params + opaque cookie value when anonymous. Eric explicitly waived GDPR/CCPA for this regional-CO program — design choice, not legal obligation.
+- **`page.viewed` metadata captures path, search params, `user_agent`, `ip` (from `x-forwarded-for`), and `anon_id` (anonymous only).** UA/IP exist so "which browser/device hung on Jeremy's profile?" is one SQL query. Users are authenticated members — no anonymous-tracking concerns that would justify dropping headers. The privacy-strict logger (no UA/no IP) is the VibeClaude extension's design, not this app's.
 - **Skip list:** `/api/*`, `/auth/confirm`, `/auth/callback`, `/admin/operations`, `/dev/*`. Root layout's logger additionally skips `/portal` and `/admin` (those have own layouts; otherwise we'd double-log).
 
 ## Email systems

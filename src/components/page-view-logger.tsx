@@ -65,6 +65,7 @@ export default function PageViewLogger({
     logPageView({
       path: pathname,
       search_params: Object.keys(sp).length > 0 ? sp : undefined,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
     }).catch((err) => {
       // Never break navigation if logging fails
       console.error("[page-view] log failed:", err);
