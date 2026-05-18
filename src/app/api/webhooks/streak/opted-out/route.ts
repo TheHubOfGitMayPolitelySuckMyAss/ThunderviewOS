@@ -36,19 +36,14 @@ export async function POST(req: NextRequest) {
   }
 
   const rawBody = await req.text();
-  let body: unknown;
+  let parsed: unknown = null;
   try {
-    body = rawBody ? JSON.parse(rawBody) : null;
+    parsed = rawBody ? JSON.parse(rawBody) : null;
   } catch {
-    await logWebhookFailure({
-      source: SOURCE,
-      cause: "malformed_body",
-      raw_body: rawBody.slice(0, 4000),
-    });
-    return malformedResponse();
+    // fall through — extractBoxKey will try form-encoded against rawBody
   }
 
-  const boxKey = extractBoxKey(body);
+  const boxKey = extractBoxKey(parsed, rawBody);
   if (!boxKey) {
     await logWebhookFailure({
       source: SOURCE,

@@ -24,14 +24,38 @@ export function verifyStreakSecret(req: NextRequest): boolean {
 /**
  * Pull a Streak box key out of a webhook payload, tolerating reasonable
  * template variations the automation builder might emit.
+ *
+ * Streak's "Outbound webhook" step defaults to `application/x-www-form-urlencoded`
+ * unless the Request Payload field contains a valid JSON object literal. The
+ * automation builder's variable picker (`{{ boxStageChanged.boxKey }}` and
+ * friends) inserts a single value, which Streak then wraps as
+ * `payload=<value>`. So in practice we receive form-encoded bodies with a
+ * `payload` field, not JSON. Accept both shapes plus a few likely key names
+ * so future Streak schema tweaks don't break us silently.
  */
-export function extractBoxKey(body: unknown): string | null {
-  if (!body || typeof body !== "object") return null;
-  const obj = body as Record<string, unknown>;
-  for (const k of ["box_key", "boxKey", "key"]) {
-    const v = obj[k];
-    if (typeof v === "string" && v.length > 0) return v;
+export function extractBoxKey(parsed: unknown, rawBody: string): string | null {
+  // JSON object body
+  if (parsed && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    for (const k of ["box_key", "boxKey", "key", "payload"]) {
+      const v = obj[k];
+      if (typeof v === "string" && v.length > 0) return v;
+    }
   }
+
+  // Form-encoded body (Streak's default when payload isn't JSON)
+  if (rawBody) {
+    try {
+      const params = new URLSearchParams(rawBody);
+      for (const k of ["box_key", "boxKey", "key", "payload"]) {
+        const v = params.get(k);
+        if (v && v.length > 0) return v;
+      }
+    } catch {
+      // not form-encoded either
+    }
+  }
+
   return null;
 }
 
