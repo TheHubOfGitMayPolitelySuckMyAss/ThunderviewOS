@@ -13,6 +13,7 @@ export const SYSTEM_FEED_INCLUDED_TYPES = [
   "email.complained",
   "email.failed",
   "email.status_set_bounced",
+  "email.soft_bounce_escalated",
   "email.primary_promoted",
   "email.no_secondary_available",
   "streak.bounce_synced",

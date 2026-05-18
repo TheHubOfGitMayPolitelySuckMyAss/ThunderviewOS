@@ -266,6 +266,44 @@ async function handleResendWebhook(req: Request) {
         actorLabel: "webhook:resend",
         safePushReason: "resend_bounce",
       });
+    } else if (eventType === "bounced" && !isHardBounce) {
+      // Soft bounce. AWS SES classifies DNS-resolution failures as Transient
+      // even when the receiving domain is permanently gone, so a single soft
+      // bounce isn't enough signal to retire an address. Two soft bounces to
+      // the same address with no positive signal between them is — escalate
+      // to hard bounce and run the same cascade.
+      const { data: emailRow } = await admin
+        .from("member_emails")
+        .select("email_status")
+        .eq("id", memberEmail.id)
+        .single();
+      if (emailRow?.email_status === "active") {
+        const { count: softBounceCount } = await admin
+          .from("email_events")
+          .select("id", { count: "exact", head: true })
+          .eq("member_email_id", memberEmail.id)
+          .eq("event_type", "bounced");
+        if ((softBounceCount ?? 0) >= 2) {
+          await logSystemEvent({
+            event_type: "email.soft_bounce_escalated",
+            actor_label: "webhook:resend",
+            subject_member_id: memberEmail.member_id,
+            summary: `Escalating ${recipientEmail} to hard bounce after ${softBounceCount} soft bounces`,
+            metadata: {
+              member_email_id: memberEmail.id,
+              recipient_email: recipientEmail,
+              soft_bounce_count: softBounceCount,
+            },
+          });
+          await applyHardBounce({
+            admin,
+            memberEmail,
+            memberName,
+            actorLabel: "webhook:resend",
+            safePushReason: "resend_soft_bounce_escalation",
+          });
+        }
+      }
     } else if (eventType === "complained") {
       await admin
         .from("member_emails")
@@ -279,8 +317,8 @@ async function handleResendWebhook(req: Request) {
         .eq("id", memberEmail.member_id);
       await safePushMember(memberEmail.member_id, "resend_complaint");
     }
-    // Soft bounces (non-Permanent): no email_status flip, no promotion, no Streak push.
-    // Row persists in email_events for dashboard visibility.
+    // First soft bounce: row persists in email_events for visibility, no
+    // state change. Second soft bounce promotes to hard bounce (see above).
   }
 
   // Notify admin on complaint or failure (non-blocking — don't 5xx on failure)
