@@ -141,7 +141,7 @@ async function runAppliedDidntConvert() {
 
   let sent = 0;
   for (const memberId of recipients) {
-    await sendAppliedDidntConvertEmail(memberId);
+    await sendAppliedDidntConvertEmail(memberId, dinner.id);
     sent++;
   }
 

@@ -15,7 +15,12 @@ export default function AppliedDidntConvertEditor(props: Props) {
   return (
     <TemplateEditor
       {...props}
-      availableVariables={["[member.firstname]"]}
+      availableVariables={[
+        "[member.firstname]",
+        "[dinner.date]",
+        "[dinner.venue]",
+        "[dinner.address]",
+      ]}
       sendTestEmail={sendTestEmail}
       saveTemplate={saveTemplate}
     />

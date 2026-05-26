@@ -319,12 +319,28 @@ export async function sendPromptIntroAskEmail(
  */
 export async function sendAppliedDidntConvertEmail(
   memberId: string,
+  dinnerId: string,
   options?: { throwOnError?: boolean }
 ): Promise<void> {
   try {
+    const admin = createAdminClient("system-internal");
+
     const recipient = await getRecipient(memberId);
     if (!recipient) {
       const msg = `No primary email for member ${memberId}`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
+
+    const { data: dinner } = await admin
+      .from("dinners")
+      .select("date, venue, address")
+      .eq("id", dinnerId)
+      .single();
+
+    if (!dinner) {
+      const msg = `Dinner ${dinnerId} not found`;
       if (options?.throwOnError) throw new Error(msg);
       console.error("[email]", msg);
       return;
@@ -338,14 +354,18 @@ export async function sendAppliedDidntConvertEmail(
       return;
     }
 
-    const subject = template.subject.replace(/\[member\.firstname\]/g, recipient.first_name);
-    const body = template.body.replace(/\[member\.firstname\]/g, recipient.first_name);
+    const render = (text: string) =>
+      text
+        .replace(/\[member\.firstname\]/g, recipient.first_name)
+        .replace(/\[dinner\.date\]/g, formatDateFriendly(dinner.date))
+        .replace(/\[dinner\.venue\]/g, dinner.venue)
+        .replace(/\[dinner\.address\]/g, dinner.address);
 
     const { error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: recipient.email,
-      subject,
-      html: bodyToHtml(body),
+      subject: render(template.subject),
+      html: bodyToHtml(render(template.body)),
     });
     if (error) throw new Error(`Resend error: ${error.message}`);
 
@@ -357,6 +377,7 @@ export async function sendAppliedDidntConvertEmail(
         template: "applied-didnt-convert",
         recipient: recipient.email,
         member_id: memberId,
+        dinner_id: dinnerId,
       },
     });
   } catch (err) {
