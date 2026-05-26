@@ -43,6 +43,12 @@ const transactionalEmails = [
     description:
       "Tuesday 2 days before a dinner \u2014 nudge ticketed members missing or with a stale Intro/Ask",
   },
+  {
+    href: "/admin/emails/applied-didnt-convert",
+    label: "Applied, Didn\u2019t Convert",
+    description:
+      "Friday 6 days before a dinner \u2014 nudge approved applicants from this dinner cycle who haven\u2019t bought a ticket",
+  },
 ];
 
 export default async function EmailsPage() {

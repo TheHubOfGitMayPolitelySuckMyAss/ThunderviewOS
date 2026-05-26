@@ -312,6 +312,59 @@ export async function sendPromptIntroAskEmail(
   }
 }
 
+/**
+ * Send "applied, didn't convert" nudge — fires from cron 6 days before a dinner
+ * to approved applicants who applied between the prior dinner and this one but
+ * haven't bought a ticket yet.
+ */
+export async function sendAppliedDidntConvertEmail(
+  memberId: string,
+  options?: { throwOnError?: boolean }
+): Promise<void> {
+  try {
+    const recipient = await getRecipient(memberId);
+    if (!recipient) {
+      const msg = `No primary email for member ${memberId}`;
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
+
+    const template = await getTemplate("applied-didnt-convert");
+    if (!template) {
+      const msg = "applied-didnt-convert template not found";
+      if (options?.throwOnError) throw new Error(msg);
+      console.error("[email]", msg);
+      return;
+    }
+
+    const subject = template.subject.replace(/\[member\.firstname\]/g, recipient.first_name);
+    const body = template.body.replace(/\[member\.firstname\]/g, recipient.first_name);
+
+    const { error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: recipient.email,
+      subject,
+      html: bodyToHtml(body),
+    });
+    if (error) throw new Error(`Resend error: ${error.message}`);
+
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      subject_member_id: memberId,
+      summary: `Sent applied-didnt-convert email to ${recipient.email}`,
+      metadata: {
+        template: "applied-didnt-convert",
+        recipient: recipient.email,
+        member_id: memberId,
+      },
+    });
+  } catch (err) {
+    if (options?.throwOnError) throw err;
+    console.error("[email] Failed to send applied-didnt-convert email:", err);
+  }
+}
+
 export async function sendNewApplicationNotification(application: {
   id: string;
   firstName: string;
