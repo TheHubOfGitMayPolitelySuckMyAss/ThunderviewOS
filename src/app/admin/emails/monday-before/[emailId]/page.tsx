@@ -31,7 +31,7 @@ export default async function MondayBeforeDraftPage({
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  const recipientCount = await getRecipientCount();
+  const recipientCount = await getRecipientCount(email.dinner_id);
 
   // Get sender name if sent
   let sentByName: string | null = null;

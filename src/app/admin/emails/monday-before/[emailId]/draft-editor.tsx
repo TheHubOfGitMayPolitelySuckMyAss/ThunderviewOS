@@ -384,7 +384,7 @@ export default function DraftEditor({
             <p className="text-sm text-fg2 mb-5">
               You&rsquo;re about to send this email to{" "}
               <strong className="text-fg1">{recipientCount}</strong>{" "}
-              member{recipientCount !== 1 ? "s" : ""} with marketing enabled.
+              member{recipientCount !== 1 ? "s" : ""} (marketing-enabled, no ticket for this dinner, not in &ldquo;Not This One&rdquo;).
             </p>
 
             {message && (

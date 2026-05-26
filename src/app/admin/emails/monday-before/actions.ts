@@ -8,7 +8,7 @@ import { formatDateFriendly, formatName } from "@/lib/format";
 import { renderMondayBeforeEmail } from "@/lib/email-templates/monday-before";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe";
 import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
-import { getMarketingRecipients, getMarketingRecipientCount, isTestingMode } from "@/lib/email-mode";
+import { getMarketingRecipients, isTestingMode } from "@/lib/email-mode";
 import { logSystemEvent } from "@/lib/system-events";
 import { Resend } from "resend";
 import crypto from "crypto";
@@ -391,8 +391,9 @@ export async function sendToAll(
     .order("group_number", { ascending: true })
     .order("display_order", { ascending: true });
 
-  // Query recipients (scoped by EMAIL_MODE: testing = team only, live = all opted-in)
-  const allRecipients = await getMarketingRecipients();
+  // Query recipients (scoped by EMAIL_MODE: testing = team only, live = all opted-in),
+  // then exclude anyone holding a ticket for this dinner or who marked "Not This One."
+  const allRecipients = await getMondayBeforeRecipients(email.dinner_id as string);
 
   if (allRecipients.length === 0) {
     return { success: false, error: "No eligible recipients" };
@@ -484,7 +485,44 @@ export async function sendToAll(
 // Helpers for the index page
 // ============================================================
 
-export { getMarketingRecipientCount as getRecipientCount };
+/**
+ * Monday-Before-specific recipient list: marketing-opted-in members minus
+ * anyone already ticketed (purchased or fulfilled) for the target dinner,
+ * minus anyone who flagged "Not This One" for it. Other marketing emails
+ * (Monday After, One Off Blast) skip this filter on purpose — they should
+ * reach the full marketing list.
+ */
+export async function getMondayBeforeRecipients(dinnerId: string) {
+  const admin = createAdminClient("system-internal");
+  const recipients = await getMarketingRecipients();
+
+  const [{ data: ticketRows }, { data: ntoRows }] = await Promise.all([
+    admin
+      .from("tickets")
+      .select("member_id")
+      .eq("dinner_id", dinnerId)
+      .in("fulfillment_status", ["purchased", "fulfilled"])
+      .range(0, 999),
+    admin
+      .from("members")
+      .select("id")
+      .eq("excluded_from_dinner_id", dinnerId)
+      .range(0, 999),
+  ]);
+
+  const excluded = new Set<string>([
+    ...(ticketRows ?? []).map((r) => r.member_id as string),
+    ...(ntoRows ?? []).map((r) => r.id as string),
+  ]);
+
+  return recipients.filter((r) => !excluded.has(r.id));
+}
+
+export async function getRecipientCount(dinnerId: string): Promise<number> {
+  const list = await getMondayBeforeRecipients(dinnerId);
+  return list.length;
+}
+
 export { isTestingMode };
 
 export async function getTeamMembers(): Promise<{ id: string; name: string }[]> {
