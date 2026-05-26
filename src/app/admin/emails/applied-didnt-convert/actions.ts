@@ -4,14 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
-import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
+import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
+import { formatDateFriendly, getTodayMT } from "@/lib/format";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-
-function renderTemplate(text: string, member: { first_name: string }): string {
-  return text.replace(/\[member\.firstname\]/g, member.first_name);
-}
 
 export async function sendTestEmail(
   slug: string,
@@ -36,17 +33,28 @@ export async function sendTestEmail(
 
   if (!lookup) return { success: false, error: "Member not found" };
 
-  const member = lookup.member;
+  const todayMT = getTodayMT();
+  const { data: nextDinner } = await admin
+    .from("dinners")
+    .select("date, venue, address")
+    .gte("date", todayMT)
+    .order("date", { ascending: true })
+    .limit(1)
+    .single();
+  if (!nextDinner) return { success: false, error: "No upcoming dinner found for test data" };
 
-  const renderedSubject = renderTemplate(subject, member);
-  const renderedBody = renderTemplate(body, member);
-  const html = bodyToHtml(renderedBody);
+  const vars = {
+    firstName: lookup.member.first_name,
+    dinnerDate: formatDateFriendly(nextDinner.date),
+    venue: nextDinner.venue,
+    address: nextDinner.address,
+  };
 
   const { error } = await resend.emails.send({
     from: EMAIL_FROM,
     to: lookup.matchedEmail,
-    subject: renderedSubject,
-    html,
+    subject: renderTemplateVars(subject, vars),
+    html: bodyToHtml(renderTemplateVars(body, vars)),
   });
 
   if (error) return { success: false, error: error.message };
