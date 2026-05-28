@@ -9,6 +9,7 @@ export type StreakStage =
   | "applied"
   | "approved"
   | "attended"
+  | "investors"
   | "has_ticket"
   | "not_this_one"
   | "bounced"
@@ -19,6 +20,7 @@ export const STAGE_NAMES: Record<StreakStage, string> = {
   applied: "Applied",
   approved: "Approved",
   attended: "Attended",
+  investors: "Investors",
   has_ticket: "Has Ticket",
   not_this_one: "Not This One",
   bounced: "Bounced",

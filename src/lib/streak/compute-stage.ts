@@ -45,6 +45,12 @@ export type MemberStreakState = {
   has_active_exclusion: boolean;
   /** From members.last_dinner_attended. */
   last_dinner_attended: string | null;
+  /**
+   * From members.attendee_stagetypes. Drives the Investors carve-out:
+   * tagged "Investor" AND NOT "Active CEO (...)". An investor who is also
+   * a current CEO is mail-merged as a CEO.
+   */
+  attendee_stagetypes: string[];
 };
 
 /**
@@ -82,6 +88,16 @@ export function computeStageForMember(state: MemberStreakState): StreakStage {
     return "not_this_one";
   }
 
+  // Investors carve-out: sits above Attended/Approved so investor-flavored
+  // mail merges target them regardless of attendance history. Active CEO
+  // tag wins — a member who is both is treated as a CEO for segmentation.
+  if (
+    state.attendee_stagetypes.includes("Investor") &&
+    !state.attendee_stagetypes.includes("Active CEO (Bootstrapping or VC-Backed)")
+  ) {
+    return "investors";
+  }
+
   if (state.last_dinner_attended !== null) {
     return "attended";
   }
@@ -115,7 +131,7 @@ export async function getMemberStreakState(
   const memberRes = await admin
     .from("members")
     .select(
-      "is_team, marketing_opted_in, kicked_out, last_dinner_attended, excluded_from_dinner_id"
+      "is_team, marketing_opted_in, kicked_out, last_dinner_attended, excluded_from_dinner_id, attendee_stagetypes"
     )
     .eq("id", memberId)
     .single();
@@ -184,5 +200,6 @@ export async function getMemberStreakState(
     has_upcoming_ticket,
     has_active_exclusion,
     last_dinner_attended: member.last_dinner_attended,
+    attendee_stagetypes: (member.attendee_stagetypes ?? []) as string[],
   };
 }
