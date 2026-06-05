@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatName } from "@/lib/format";
 
 export type Attendee = {
+  id: string;
   first_name: string;
   last_name: string;
   company_name: string | null;
@@ -15,6 +16,7 @@ export type Attendee = {
   last_dinner_attended: string | null;
   has_community_access: boolean;
   kicked_out: boolean;
+  is_team: boolean;
 };
 
 /**
@@ -31,14 +33,14 @@ export async function getDinnerAttendees(
   const { data: tickets } = await client
     .from("tickets")
     .select(
-      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, member_emails(email, is_primary))"
+      "member_id, members!inner(id, first_name, last_name, company_name, company_website, linkedin_profile, contact_preference, current_intro, current_ask, ask_updated_at, last_dinner_attended, has_community_access, kicked_out, is_team, member_emails(email, is_primary))"
     )
     .eq("dinner_id", dinnerId)
     .eq("fulfillment_status", "fulfilled");
 
   type TicketRow = {
     member_id: string;
-    members: Attendee & { id: string; member_emails: { email: string; is_primary: boolean }[] };
+    members: Attendee & { member_emails: { email: string; is_primary: boolean }[] };
   };
 
   const rows = (tickets ?? []) as unknown as TicketRow[];
