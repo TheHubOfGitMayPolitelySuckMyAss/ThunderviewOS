@@ -322,7 +322,7 @@ export async function sendTestEmail(emailId: string): Promise<{ success: boolean
     .order("display_order", { ascending: true });
 
   const attendees = await getDinnerAttendees(dinner.id, admin);
-  const introsAsksHtml = buildAttendeeHtml(attendees);
+  const introsAsksHtml = buildAttendeeHtml(attendees, { filterStaleAsks: false });
 
   const upcomingDinner = await getNextUpcomingDinner(admin);
 
@@ -387,7 +387,7 @@ export async function sendToAll(emailId: string): Promise<{ success: boolean; er
     .order("display_order", { ascending: true });
 
   const attendees = await getDinnerAttendees(dinner.id, admin);
-  const introsAsksHtml = buildAttendeeHtml(attendees);
+  const introsAsksHtml = buildAttendeeHtml(attendees, { filterStaleAsks: false });
 
   const imageData = (images ?? []).map((img: { group_number: number; public_url: string; display_order: number }) => ({
     groupNumber: img.group_number, publicUrl: img.public_url, displayOrder: img.display_order,

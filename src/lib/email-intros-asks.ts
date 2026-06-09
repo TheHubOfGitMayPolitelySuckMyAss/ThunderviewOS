@@ -72,8 +72,19 @@ export async function getDinnerAttendees(
 /**
  * Renders the Intros & Asks HTML block for email.
  * Same rendering as Morning Of — inline-styled, Resend-safe.
+ *
+ * `filterStaleAsks` (default true): suppress asks not updated since the
+ * attendee's last_dinner_attended. Correct for forward-looking emails
+ * (Morning Of). Monday After must pass `false`: the post-dinner cron has
+ * already bumped last_dinner_attended to the recapped dinner, so the
+ * default filter would drop nearly every ask.
  */
-export function buildAttendeeHtml(attendees: Attendee[]): string {
+export function buildAttendeeHtml(
+  attendees: Attendee[],
+  opts: { filterStaleAsks?: boolean } = {}
+): string {
+  const { filterStaleAsks = true } = opts;
+
   if (attendees.length === 0) {
     return '<p style="font-size:14px;color:#75695B;font-style:italic;">No attendees confirmed yet.</p>';
   }
@@ -100,9 +111,10 @@ export function buildAttendeeHtml(attendees: Attendee[]): string {
         }
       }
 
-      const showAsk = a.current_ask && (
+      const showAsk = !!a.current_ask && (
+        !filterStaleAsks ||
         !a.last_dinner_attended ||
-        (a.ask_updated_at && a.ask_updated_at > a.last_dinner_attended)
+        !!(a.ask_updated_at && a.ask_updated_at > a.last_dinner_attended)
       );
 
       const sections: string[] = [];
