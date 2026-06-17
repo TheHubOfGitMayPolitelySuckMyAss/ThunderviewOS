@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_FROM, bodyToHtml } from "@/lib/email";
 import { formatDateFriendly } from "@/lib/format";
 import { logSystemEvent } from "@/lib/system-events";
+import { generateApplicationActionToken } from "@/lib/application-action-token";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -399,6 +400,12 @@ export async function sendNewApplicationNotification(application: {
   try {
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
     const adminUrl = `${siteUrl}/admin/applications/${application.id}`;
+    const approveUrl = `${siteUrl}/application-review?token=${encodeURIComponent(
+      generateApplicationActionToken(application.id, "approve")
+    )}`;
+    const rejectUrl = `${siteUrl}/application-review?token=${encodeURIComponent(
+      generateApplicationActionToken(application.id, "reject")
+    )}`;
 
     const subject = `New Application: ${application.firstName} ${application.lastName} (${application.companyName})`;
     const bodyText = [
@@ -412,7 +419,13 @@ export async function sendNewApplicationNotification(application: {
       .filter(Boolean)
       .join("\n");
 
-    const ctaHtml = `<a href="${adminUrl}" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:16px 0 6px;">Review Application</a>`;
+    // Approve / Reject open a confirmation page (no action fires on the link
+    // itself — safe from email prefetch); the full record + all other options
+    // stay one click away behind "Review Application".
+    const approveBtn = `<a href="${approveUrl}" style="display:inline-block;background-color:#2F7A4D;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:16px 8px 6px 0;">Approve</a>`;
+    const rejectBtn = `<a href="${rejectUrl}" style="display:inline-block;background-color:#FBF7F0;color:#9A4A3A !important;text-decoration:none;font-weight:600;font-size:15px;padding:11px 21px;border:1px solid #9A4A3A;border-radius:8px;margin:16px 8px 6px 0;">Reject</a>`;
+    const reviewBtn = `<a href="${adminUrl}" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:16px 0 6px;">Review Application</a>`;
+    const ctaHtml = `${approveBtn}${rejectBtn}<br />${reviewBtn}`;
 
     // Admin is hard-coded (no is_admin column in DB)
     const recipients = ["eric@marcoullier.com"];

@@ -42,6 +42,17 @@ import { getCurrentActorMemberId } from "@/lib/current-actor";
 
 export async function createAdminClientForCurrentActor() {
   const actorMemberId = await getCurrentActorMemberId();
+  return createAdminClientForActor(actorMemberId);
+}
+
+/**
+ * Build the attributed admin client for a known actor member id, bypassing
+ * session resolution. Use this when the actor is established by something
+ * other than the request session — e.g. a signed-link flow that re-establishes
+ * "this action is Eric's" from a verified token rather than a cookie. Pass
+ * null for an unattributed client (same as omitting the header).
+ */
+export function createAdminClientForActor(actorMemberId: string | null) {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
