@@ -150,6 +150,7 @@ Each emits one heartbeat row to `system_events`.
 - `/api/cron/prompt-intro-ask` — daily 14:00 UTC. No-op unless a dinner is scheduled exactly 2 days from today MT. On firing day, sends `prompt-intro-ask-{missing,stale}` to ticketed members per their intro/ask state (see Email systems section).
 - `/api/cron/applied-didnt-convert` — daily 15:00 UTC (9am MDT / 8am MST). No-op unless a dinner is scheduled exactly 6 days from today MT. On firing day, sends `applied-didnt-convert` to approved applicants whose application was submitted strictly after the prior dinner's date and on or before the upcoming dinner's date, AND who don't already hold a ticket (`fulfillment_status IN ('purchased','fulfilled')`) for the upcoming dinner. Excludes kicked-out members.
 - `/api/cron/morning-of` — daily 14:00 UTC (8am MDT / 7am MST). No-op unless a dinner is scheduled for today MT. Idempotent: if `dinners.morning_of_sent_at` is already set (e.g. operator hit the manual "Send To Attendees" button earlier), heartbeat `outcome=already_sent` and exit. Otherwise calls shared `sendMorningOfToDinner` in `src/lib/morning-of-send.ts` (also used by the admin button), which sends the `morning-of` template + attendee block to every fulfilled, non-kicked-out attendee with community access. Stamps `morning_of_sent_at` + leaves `morning_of_sent_by` NULL for cron runs. Manual button still works as fallback if cron fails. **Helper is intentionally in `src/lib/`, NOT in the `"use server"` actions file — exporting it from `actions.ts` would expose it as a publicly POST-able server action.**
+- `/api/cron/coachingos-attendee-sync` — daily 12:00 UTC. No-op unless today MT is a dinner day. POSTs **first-time attendees only** (fulfilled ticket for today's dinner AND `last_dinner_attended IS NULL`) to CoachingOS at `COACHINGOS_WEBHOOK_URL` (bearer `COACHINGOS_WEBHOOK_SECRET`). Payload per attendee: member id, name, email, company name/website, linkedin, intro, ask. Best-effort: webhook failure → `error.caught`, cron still 200 (no retry storm); CoachingOS dedups on its end. **This is the only Thunderview→CoachingOS data flow** — returning attendees are never re-sent.
 
 ## Environment variables
 
@@ -164,6 +165,7 @@ Set in `.env.local` (see `.env.local.example`) and Vercel scopes.
 - `CRON_SECRET` — checked by every `/api/cron/*` route via `Authorization: Bearer ${CRON_SECRET}`. Vercel cron invocations send this automatically. Without it, an unauthenticated request can fire any cron.
 - `ANTHROPIC_API_KEY` — used by `src/lib/summarize-profile.ts` to generate directory shorts on profile save. Production + Preview + local. Without it, profile saves still succeed but the `*_short` columns are left untouched (the helper catches and logs).
 - `NEXT_PUBLIC_EMAIL_MODE` — `"testing"` or `"live"`. Production is `live`.
+- `COACHINGOS_WEBHOOK_URL`, `COACHINGOS_WEBHOOK_SECRET` — target + bearer for the `coachingos-attendee-sync` cron. NOT in `.env.local.example`; live only in Vercel. If unset, the cron logs `error.caught` each dinner day and sends nothing.
 
 **Adding env vars to Vercel Preview scope: use the REST API, not the CLI.** All-preview-branches requires `gitBranch: null`. The CLI's interactive flow falls into a `git_branch_required` action_required loop. `PATCH /v9/projects/{id}/env/{id}` with `{"gitBranch": null}` to fix an existing entry, or `POST /v10/projects/{id}/env` with `target: ["preview"]` and no `gitBranch` for fresh.
 
@@ -239,7 +241,6 @@ pgTAP suites in `supabase/tests/` covering the most load-bearing trigger/RPC pai
 - LinkedIn URL matching for duplicate detection across applications and members.
 - Side-by-side comparison when re-application differs from existing member record (now narrowed scope: active members short-circuit at submission, so this only matters for kicked-out re-applications that land in the pending queue).
 - Automatic member field updates from re-application data (same narrowed scope).
-- CoachingOS sync.
 - Custom receipt email (using Stripe's built-in).
 - Reconciliation/retry queue for failed Streak pushes.
 - Integration test for the `activity_feed` view.
