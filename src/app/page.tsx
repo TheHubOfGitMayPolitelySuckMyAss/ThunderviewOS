@@ -198,6 +198,10 @@ export default async function HomePage() {
         Denver, Colorado
         <span className="text-fg4 mx-2">&middot;</span>
         team@thunderviewceodinners.com
+        <span className="text-fg4 mx-2">&middot;</span>
+        <a href="/privacy" className="underline underline-offset-2 hover:text-fg2">
+          Privacy
+        </a>
       </footer>
     </div>
   );
