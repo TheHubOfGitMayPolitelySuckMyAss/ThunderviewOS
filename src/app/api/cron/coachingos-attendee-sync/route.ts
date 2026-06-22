@@ -102,6 +102,11 @@ async function runAttendeeSync() {
     });
   }
 
+  // First-time attendees (never attended) PLUS anyone DigiEric flagged via
+  // "Didn't come" — a prior no-show whose last_dinner_attended got stamped by
+  // the post-dinner cron but who we still want to re-surface. The flag is
+  // cleared after a successful push below (one-shot pulse, re-armed by each
+  // "Didn't come"). See /api/webhooks/coachingos/no-show.
   const { data: members } = await admin
     .from("members")
     .select(
@@ -110,7 +115,7 @@ async function runAttendeeSync() {
        member_emails!inner(email, is_primary, email_status)`,
     )
     .in("id", ticketedMemberIds)
-    .is("last_dinner_attended", null)
+    .or("last_dinner_attended.is.null,coachingos_resend_requested.eq.true")
     .eq("member_emails.is_primary", true)
     .eq("member_emails.email_status", "active");
 
@@ -225,12 +230,39 @@ async function runAttendeeSync() {
     return NextResponse.json({ ran: true, dinner_date: targetDate, first_timers: attendees.length, webhook_error: error.message });
   }
 
+  // Disarm the re-send pulse for everyone we just pushed — only on a confirmed
+  // 2xx, so a failed push leaves flagged members armed for the next run. No-op
+  // for genuine first-timers (flag already false). A future no-show re-arms it
+  // via the "Didn't come" webhook.
+  const pushSucceeded = webhookStatus !== null && webhookStatus < 300;
+  if (pushSucceeded) {
+    const sentMemberIds = attendees.map((a) => a.thunderview_member_id);
+    const { error: clearError } = await admin
+      .from("members")
+      .update({ coachingos_resend_requested: false })
+      .in("id", sentMemberIds)
+      .eq("coachingos_resend_requested", true);
+    if (clearError) {
+      await logSystemEvent({
+        event_type: "error.caught",
+        actor_label: "cron:coachingos-attendee-sync",
+        summary: `coachingos-attendee-sync: failed to clear resend flag — ${clearError.message}`,
+        metadata: {
+          context: "cron.coachingos_attendee_sync",
+          cause: "clear_resend_flag_failed",
+          message: clearError.message,
+          sent_count: sentMemberIds.length,
+        },
+      });
+    }
+  }
+
   await logSystemEvent({
     event_type: "cron.coachingos_attendee_sync",
     actor_label: "cron:coachingos-attendee-sync",
-    summary: `coachingos-attendee-sync pushed ${attendees.length} first-timer(s) for ${targetDate}`,
+    summary: `coachingos-attendee-sync pushed ${attendees.length} attendee(s) for ${targetDate}`,
     metadata: {
-      outcome: webhookStatus && webhookStatus < 300 ? "success" : "webhook_error",
+      outcome: pushSucceeded ? "success" : "webhook_error",
       dinner_id: dinner.id,
       dinner_date: targetDate,
       first_timer_count: attendees.length,
