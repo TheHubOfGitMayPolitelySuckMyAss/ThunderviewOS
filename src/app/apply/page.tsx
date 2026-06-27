@@ -1,9 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
+import { generateFormToken } from "@/lib/form-token";
 import PublicNav from "@/components/public-nav";
 import { Eyebrow } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import ApplicationForm from "./application-form";
+
+// Render per-request so each visitor gets a freshly-stamped form token
+// (the timing/anti-spam check relies on the token being minted at page load).
+export const dynamic = "force-dynamic";
 
 function ordinalDay(day: number): string {
   if (day >= 11 && day <= 13) return `${day}th`;
@@ -40,6 +45,9 @@ export default async function ApplyPage() {
   const nextDinnerDate = allDinners[0]
     ? formatDinnerDate(allDinners[0].date)
     : "next";
+
+  // Anti-spam: server-issued, time-stamped token verified on submit.
+  const formToken = generateFormToken();
 
   // Build 12-month schedule starting from current month in MT
   const nowParts = new Intl.DateTimeFormat("en-US", {
@@ -145,7 +153,7 @@ export default async function ApplyPage() {
           </ul>
         </Card>
 
-        <ApplicationForm />
+        <ApplicationForm formToken={formToken} />
       </div>
     </div>
   );
