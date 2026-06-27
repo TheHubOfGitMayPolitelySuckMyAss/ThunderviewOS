@@ -3,6 +3,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNewApplicationNotification } from "@/lib/email-send";
 import { safePushApplication } from "@/lib/streak/safe-push";
+import { verifyFormToken } from "@/lib/form-token";
+import { logSystemEvent } from "@/lib/system-events";
+
+// A real applicant takes seconds-to-minutes on a 12-field form; a token that
+// fires in under 3s, or is replayed more than 12h after issue, is a bot.
+const MIN_FILL_MS = 3_000;
+const MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 export async function submitApplication(formData: {
   firstName: string;
@@ -17,9 +24,35 @@ export async function submitApplication(formData: {
   attendeeStagetype: string;
   iAmCeo: string | null;
   isNotServices: string | null;
+  formToken?: string;
+  honeypot?: string;
 }): Promise<{ success: boolean; alreadyMember?: boolean; error?: string }> {
   const admin = createAdminClient("public-flow");
   const normalizedEmail = formData.email.trim().toLowerCase();
+
+  // Anti-spam gate. Drop bots SILENTLY — return the same `{ success: true }`
+  // a real submit gets so the spammer is routed to the thanks page and can't
+  // tell they were filtered. No application row, no admin email, no Streak box.
+  // Each drop is logged to system_events for ad-hoc "is it working" queries
+  // (not surfaced in any activity feed — it's noise, not an operator alert).
+  const spamReason = ((): string | null => {
+    if (formData.honeypot && formData.honeypot.trim() !== "") return "honeypot";
+    const ageMs = verifyFormToken(formData.formToken);
+    if (ageMs === null) return "bad_token";
+    if (ageMs < MIN_FILL_MS) return "too_fast";
+    if (ageMs > MAX_AGE_MS) return "stale_token";
+    return null;
+  })();
+
+  if (spamReason) {
+    await logSystemEvent({
+      event_type: "application.spam_blocked",
+      actor_label: "public-flow",
+      summary: `Blocked spam application (${spamReason})`,
+      metadata: { reason: spamReason, email: normalizedEmail },
+    });
+    return { success: true };
+  }
 
   // Pre-check: if email already maps to an active (non-kicked-out) member,
   // short-circuit to a "you're already a member" response — no application

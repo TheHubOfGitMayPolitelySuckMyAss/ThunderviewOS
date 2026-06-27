@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitApplication } from "./actions";
 import Field from "@/components/field";
@@ -40,10 +40,15 @@ const ORIENTATION_OPTIONS = [
   "Prefer not to say",
 ];
 
-export default function ApplicationForm() {
+export default function ApplicationForm({ formToken }: { formToken: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
+
+  // Honeypot: a field invisible to humans. Bots that auto-fill every input
+  // populate it; we read it via a ref (catches values set by any means, not
+  // just React onChange) and silently drop the submission server-side.
+  const honeypotRef = useRef<HTMLInputElement>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -79,6 +84,8 @@ export default function ApplicationForm() {
         attendeeStagetype,
         iAmCeo: isActiveCEO ? iAmCeo : null,
         isNotServices: isActiveCEO ? isNotServices : null,
+        formToken,
+        honeypot: honeypotRef.current?.value ?? "",
       });
 
       if (result.success) {
@@ -91,6 +98,30 @@ export default function ApplicationForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-7">
+      {/* Honeypot — hidden from humans, tempting to bots. Real applicants
+          never see or fill this; a non-empty value is dropped server-side. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          width: "1px",
+          height: "1px",
+          overflow: "hidden",
+        }}
+      >
+        <label htmlFor="company_url_confirm">Leave this field blank</label>
+        <input
+          ref={honeypotRef}
+          type="text"
+          id="company_url_confirm"
+          name="company_url_confirm"
+          tabIndex={-1}
+          autoComplete="off"
+          defaultValue=""
+        />
+      </div>
+
       {/* PERSONAL INFORMATION */}
       <section>
         <Eyebrow className="border-b border-border-subtle pb-2.5 mb-5">
