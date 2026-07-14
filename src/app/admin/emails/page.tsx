@@ -7,6 +7,8 @@ import { formatDateFriendly, formatTimestamp, getTodayMT } from "@/lib/format";
 import CreateMondayBeforeButton from "./create-monday-before-button";
 import CreateMondayAfterButton from "./create-monday-after-button";
 import CreateOneOffBlastButton from "./create-one-off-blast-button";
+import CreateMailMergeButton from "./create-mail-merge-button";
+import { getGmailConnection } from "@/lib/gmail/auth";
 
 const transactionalEmails = [
   {
@@ -51,7 +53,12 @@ const transactionalEmails = [
   },
 ];
 
-export default async function EmailsPage() {
+export default async function EmailsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ gmail?: string }>;
+}) {
+  const { gmail: gmailParam } = await searchParams;
   const admin = createAdminClient("read-only");
   const todayMT = getTodayMT();
 
@@ -103,6 +110,25 @@ export default async function EmailsPage() {
     .select("id, subject, status, sent_at, created_at")
     .order("created_at", { ascending: false })
     .limit(10);
+
+  // Mail Merges: recent, newest first, with sent counts
+  const gmail = await getGmailConnection();
+  const { data: recentMerges } = await admin
+    .from("mail_merges")
+    .select("id, subject, status, sent_at, send_started_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const mergeSentCounts = new Map<string, number>();
+  for (const m of recentMerges ?? []) {
+    if (m.status === "draft") continue;
+    const { count } = await admin
+      .from("mail_merge_recipients")
+      .select("id", { count: "exact", head: true })
+      .eq("mail_merge_id", m.id)
+      .eq("status", "sent");
+    mergeSentCounts.set(m.id, count ?? 0);
+  }
 
   return (
     <div className="max-w-[720px]">
@@ -251,6 +277,76 @@ export default async function EmailsPage() {
           </div>
 
         </div>
+      </section>
+
+      {/* Mail Merges */}
+      <section className="mt-7">
+        <Eyebrow className="mb-3 pb-2.5 border-b border-border-subtle">Mail Merges</Eyebrow>
+
+        {gmailParam === "connected" && (
+          <div className="rounded-md bg-[rgba(91,106,59,0.08)] px-4 py-3 text-sm text-success mb-4">
+            Gmail connected — mail merges will send from eric@marcoullier.com.
+          </div>
+        )}
+        {gmailParam && gmailParam !== "connected" && (
+          <div className="rounded-md bg-[rgba(192,68,42,0.08)] px-4 py-3 text-sm text-danger mb-4">
+            Gmail connection failed ({gmailParam}). Try again, or check the System feed for details.
+          </div>
+        )}
+
+        <p className="mt-0.5 text-sm text-fg3">
+          Personal one-to-one emails sent through Eric&rsquo;s Gmail (replaces
+          Streak mail merge). &ldquo;Hi &lt;first name&gt;&rdquo; + your message
+          + Gmail signature.
+        </p>
+        <div className="mt-2 flex items-center gap-3">
+          <CreateMailMergeButton />
+          {!(gmail.connected && gmail.scopeOk) && (
+            <a href="/api/auth/google" className="text-sm text-accent-hover underline">
+              Connect Gmail
+            </a>
+          )}
+        </div>
+        {recentMerges && recentMerges.length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {recentMerges.map((m) => {
+              const ts =
+                m.status === "sent"
+                  ? m.sent_at
+                  : m.status === "sending"
+                    ? m.send_started_at
+                    : m.created_at;
+              const sentCount = mergeSentCounts.get(m.id);
+              return (
+                <li key={m.id}>
+                  <Link
+                    href={`/admin/emails/mail-merge/${m.id}`}
+                    className="inline-flex items-center gap-2 text-sm no-underline hover:underline"
+                  >
+                    <Pill
+                      variant={
+                        m.status === "sent"
+                          ? "success"
+                          : m.status === "sending"
+                            ? "accent"
+                            : "warn"
+                      }
+                    >
+                      {m.status === "sent" ? "Sent" : m.status === "sending" ? "Sending" : "Draft"}
+                    </Pill>
+                    <span className={m.status === "sent" ? "text-fg3" : "text-accent-hover"}>
+                      {m.subject || "(no subject)"}
+                    </span>
+                    {m.status !== "draft" && sentCount !== undefined && (
+                      <span className="text-xs text-fg3">{sentCount} sent</span>
+                    )}
+                    {ts && <span className="text-xs text-fg3">{formatTimestamp(ts)}</span>}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
