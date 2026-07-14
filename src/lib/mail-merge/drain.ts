@@ -52,9 +52,22 @@ type RecipientRow = {
 
 type MergeContent = { subject: string; body: string; sent_by: string | null };
 
-/** Greeting + typed body. The signature is appended by buildRawMessage. */
+/**
+ * Personalize the typed body: substitute [member.first_name] (same placeholder
+ * syntax as the transactional templates — Eric writes his own greeting) and
+ * strip trailing empty paragraphs/breaks so the signature lands exactly one
+ * blank line below the last line of text. The signature itself is appended by
+ * buildRawMessage.
+ */
 export function composeMergeHtml(firstName: string, bodyHtml: string): string {
-  return `<p>Hi ${escapeHtml(firstName)},</p>${bodyHtml}`;
+  const personalized = bodyHtml.replace(
+    /\[member\.first_name\]/g,
+    escapeHtml(firstName)
+  );
+  return personalized.replace(
+    /(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>|\s)+$/gi,
+    ""
+  );
 }
 
 export async function runMailMergeDrain(

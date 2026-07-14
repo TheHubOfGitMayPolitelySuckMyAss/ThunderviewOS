@@ -224,12 +224,13 @@ export default function DraftEditor({
       {/* What each recipient gets */}
       <div className="rounded-lg border border-border bg-bg-elevated p-4 mb-6">
         <p className="text-xs text-fg3 leading-relaxed">
-          Each recipient gets a personal email from eric@marcoullier.com:
-          <br />
-          <span className="text-fg2">Hi &lt;first name&gt;,</span> &mdash; then
-          your message above &mdash; then your live Gmail signature. No
-          Thunderview template, no unsubscribe footer. Sends pace at ~1/sec so
-          it reads as one-to-one email.
+          Each recipient gets a personal email from eric@marcoullier.com: your
+          message above with{" "}
+          <code className="text-fg2 bg-bg px-1 py-0.5 rounded">[member.first_name]</code>{" "}
+          swapped for their first name, then your live Gmail signature one
+          blank line below. Write your own greeting. No Thunderview template,
+          no unsubscribe footer. Sends pace at ~1/sec so it reads as
+          one-to-one email.
         </p>
       </div>
 

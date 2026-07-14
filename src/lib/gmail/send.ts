@@ -135,9 +135,11 @@ export function buildRawMessage(input: BuildMessageInput): string {
   const bodyText = htmlToText(bodyHtml);
   const sigText = signatureHtml ? htmlToText(signatureHtml) : "";
   const textPart = sigText ? `${bodyText}\n\n${sigText}` : bodyText;
-  const htmlPart = signatureHtml
-    ? `${bodyHtml}<br><br>${signatureHtml}`
-    : bodyHtml;
+  // No <br>s at the junction: the body ends with a block element (<p>/<div>)
+  // whose bottom margin renders as the single blank line before the signature,
+  // matching a hand-typed Gmail reply. Explicit breaks here stacked on top of
+  // that margin and produced a 3-4 line gap.
+  const htmlPart = signatureHtml ? `${bodyHtml}${signatureHtml}` : bodyHtml;
 
   const lines = [
     `From: ${fromHeader}`,
