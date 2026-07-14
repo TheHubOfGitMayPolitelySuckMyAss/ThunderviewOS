@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/mail-merge-drain",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/gmail-label-actions",
+      "schedule": "* * * * *"
     }
   ]
 }

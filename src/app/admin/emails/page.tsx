@@ -301,12 +301,22 @@ export default async function EmailsPage({
         </p>
         <div className="mt-2 flex items-center gap-3">
           <CreateMailMergeButton />
-          {!(gmail.connected && gmail.scopeOk) && (
+          {!(gmail.connected && gmail.scopeOk) ? (
             <a href="/api/auth/google" className="text-sm text-accent-hover underline">
               Connect Gmail
             </a>
-          )}
+          ) : !gmail.labelScopeOk ? (
+            <a href="/api/auth/google" className="text-sm text-accent-hover underline">
+              Reconnect Gmail to enable TV Bounce / TV Skip labels
+            </a>
+          ) : null}
         </div>
+        <p className="mt-2 text-xs text-fg3">
+          In Gmail, label a bounce notification &ldquo;TV Bounce&rdquo; or a
+          member&rsquo;s can&rsquo;t-make-it reply &ldquo;TV Skip&rdquo; &mdash;
+          Thunderview acts on it within a minute and replies in the thread with
+          what it did.
+        </p>
         {recentMerges && recentMerges.length > 0 && (
           <ul className="mt-3 space-y-1.5">
             {recentMerges.map((m) => {

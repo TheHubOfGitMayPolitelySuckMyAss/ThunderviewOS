@@ -13,7 +13,7 @@ import { logSystemEvent } from "@/lib/system-events";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-export type BounceActorLabel = "webhook:resend";
+export type BounceActorLabel = "webhook:resend" | "gmail:label-action";
 
 export async function applyHardBounce(opts: {
   admin: AdminClient;

@@ -110,6 +110,10 @@ export interface BuildMessageInput {
   bodyHtml: string;
   /** Gmail signature HTML to append, or "" for none. */
   signatureHtml?: string;
+  /** Message-ID of the message being replied to (threads the reply). */
+  inReplyTo?: string;
+  /** References header value for the reply (usually same as inReplyTo). */
+  references?: string;
   /** Override the MIME boundary (tests pass a fixed value). */
   boundary?: string;
 }
@@ -127,6 +131,8 @@ export function buildRawMessage(input: BuildMessageInput): string {
     subject,
     bodyHtml,
     signatureHtml = "",
+    inReplyTo,
+    references,
     boundary = `thunderview_${Math.random().toString(36).slice(2)}`,
   } = input;
 
@@ -145,6 +151,8 @@ export function buildRawMessage(input: BuildMessageInput): string {
     `From: ${fromHeader}`,
     `To: ${to}`,
     `Subject: ${encodeSubject(subject)}`,
+    ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`] : []),
+    ...(references ? [`References: ${references}`] : []),
     "MIME-Version: 1.0",
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",
@@ -186,10 +194,15 @@ export class GmailFatalError extends Error {
  * POST a prebuilt raw message to Gmail. Throws GmailFatalError on 401/403/429
  * (revoked grant, missing scope, quota exhausted — retrying the next recipient
  * would fail identically), plain Error on anything else (recipient-specific).
+ *
+ * `threadId` places the sent message in an existing Gmail thread (pair with
+ * In-Reply-To/References headers in the raw message for the reply to thread
+ * in other clients too).
  */
 export async function sendMessage(
   accessToken: string,
-  raw: string
+  raw: string,
+  threadId?: string
 ): Promise<SendResult> {
   const res = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -199,7 +212,7 @@ export async function sendMessage(
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ raw }),
+      body: JSON.stringify(threadId ? { raw, threadId } : { raw }),
     }
   );
   if (!res.ok) {

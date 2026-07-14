@@ -5,7 +5,8 @@
  * client in Google Cloud console.
  *
  * Scopes are narrower than DigiEric's: send + settings.basic (signature read)
- * only. No calendar/contacts/readonly.
+ * + modify (read inbox messages and move labels, for the TV Bounce / TV Skip
+ * label-actions cron). No calendar/contacts.
  *
  * Admin/team gated: the proxy only protects /admin page paths, so this route
  * checks the session itself.
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
     scope: [
       "https://www.googleapis.com/auth/gmail.send",
       "https://www.googleapis.com/auth/gmail.settings.basic",
+      "https://www.googleapis.com/auth/gmail.modify",
     ].join(" "),
     // offline + consent: force a refresh_token on every connect, so
     // reconnecting always heals a dead grant.

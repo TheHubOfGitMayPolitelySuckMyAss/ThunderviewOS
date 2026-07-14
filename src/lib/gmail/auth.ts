@@ -13,6 +13,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+const MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
 
 /** True if a space-delimited OAuth scope string grants gmail.send. */
 export function scopeCanSend(scope: string | null | undefined): boolean {
@@ -20,9 +21,24 @@ export function scopeCanSend(scope: string | null | undefined): boolean {
   return scope.split(/\s+/).includes(SEND_SCOPE);
 }
 
+/**
+ * True if the grant carries gmail.modify (read messages + change labels).
+ * Grants created before the label-actions feature won't have it — the UI
+ * prompts a reconnect, and the label-actions cron no-ops until then.
+ */
+export function scopeCanModify(scope: string | null | undefined): boolean {
+  if (!scope) return false;
+  return scope.split(/\s+/).includes(MODIFY_SCOPE);
+}
+
 export type GmailConnection =
   | { connected: false }
-  | { connected: true; scopeOk: boolean; connectedAt: string | null };
+  | {
+      connected: true;
+      scopeOk: boolean;
+      labelScopeOk: boolean;
+      connectedAt: string | null;
+    };
 
 /**
  * Cheap connection check for UI: is there a stored grant, and does it carry
@@ -41,6 +57,7 @@ export async function getGmailConnection(): Promise<GmailConnection> {
   return {
     connected: true,
     scopeOk: scopeCanSend(data.scope),
+    labelScopeOk: scopeCanModify(data.scope),
     connectedAt: data.created_at ?? null,
   };
 }
