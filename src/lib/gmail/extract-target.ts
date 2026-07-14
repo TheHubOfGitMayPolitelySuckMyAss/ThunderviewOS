@@ -3,8 +3,9 @@
  *
  * "bounce" → the recipient address that failed to deliver (mailer-daemon
  * notifications, or a forwarded bounce). "skip" → the member saying they
- * can't make the upcoming dinner (usually the From address, but the body
- * wins when Eric forwards on someone's behalf).
+ * can't make the upcoming dinner. "optout" → the member asking to stop
+ * receiving emails. For skip/optout it's usually the From address, but the
+ * body wins when Eric forwards on someone's behalf.
  *
  * Same lazy-client / catch-and-report pattern as summarize-profile. Returns
  * { email: null } with a reason instead of throwing — the caller turns that
@@ -34,17 +35,29 @@ It is usually the From address. If the message is a forward or mentions that a D
 
 Output ONLY that email address, lowercase. If you cannot confidently identify it, output exactly NONE.`;
 
+const OPTOUT_PROMPT = `The email below was flagged in Eric's inbox as a person asking to stop receiving Thunderview emails (unsubscribe / "take me off the list"). Identify that person's email address.
+
+It is usually the From address. If the message is a forward or mentions that a DIFFERENT person wants off the list, prefer that person's address. Never return eric@marcoullier.com.
+
+Output ONLY that email address, lowercase. If you cannot confidently identify it, output exactly NONE.`;
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type ExtractTargetResult =
   | { email: string }
   | { email: null; reason: string };
 
+const PROMPT_BY_KIND = {
+  bounce: BOUNCE_PROMPT,
+  skip: SKIP_PROMPT,
+  optout: OPTOUT_PROMPT,
+} as const;
+
 export async function extractTargetEmail(
-  kind: "bounce" | "skip",
+  kind: "bounce" | "skip" | "optout",
   message: { from: string | null; subject: string | null; body: string }
 ): Promise<ExtractTargetResult> {
-  const prompt = kind === "bounce" ? BOUNCE_PROMPT : SKIP_PROMPT;
+  const prompt = PROMPT_BY_KIND[kind];
   const content = [
     prompt,
     "",

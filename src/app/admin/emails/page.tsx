@@ -312,10 +312,10 @@ export default async function EmailsPage({
           ) : null}
         </div>
         <p className="mt-2 text-xs text-fg3">
-          In Gmail, label a bounce notification &ldquo;TV Bounce&rdquo; or a
-          member&rsquo;s can&rsquo;t-make-it reply &ldquo;TV Skip&rdquo; &mdash;
-          Thunderview acts on it within a minute and replies in the thread with
-          what it did.
+          In Gmail, label a bounce notification &ldquo;TV Bounce&rdquo;, a
+          member&rsquo;s can&rsquo;t-make-it reply &ldquo;TV Skip&rdquo;, or an
+          unsubscribe request &ldquo;TV Opt Out&rdquo; &mdash; Thunderview acts
+          on it within a minute and replies in the thread with what it did.
         </p>
         {recentMerges && recentMerges.length > 0 && (
           <ul className="mt-3 space-y-1.5">

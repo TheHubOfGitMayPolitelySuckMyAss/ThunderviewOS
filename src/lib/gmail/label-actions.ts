@@ -8,6 +8,9 @@
  *    which arrive as mailer-daemon emails and have no Resend webhook.
  *  - TV Skip → set members.excluded_from_dinner_id to the next upcoming
  *    dinner (the not_this_one stage; post-dinner cron clears it afterwards).
+ *  - TV Opt Out → flip members.marketing_opted_in to false (same write as
+ *    the unsubscribe link; the DB trigger stamps marketing_opted_out_at and
+ *    the feed refiner renders it as member.marketing_opted_out).
  *
  * Processing contract:
  *  - One attempt per message. Success → trigger labels removed, "TV Done"
@@ -45,6 +48,7 @@ import { formatDateFriendly, getTodayMT } from "@/lib/format";
 
 export const LABEL_BOUNCE = "TV Bounce";
 export const LABEL_SKIP = "TV Skip";
+export const LABEL_OPTOUT = "TV Opt Out";
 export const LABEL_DONE = "TV Done";
 export const LABEL_ERROR = "TV Error";
 
@@ -58,7 +62,13 @@ export type LabelActionsResult =
 /** Failure that should be reported back to Eric on the thread, not thrown up. */
 class ActionError extends Error {}
 
-type Kind = "bounce" | "skip";
+type Kind = "bounce" | "skip" | "optout";
+
+const KIND_LABEL: Record<Kind, string> = {
+  bounce: LABEL_BOUNCE,
+  skip: LABEL_SKIP,
+  optout: LABEL_OPTOUT,
+};
 
 export async function runGmailLabelActions(): Promise<LabelActionsResult> {
   const conn = await getGmailConnection();
@@ -71,19 +81,25 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
   const labelIds = await ensureLabels(accessToken, [
     LABEL_BOUNCE,
     LABEL_SKIP,
+    LABEL_OPTOUT,
     LABEL_DONE,
     LABEL_ERROR,
   ]);
-  const bounceLabelId = labelIds.get(LABEL_BOUNCE)!;
-  const skipLabelId = labelIds.get(LABEL_SKIP)!;
   const doneLabelId = labelIds.get(LABEL_DONE)!;
   const errorLabelId = labelIds.get(LABEL_ERROR)!;
+  const triggerLabelIds = [
+    labelIds.get(LABEL_BOUNCE)!,
+    labelIds.get(LABEL_SKIP)!,
+    labelIds.get(LABEL_OPTOUT)!,
+  ];
 
-  const [bounceIds, skipIds] = await Promise.all([
-    listMessageIdsWithLabel(accessToken, bounceLabelId),
-    listMessageIdsWithLabel(accessToken, skipLabelId),
-  ]);
-  if (bounceIds.length === 0 && skipIds.length === 0) {
+  const kinds: Kind[] = ["bounce", "skip", "optout"];
+  const idsByKind = await Promise.all(
+    kinds.map((kind) =>
+      listMessageIdsWithLabel(accessToken, labelIds.get(KIND_LABEL[kind])!)
+    )
+  );
+  if (idsByKind.every((ids) => ids.length === 0)) {
     return { outcome: "idle" };
   }
 
@@ -92,13 +108,17 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
   const eric = await findMemberByAnyEmail(lookupAdmin, ADMIN_EMAIL);
   const admin = createAdminClientForActor(eric?.memberId ?? null);
 
-  const queue: { id: string; kind: Kind }[] = [
-    ...bounceIds.map((id) => ({ id, kind: "bounce" as const })),
-    ...skipIds.filter((id) => !bounceIds.includes(id)).map((id) => ({
-      id,
-      kind: "skip" as const,
-    })),
-  ];
+  // One queue entry per message; a message carrying several trigger labels
+  // enters once and fails the multi-label check below.
+  const seen = new Set<string>();
+  const queue: { id: string; kind: Kind }[] = [];
+  kinds.forEach((kind, i) => {
+    for (const id of idsByKind[i]) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      queue.push({ id, kind });
+    }
+  });
 
   let processed = 0;
   let failed = 0;
@@ -108,12 +128,13 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
     try {
       message = await getMessage(accessToken, id);
 
-      const hasBoth =
-        (message.labelIds ?? []).includes(bounceLabelId) &&
-        (message.labelIds ?? []).includes(skipLabelId);
-      if (hasBoth) {
+      const labelsOnMessage = message.labelIds ?? [];
+      const triggersOnMessage = triggerLabelIds.filter((lid) =>
+        labelsOnMessage.includes(lid)
+      );
+      if (triggersOnMessage.length > 1) {
         throw new ActionError(
-          `Both "${LABEL_BOUNCE}" and "${LABEL_SKIP}" are on this message — remove both, then re-apply just one.`
+          "More than one TV trigger label is on this message — remove them all, then re-apply just one."
         );
       }
 
@@ -126,10 +147,7 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
         .limit(1)
         .maybeSingle();
       if (prior) {
-        await modifyMessageLabels(accessToken, id, [doneLabelId], [
-          bounceLabelId,
-          skipLabelId,
-        ]);
+        await modifyMessageLabels(accessToken, id, [doneLabelId], triggerLabelIds);
         continue;
       }
 
@@ -158,8 +176,10 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
       let confirmation: string;
       if (kind === "bounce") {
         confirmation = await handleBounce(admin, target.email, memberName);
-      } else {
+      } else if (kind === "skip") {
         confirmation = await handleSkip(admin, found.memberId, memberName);
+      } else {
+        confirmation = await handleOptOut(admin, found.memberId, memberName);
       }
 
       await logSystemEvent({
@@ -176,10 +196,7 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
       });
 
       await replyOnThread(accessToken, message, subject, confirmation);
-      await modifyMessageLabels(accessToken, id, [doneLabelId], [
-        bounceLabelId,
-        skipLabelId,
-      ]);
+      await modifyMessageLabels(accessToken, id, [doneLabelId], triggerLabelIds);
       processed++;
     } catch (err) {
       if (err instanceof GmailFatalError) {
@@ -222,13 +239,10 @@ export async function runGmailLabelActions(): Promise<LabelActionsResult> {
             accessToken,
             message,
             getHeader(message, "Subject"),
-            `Couldn't process this as "${kind === "bounce" ? LABEL_BOUNCE : LABEL_SKIP}": ${reason}\n\nFix whatever's off and re-apply the label to retry.`
+            `Couldn't process this as "${KIND_LABEL[kind]}": ${reason}\n\nFix whatever's off and re-apply the label to retry.`
           );
         }
-        await modifyMessageLabels(accessToken, id, [errorLabelId], [
-          bounceLabelId,
-          skipLabelId,
-        ]);
+        await modifyMessageLabels(accessToken, id, [errorLabelId], triggerLabelIds);
       } catch (cleanupErr) {
         console.error("[gmail-label-actions] error-path cleanup failed:", cleanupErr);
       }
@@ -328,6 +342,38 @@ async function handleSkip(
   });
 
   return `Marked ${memberName} "not this time" for the ${formatDateFriendly(dinner.date)} dinner. They're out of mail-merge audiences until that dinner passes.`;
+}
+
+async function handleOptOut(
+  admin: AdminClient,
+  memberId: string,
+  memberName: string
+): Promise<string> {
+  const { data: member, error } = await admin
+    .from("members")
+    .select("marketing_opted_in")
+    .eq("id", memberId)
+    .single();
+  if (error || !member) {
+    throw new ActionError(
+      `Couldn't load the member record: ${error?.message ?? "not found"}`
+    );
+  }
+  if (!member.marketing_opted_in) {
+    return `${memberName} was already opted out of marketing emails — no change.`;
+  }
+
+  // Same write as the unsubscribe link; the DB trigger stamps
+  // marketing_opted_out_at.
+  const { error: updateError } = await admin
+    .from("members")
+    .update({ marketing_opted_in: false })
+    .eq("id", memberId);
+  if (updateError) {
+    throw new ActionError(`Couldn't set the opt-out: ${updateError.message}`);
+  }
+
+  return `Opted ${memberName} out of marketing emails. They're out of every marketing and mail-merge audience (transactional emails like ticket confirmations still send).`;
 }
 
 async function replyOnThread(
