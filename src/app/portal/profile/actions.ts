@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClientForCurrentActor } from "@/lib/supabase/admin-with-actor";
 import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
-import { safePushMember } from "@/lib/streak/safe-push";
 import { summarizeChangedFields } from "@/lib/summarize-profile";
 import sharp from "sharp";
 
@@ -344,7 +343,6 @@ export async function saveProfile(formData: FormData) {
     requestedTargetId && user.email === ADMIN_EMAIL
       ? "admin_portal_profile_save"
       : "portal_profile_save";
-  await safePushMember(member.id, op);
 
   return { success: true, noChanges: false };
 }
@@ -378,11 +376,6 @@ export async function toggleMarketing(
     .eq("id", memberId);
 
   if (error) return { success: false, error: error.message };
-
-  await safePushMember(
-    memberId,
-    value ? "opt_back_in" : "portal_marketing_opt_out"
-  );
 
   return { success: true };
 }

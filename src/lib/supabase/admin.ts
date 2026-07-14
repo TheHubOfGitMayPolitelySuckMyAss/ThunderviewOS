@@ -12,7 +12,7 @@ import { createClient } from "@supabase/supabase-js";
  * `actor_member_id = NULL` and the change won't appear in the People feed.
  *
  *   cron            — Vercel cron handler. No human actor by definition.
- *   webhook         — External webhook (Stripe, Resend, Streak). No human actor.
+ *   webhook         — External webhook (Stripe, Resend). No human actor.
  *   public-flow     — Unauthenticated public flow (/apply, marketing pages).
  *   read-only       — Page render or layout query that performs no writes.
  *   system-internal — Library helper called from many contexts where the

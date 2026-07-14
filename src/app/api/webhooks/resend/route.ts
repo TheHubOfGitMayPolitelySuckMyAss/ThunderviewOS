@@ -8,7 +8,7 @@
  *
  * Hard-bounce vs soft-bounce: only `bounce.type = "Permanent"` flips state.
  * Transient/Undetermined bounces persist for dashboard visibility but do not
- * change member_emails.email_status, do not promote, and do not push to Streak.
+ * change member_emails.email_status, do not promote.
  *
  * The Resend webhook is account-scoped — every app on Eric's Resend account
  * POSTs here. We filter on `data.from` domain and silently drop anything not
@@ -31,7 +31,6 @@ import {
   sendSendFailureNotification,
 } from "@/lib/email-send";
 import { logSystemEvent } from "@/lib/system-events";
-import { safePushMember } from "@/lib/streak/safe-push";
 import { applyHardBounce } from "@/lib/email-bounce";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -264,7 +263,6 @@ async function handleResendWebhook(req: Request) {
         memberEmail,
         memberName,
         actorLabel: "webhook:resend",
-        safePushReason: "resend_bounce",
       });
     } else if (eventType === "bounced" && !isHardBounce) {
       // Soft bounce. AWS SES classifies DNS-resolution failures as Transient
@@ -300,7 +298,6 @@ async function handleResendWebhook(req: Request) {
             memberEmail,
             memberName,
             actorLabel: "webhook:resend",
-            safePushReason: "resend_soft_bounce_escalation",
           });
         }
       }
@@ -315,7 +312,6 @@ async function handleResendWebhook(req: Request) {
         .from("members")
         .update({ marketing_opted_in: false })
         .eq("id", memberEmail.member_id);
-      await safePushMember(memberEmail.member_id, "resend_complaint");
     }
     // First soft bounce: row persists in email_events for visibility, no
     // state change. Second soft bounce promotes to hard bounce (see above).

@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTargetDinner } from "@/lib/ticket-assignment";
 import { sendFulfillmentEmail, sendTicketPurchasedNotification } from "@/lib/email-send";
 import { logSystemEvent } from "@/lib/system-events";
-import { safePushMember } from "@/lib/streak/safe-push";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -203,8 +202,6 @@ async function handleStripeWebhook(request: NextRequest) {
       await sendFulfillmentEmail(metadata.member_id, metadata.dinner_id);
       autoFulfilled = true;
     }
-
-    await safePushMember(metadata.member_id, "stripe_webhook");
 
     // Admin alert (best-effort; never blocks the webhook)
     await sendTicketPurchasedNotification({

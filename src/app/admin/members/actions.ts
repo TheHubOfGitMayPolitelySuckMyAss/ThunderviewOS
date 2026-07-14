@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { formatName } from "@/lib/format";
 import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
-import { safePushMember } from "@/lib/streak/safe-push";
 
 export type EmailCheckResult = {
   existingMember?: { id: string; name: string };
@@ -90,7 +89,6 @@ export async function addMember(formData: {
   // can log in via any of them.
   await ensureAuthUsersForMember(data as string);
 
-  await safePushMember(data as string, "add_member");
 
   // No explicit member.added log — audit row covers it via the members
   // INSERT (actor attributed via X-Audit-Actor header on this request).

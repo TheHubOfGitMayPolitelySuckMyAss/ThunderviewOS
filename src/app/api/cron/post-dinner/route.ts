@@ -14,7 +14,6 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT } from "@/lib/format";
 import { logSystemEvent } from "@/lib/system-events";
-import { safePushMember } from "@/lib/streak/safe-push";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -128,16 +127,9 @@ async function runPostDinner() {
 
   console.log(`[post-dinner] Updated ${count} members for dinner ${dinner.date}`);
 
-  // Push attended members to Streak — last_dinner_attended changed, which
-  // bumps them from has_ticket → attended (or no-op if precedence higher).
-  for (const memberId of memberIds) {
-    await safePushMember(memberId, "post_dinner_attended");
-  }
-
   // Not This One cleanup: any member who marked Not This One for the dinner
   // that just happened gets their exclusion cleared (the dinner has passed,
-  // so "not this one" no longer applies). Push each so Streak reflects the
-  // post-clearance state.
+  // so "not this one" no longer applies).
   const { data: excluded } = await admin
     .from("members")
     .select("id")
@@ -169,9 +161,6 @@ async function runPostDinner() {
       });
     } else {
       ntoCleared = excludedIds.length;
-      for (const memberId of excludedIds) {
-        await safePushMember(memberId, "post_dinner_not_this_one_clear");
-      }
     }
   }
 
@@ -185,8 +174,7 @@ async function runPostDinner() {
       dinner_id: dinner.id,
       dinner_date: dinner.date,
       member_count: memberIds.length,
-      streak_attendance_pushes: memberIds.length,
-      streak_nto_cleared: ntoCleared,
+      nto_cleared: ntoCleared,
     },
   });
   return NextResponse.json({
@@ -194,7 +182,6 @@ async function runPostDinner() {
     updated: count,
     dinnerDate: dinner.date,
     memberCount: memberIds.length,
-    streakAttendancePushes: memberIds.length,
-    streakNtoCleared: ntoCleared,
+    ntoCleared,
   });
 }

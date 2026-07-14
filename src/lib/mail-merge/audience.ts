@@ -1,9 +1,8 @@
 /**
  * Mail-merge audience engine.
  *
- * Buckets every member with computeStageForMember — the SAME pure precedence
- * ladder that drives Streak stages. When the Streak integration is torn down,
- * compute-stage.ts stays: this module is its consumer.
+ * Buckets every member with computeStageForMember (src/lib/member-stage.ts),
+ * the pure precedence ladder inherited from the retired Streak integration.
  *
  * Bucket semantics for mail merges (per Eric):
  *   - Selectable send groups: investors / attended / approved.
@@ -23,9 +22,9 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getTodayMT } from "@/lib/format";
 import {
   computeStageForMember,
-  type MemberStreakState,
-} from "@/lib/streak/compute-stage";
-import type { StreakStage } from "@/lib/streak/stages";
+  type MemberStage,
+  type MemberStageState,
+} from "@/lib/member-stage";
 
 /** Buckets an admin can tick on a merge. */
 export const SELECTABLE_GROUPS = ["investors", "attended", "approved"] as const;
@@ -44,7 +43,7 @@ export type AudienceMember = {
 
 export type Audience = {
   /** Member count per ladder bucket — the full ladder, for UI transparency. */
-  counts: Record<StreakStage, number>;
+  counts: Record<MemberStage, number>;
   /** Members in sendable buckets (team/investors/attended/approved). */
   sendable: AudienceMember[];
 };
@@ -136,12 +135,12 @@ export async function computeAudience(): Promise<Audience> {
     attended: 0,
     approved: 0,
     applied: 0,
-  } satisfies Record<StreakStage, number>;
+  } satisfies Record<MemberStage, number>;
   const sendable: AudienceMember[] = [];
 
   for (const m of members) {
     const memberEmails = emailsByMember.get(m.id) ?? [];
-    const state: MemberStreakState = {
+    const state: MemberStageState = {
       is_team: !!m.is_team,
       marketing_opted_in: !!m.marketing_opted_in,
       kicked_out: !!m.kicked_out,

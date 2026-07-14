@@ -6,10 +6,6 @@ import { formatName } from "@/lib/format";
 import { sendReApplicationEmail } from "@/lib/email-send";
 import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
 import {
-  safeDeleteApplicationBox,
-  safePushMember,
-} from "@/lib/streak/safe-push";
-import {
   approveApplicationWith,
   rejectApplicationWith,
   type ApproveResult,
@@ -72,12 +68,6 @@ export async function linkApplicationToMember(
 
   await sendReApplicationEmail(result.member_id);
 
-  // Per spec: orphan-delete the application's Applied box (if any), then
-  // push the existing member. Linked members already represent the same
-  // human in Streak via the member's box, so the application box is redundant.
-  await safeDeleteApplicationBox(applicationId, "link_application");
-  await safePushMember(result.member_id, "link_application");
-
   // No explicit application.linked log — refineAuditRow now distinguishes
   // link (member existed before this UPDATE) from fresh approve (member was
   // created in the same RPC tx) using member.created_at vs the audit row's
@@ -97,15 +87,12 @@ export async function linkApplicationToMember(
  * applicants slip through if they coincidentally share an email) and
  * shouldn't email the spammer.
  *
- * Cleans up the Streak Applied-stage box if one exists, then DELETEs the
- * application. Audit row is written by the trigger automatically.
+ * Audit row is written by the trigger automatically.
  */
 export async function deleteSpamApplication(
   applicationId: string
 ): Promise<{ success: boolean; error?: string }> {
   const admin = await createAdminClientForCurrentActor();
-
-  await safeDeleteApplicationBox(applicationId, "spam_delete");
 
   const { error } = await admin
     .from("applications")

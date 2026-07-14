@@ -1,26 +1,19 @@
 /**
- * Hard-bounce cascade shared by inbound webhook routes that learn an address
- * is undeliverable.
+ * Hard-bounce cascade: when /api/webhooks/resend learns an address is
+ * undeliverable (Permanent bounce, or second soft bounce escalation), flip
+ * member_emails.email_status to 'bounced', auto-promote a non-bounced
+ * secondary if the bounced address was the primary, and emit a small fixed
+ * set of system_events rows that the System feed surfaces.
  *
- * Callers:
- *   - /api/webhooks/resend — Resend sent us a Permanent bounce event for a
- *     known recipient address.
- *   - /api/webhooks/streak/bounced — Eric manually moved a box to "Bounced"
- *     in Streak because the bounce came back to his inbox as unstructured
- *     text Resend can't parse (e.g., "Address not found").
- *
- * Both paths converge on the same downstream steps: flip member_emails.email_status
- * to 'bounced', auto-promote a non-bounced secondary if the bounced address was
- * the primary, push Streak so the box re-syncs, and emit a small fixed set of
- * system_events rows that the System feed surfaces.
+ * (Historically also fed by a Streak "Bounced" webhook and followed by a
+ * Streak stage push — the Streak integration was retired 2026-07.)
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logSystemEvent } from "@/lib/system-events";
-import { safePushMember } from "@/lib/streak/safe-push";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-export type BounceActorLabel = "webhook:resend" | "webhook:streak";
+export type BounceActorLabel = "webhook:resend";
 
 export async function applyHardBounce(opts: {
   admin: AdminClient;
@@ -32,9 +25,8 @@ export async function applyHardBounce(opts: {
   };
   memberName: string | null;
   actorLabel: BounceActorLabel;
-  safePushReason: string;
 }): Promise<void> {
-  const { admin, memberEmail, memberName, actorLabel, safePushReason } = opts;
+  const { admin, memberEmail, memberName, actorLabel } = opts;
   const recipientEmail = memberEmail.email;
 
   await admin
@@ -53,10 +45,6 @@ export async function applyHardBounce(opts: {
       was_primary: memberEmail.is_primary,
     },
   });
-
-  let promotedEmail: string | null = null;
-  let streakOutcome: "primary_rotated" | "no_secondary_unreachable" | "secondary_retired" =
-    memberEmail.is_primary ? "no_secondary_unreachable" : "secondary_retired";
 
   if (memberEmail.is_primary) {
     const { data: candidates } = await admin
@@ -89,8 +77,6 @@ export async function applyHardBounce(opts: {
           },
         });
       } else {
-        promotedEmail = promotion.email;
-        streakOutcome = "primary_rotated";
         await logSystemEvent({
           event_type: "email.primary_promoted",
           actor_label: actorLabel,
@@ -118,24 +104,4 @@ export async function applyHardBounce(opts: {
     }
   }
 
-  await safePushMember(memberEmail.member_id, safePushReason);
-
-  const outcomeSummary =
-    streakOutcome === "primary_rotated"
-      ? `Streak resynced: primary email rotated to ${promotedEmail}`
-      : streakOutcome === "no_secondary_unreachable"
-        ? `Streak resynced: member moved to Bounced stage (no deliverable email)`
-        : `Streak resynced: secondary email retired (member still reachable)`;
-  await logSystemEvent({
-    event_type: "streak.bounce_synced",
-    actor_label: actorLabel,
-    subject_member_id: memberEmail.member_id,
-    summary: outcomeSummary,
-    metadata: {
-      member_id: memberEmail.member_id,
-      outcome: streakOutcome,
-      bounced_email: recipientEmail,
-      promoted_email: promotedEmail,
-    },
-  });
 }

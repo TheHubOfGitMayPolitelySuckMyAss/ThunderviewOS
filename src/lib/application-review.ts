@@ -17,10 +17,6 @@ import {
   sendRejectionEmail,
 } from "@/lib/email-send";
 import { ensureAuthUsersForMember } from "@/lib/ensure-auth-user";
-import {
-  safeDeleteApplicationBox,
-  safePushMember,
-} from "@/lib/streak/safe-push";
 
 export type ApproveResult = {
   success: boolean;
@@ -67,40 +63,6 @@ export async function approveApplicationWith(
     await sendApprovalEmail(result.member_id);
   }
 
-  // Streak housekeeping: route on box-key state, not is_existing. Cases:
-  //   - app has box & member already has box   → orphan-delete the app box
-  //   - app has box & member has no box        → migrate the box to member
-  //   - app has no box                         → push will create one for member
-  // Box-key writes use plain admin (infra plumbing, not an Eric-attributed edit).
-  const housekeeping = createAdminClient("system-internal");
-  const { data: appBox } = await housekeeping
-    .from("applications")
-    .select("streak_box_key")
-    .eq("id", applicationId)
-    .single();
-  const { data: memberBox } = await housekeeping
-    .from("members")
-    .select("streak_box_key")
-    .eq("id", result.member_id)
-    .single();
-
-  if (appBox?.streak_box_key) {
-    if (memberBox?.streak_box_key) {
-      await safeDeleteApplicationBox(applicationId, "approve_application_orphan");
-    } else {
-      await housekeeping
-        .from("members")
-        .update({ streak_box_key: appBox.streak_box_key })
-        .eq("id", result.member_id);
-      await housekeeping
-        .from("applications")
-        .update({ streak_box_key: null })
-        .eq("id", applicationId);
-    }
-  }
-
-  await safePushMember(result.member_id, "approve_application");
-
   // No explicit application.approved log — audit row covers it via the
   // status pending→approved transition.
 
@@ -126,8 +88,6 @@ export async function rejectApplicationWith(
     .eq("id", applicationId);
 
   if (error) return { success: false, error: error.message };
-
-  await safeDeleteApplicationBox(applicationId, "reject_application");
 
   await sendRejectionEmail(applicationId);
 

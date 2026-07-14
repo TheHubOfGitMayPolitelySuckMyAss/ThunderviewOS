@@ -2,7 +2,6 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNewApplicationNotification } from "@/lib/email-send";
-import { safePushApplication } from "@/lib/streak/safe-push";
 import { verifyFormToken } from "@/lib/form-token";
 import { logSystemEvent } from "@/lib/system-events";
 
@@ -32,7 +31,7 @@ export async function submitApplication(formData: {
 
   // Anti-spam gate. Drop bots SILENTLY — return the same `{ success: true }`
   // a real submit gets so the spammer is routed to the thanks page and can't
-  // tell they were filtered. No application row, no admin email, no Streak box.
+  // tell they were filtered. No application row, no admin email.
   // Each drop is logged to system_events for ad-hoc "is it working" queries
   // (not surfaced in any activity feed — it's noise, not an operator alert).
   const spamReason = ((): string | null => {
@@ -56,7 +55,7 @@ export async function submitApplication(formData: {
 
   // Pre-check: if email already maps to an active (non-kicked-out) member,
   // short-circuit to a "you're already a member" response — no application
-  // row, no admin notification, no Streak push. Kicked-out re-applications
+  // row, no admin notification. Kicked-out re-applications
   // fall through to the normal flow so they land in the pending queue with
   // a flag for manual review.
   const { data: existingEmail } = await admin
@@ -92,7 +91,6 @@ export async function submitApplication(formData: {
 
   if (error) return { success: false, error: error.message };
 
-  await safePushApplication(data.id, "apply_submission");
 
   // Notify admin — must await or serverless may terminate before send completes
   await sendNewApplicationNotification({
