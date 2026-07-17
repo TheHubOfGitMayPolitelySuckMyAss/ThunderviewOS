@@ -1,0 +1,11 @@
+# Upload exclusions for CLI deploys (the git-integration path ignores this).
+# CLI fallback exists because the GitHub webhook has silently missed pushes
+# (2026-07-16); without these, `vercel deploy` tries to upload ~100MB.
+.git
+node_modules
+.next
+.env*
+.claude
+design-system/uploads
+design-system/preview
+scripts
