@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import { getTicketInfo } from "@/lib/ticket-assignment";
+import { getSeatsSold, SEAT_CAP } from "@/lib/seat-cap";
 import { formatDinnerDisplay } from "@/lib/format";
 import Stripe from "stripe";
 
@@ -66,6 +67,15 @@ export async function purchaseTicket(formData: FormData) {
   );
 
   const quantity = actualWithGuest ? 2 : 1;
+
+  // Seat cap: block before creating the Checkout session. The pages show
+  // sold-out state too, but this is the enforcement — the UI check is only
+  // cosmetic. remaining >= quantity, so a with-guest buy at 44/45 is blocked.
+  const seatsSold = await getSeatsSold(admin, dinner.id);
+  if (seatsSold + quantity > SEAT_CAP) {
+    redirect("/portal/tickets");
+  }
+
   const amountPaid = actualWithGuest ? price + 40 : price;
   const dinnerDisplay = formatDinnerDisplay(dinner.date);
 

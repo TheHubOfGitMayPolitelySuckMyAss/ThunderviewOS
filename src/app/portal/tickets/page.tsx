@@ -4,6 +4,7 @@ import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
+import { getSeatsSoldByDinner, SEAT_CAP } from "@/lib/seat-cap";
 import { H1, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import TicketPurchase from "./ticket-purchase";
@@ -84,28 +85,24 @@ export default async function TicketSelectionPage() {
     .limit(3);
 
   // Combine: past dinner (if any) + upcoming
-  const dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[] = [];
+  const candidateDinners = [
+    ...(pastDinner ? [{ ...pastDinner, isPast: true }] : []),
+    ...(upcomingDinners || []).map((d) => ({ ...d, isPast: false })),
+  ].filter((d) => !ticketedDinnerIds.has(d.id));
 
-  if (pastDinner && !ticketedDinnerIds.has(pastDinner.id)) {
-    dinnerOptions.push({
-      id: pastDinner.id,
-      date: pastDinner.date,
-      label: formatDinnerDisplay(pastDinner.date),
-      isPast: true,
-      guestsAllowed: pastDinner.guests_allowed,
-    });
-  }
+  const seatsSoldByDinner = await getSeatsSoldByDinner(
+    admin,
+    candidateDinners.map((d) => d.id)
+  );
 
-  for (const d of upcomingDinners || []) {
-    if (ticketedDinnerIds.has(d.id)) continue;
-    dinnerOptions.push({
-      id: d.id,
-      date: d.date,
-      label: formatDinnerDisplay(d.date),
-      isPast: false,
-      guestsAllowed: d.guests_allowed,
-    });
-  }
+  const dinnerOptions = candidateDinners.map((d) => ({
+    id: d.id,
+    date: d.date,
+    label: formatDinnerDisplay(d.date),
+    isPast: d.isPast,
+    guestsAllowed: d.guests_allowed,
+    seatsLeft: Math.max(0, SEAT_CAP - (seatsSoldByDinner.get(d.id) ?? 0)),
+  }));
 
   if (dinnerOptions.length === 0) {
     return (
@@ -121,9 +118,11 @@ export default async function TicketSelectionPage() {
     );
   }
 
-  // Default to first upcoming (non-past) dinner
+  // Default to first upcoming (non-past) dinner with seats left
   const defaultDinnerId =
-    dinnerOptions.find((d) => !d.isPast)?.id || dinnerOptions[0].id;
+    dinnerOptions.find((d) => !d.isPast && d.seatsLeft > 0)?.id ||
+    dinnerOptions.find((d) => !d.isPast)?.id ||
+    dinnerOptions[0].id;
 
   const { label, price } = getTicketInfo(
     member.attendee_stagetypes,

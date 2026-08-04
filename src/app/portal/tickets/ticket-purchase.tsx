@@ -13,6 +13,7 @@ type DinnerOption = {
   label: string;
   isPast: boolean;
   guestsAllowed: boolean;
+  seatsLeft: number;
 };
 
 export default function TicketPurchase({
@@ -34,8 +35,11 @@ export default function TicketPurchase({
   const [isPending, startTransition] = useTransition();
 
   const selectedDinner = dinnerOptions.find((d) => d.id === selectedDinnerId);
+  const soldOut = selectedDinner ? selectedDinner.seatsLeft <= 0 : false;
+  // A guest ticket needs 2 seats — hide the guest option at 1 seat left.
   const showGuestButton = selectedDinner
-    ? allowsGuestTicket({ guests_allowed: selectedDinner.guestsAllowed })
+    ? allowsGuestTicket({ guests_allowed: selectedDinner.guestsAllowed }) &&
+      selectedDinner.seatsLeft >= 2
     : false;
 
   function handlePurchase(withGuest: boolean) {
@@ -56,7 +60,7 @@ export default function TicketPurchase({
           >
             {dinnerOptions.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.label}
+                {d.seatsLeft <= 0 ? `${d.label} — Sold out` : d.label}
               </option>
             ))}
           </Select>
@@ -72,12 +76,12 @@ export default function TicketPurchase({
       <div className="flex flex-col gap-tight">
         <button
           onClick={() => handlePurchase(false)}
-          disabled={isPending}
+          disabled={isPending || soldOut}
           className="w-full p-form-row border border-border rounded-xl bg-bg text-left cursor-pointer transition-all duration-[120ms] hover:border-accent hover:bg-bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="font-semibold text-sm text-fg1">{ticketLabel}</div>
           <div className="text-accent-hover font-display font-medium text-lg mt-label-input" style={{ fontVariationSettings: '"opsz" 72' }}>
-            {isPending ? "Processing\u2026" : `$${ticketPrice}`}
+            {soldOut ? "Sold out" : isPending ? "Processing\u2026" : `$${ticketPrice}`}
           </div>
         </button>
         {showGuestButton && (
@@ -95,7 +99,9 @@ export default function TicketPurchase({
       </div>
 
       <p className="text-xs text-fg3 leading-[1.5]">
-        Ticket price covers the meal. You&rsquo;ll be redirected to Stripe to complete payment.
+        {soldOut
+          ? "This dinner is sold out. Check back — a seat may open up."
+          : "Ticket price covers the meal. You’ll be redirected to Stripe to complete payment."}
       </p>
     </div>
   );

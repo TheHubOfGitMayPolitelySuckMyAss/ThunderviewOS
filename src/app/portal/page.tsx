@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { formatDinnerDisplay, formatName, getTodayMT, toDateMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
+import { getSeatsSold, SEAT_CAP } from "@/lib/seat-cap";
 import { H1, Eyebrow } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
@@ -109,7 +110,7 @@ export default async function PortalPage({
 
   // Build ticket purchase data when member has no upcoming ticket
   let ticketPurchaseData: {
-    dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean }[];
+    dinnerOptions: { id: string; date: string; label: string; isPast: boolean; guestsAllowed: boolean; seatsLeft: number }[];
     defaultDinnerId: string;
     ticketLabel: string;
     ticketPrice: number;
@@ -151,12 +152,15 @@ export default async function PortalPage({
           .eq("member_id", member.id);
         const primaryEmail = emails?.find((e) => e.is_primary)?.email ?? email;
 
+        const seatsSold = await getSeatsSold(admin, nextDinnerForTicket.id);
+
         const dinnerOption = {
           id: nextDinnerForTicket.id,
           date: nextDinnerForTicket.date,
           label: formatDinnerDisplay(nextDinnerForTicket.date),
           isPast: false,
           guestsAllowed: nextDinnerForTicket.guests_allowed,
+          seatsLeft: Math.max(0, SEAT_CAP - seatsSold),
         };
 
         ticketPurchaseData = {
