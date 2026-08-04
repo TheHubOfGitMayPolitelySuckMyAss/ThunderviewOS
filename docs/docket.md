@@ -20,5 +20,6 @@ single-writer hook):
 
 ## Done
 
+- 2026-08-04 — Atlas renderer at /admin/atlas (ported from knownquantity, no notes inbox) + kit updated to b9fce63 (v7 renderer-default-on ritual).
 - 2026-08-04 — Atlas kit installed (origin SHA 0c60614); six domains + seat-cap node seeded from code and git history.
 - 2026-08-04 — Per-dinner seat cap shipped: `dinners.seat_cap` default 45, December 80, admin-editable, sold-out derived live. (atlas: tickets/seat-cap)

@@ -13,6 +13,7 @@ const NAV_GROUPS = [
       { href: "/admin/applications", label: "Applications" },
       { href: "/admin/tickets", label: "Tickets" },
       { href: "/admin/operations", label: "Activity" },
+      { href: "/admin/atlas", label: "Atlas" },
     ],
   },
   {
