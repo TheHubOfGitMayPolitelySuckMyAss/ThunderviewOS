@@ -223,8 +223,14 @@ kit:
    reconciled by judgment, stamp advanced, one commit.
 8. An atlas-contract test enforcing the node format in CI (seed from
    `templates/atlas-contract.test.ts`, adapt to the host's runner).
-9. Host-specific and optional: a renderer and a todos capture inbox behind
-   an adapter (Todos section above). A repo can run with neither — open
+9. The renderer — DEFAULT-ON for hosts with an authenticated admin surface:
+   port it from an existing install and mount it at `/admin/atlas` (the
+   cross-install convention; this repo mounts it there). The installing
+   agent asks the owner only when there is no obvious mount point;
+   "optional" is reserved for hosts with nowhere to render (CLIs,
+   libraries).
+10. Host-specific and genuinely optional: a todos capture inbox behind
+   an adapter (Todos section above). A repo can run without one — open
    loops go to the docket until an inbox exists. A repo that HAS an inbox
    also seeds BOTH `docs/atlas/notes-adapter.md` (from
    `templates/notes-adapter.md` — the pinned storage contract every sweep
