@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/docket-single-writer.sh\"",
+            "timeout": 10,
+            "statusMessage": "Docket single-writer guard"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/atlas-open-loop-sweep.sh\"",
+            "timeout": 10,
+            "statusMessage": "Atlas open-loop sweep"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/atlas-kit-update-check.sh\"",
+            "timeout": 15,
+            "statusMessage": "Atlas kit update check"
+          }
+        ]
+      }
+    ]
+  }
+}

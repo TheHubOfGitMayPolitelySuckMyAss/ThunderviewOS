@@ -45,3 +45,5 @@ next-env.d.ts
 /tmp/
 /supabase/.temp/
 /.claude/worktrees/
+/.claude/projects/
+.claude/settings.local.json

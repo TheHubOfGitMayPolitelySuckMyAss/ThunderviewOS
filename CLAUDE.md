@@ -6,6 +6,7 @@ Next.js 16 + Supabase + Vercel. Replaces a Squarespace/Sheets/Streak stack for a
 
 ## Operating rules (read first)
 
+- **The atlas (`docs/atlas/`) is the project's decision map.** Read the owning node before changing a feature; a behavior-changing commit updates the node in the same commit (How rewritten, Decisions appended). Open work lives in `docs/docket.md`. Convention: `docs/atlas/README.md`.
 - Cloud-first. No local-only scripts or dependencies.
 - Don't invent requirements. If something seems missing, flag it — don't fill it in.
 - When Eric reports a bug, ask at least one clarifying question before offering an explanation. Don't infer the cause.
