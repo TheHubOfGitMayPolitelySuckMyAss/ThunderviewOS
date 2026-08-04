@@ -18,6 +18,11 @@ single-writer hook):
 
 ## Open — Unanswered
 
+- **ON ERIC:** Aug 6 dinner (in 2 days) shows SOLD OUT at 46 seats vs cap 45 — bump its cap on /admin/dinners/[id] if members should still be able to buy.
+- **ON ERIC:** Homepage says "40 seats. Closes when full." (`this-months-dinner.tsx:153`); actual cap is 45 — reconcile the copy or leave it.
+- **ON ERIC:** Open /admin/atlas and confirm six domain cards render. If it says "No atlas nodes yet," the `outputFileTracingIncludes` tracing failed in the deployed bundle — tell the agent. Unverifiable from outside auth. ⚠unverified
+- **ON ERIC:** Pre-existing untracked paths: `design-system/**`, `scripts/`, `supabase/config.toml`. CLAUDE.md documents design-system/ as repo content, but it has never been committed — commit or gitignore?
+
 ## Done
 
 - 2026-08-04 — Atlas renderer at /admin/atlas (ported from knownquantity, no notes inbox) + kit updated to b9fce63 (v7 renderer-default-on ritual).
