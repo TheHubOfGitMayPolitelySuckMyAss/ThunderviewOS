@@ -41,15 +41,19 @@ export default function DinnerSeatCap({
 
   return (
     <div className="rounded-xl border border-border bg-bg px-5 py-4 shadow-xs">
-      <p className="tv-eyebrow mb-1">Seat Cap</p>
+      <p className="tv-eyebrow mb-1">Purchased</p>
+      <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
+        {seatsSold}
+      </p>
       {editing ? (
-        <div className="flex items-center gap-1">
+        <div className="mt-1 flex items-center gap-1">
+          <span className="text-xs text-fg3">Cap:</span>
           <input
             type="number"
             min={1}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-16 rounded-md border border-border px-2 py-0.5 text-sm text-fg1 bg-bg focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]"
+            className="w-14 rounded-md border border-border px-1.5 py-0.5 text-xs text-fg1 bg-bg focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(181,131,90,0.18)]"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSave();
@@ -61,7 +65,7 @@ export default function DinnerSeatCap({
           </Button>
           <button
             onClick={handleCancel}
-            className="rounded px-2 py-0.5 text-xs font-medium text-fg3 cursor-pointer hover:text-fg1"
+            className="rounded px-1.5 py-0.5 text-xs font-medium text-fg3 cursor-pointer hover:text-fg1"
           >
             Cancel
           </button>
@@ -69,17 +73,14 @@ export default function DinnerSeatCap({
       ) : (
         <p
           onClick={() => setEditing(true)}
-          className="font-display font-medium text-[28px] text-fg1 cursor-pointer hover:text-fg2"
-          style={{ fontVariationSettings: '"opsz" 72' }}
+          className="mt-1 text-xs text-fg3 cursor-pointer hover:text-fg1 hover:underline"
           title="Click to edit"
         >
-          {current}
+          Cap: {current}
+          {seatsSold >= current && " — sold out"}
         </p>
       )}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-      {!editing && seatsSold >= current && (
-        <p className="text-xs text-fg3 mt-1">Sold out</p>
-      )}
     </div>
   );
 }

@@ -227,12 +227,6 @@ export default async function DinnerDetailPage({
 
       {/* Ticket counts */}
       <div className="flex gap-4">
-        <div className="rounded-xl border border-border bg-bg px-5 py-4 shadow-xs">
-          <p className="tv-eyebrow mb-1">Purchased</p>
-          <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>
-            {(statusCounts["purchased"] || 0) + (statusCounts["fulfilled"] || 0)}
-          </p>
-        </div>
         <DinnerSeatCap
           dinnerId={dinner.id}
           seatCap={dinner.seat_cap}
