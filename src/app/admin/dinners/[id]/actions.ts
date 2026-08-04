@@ -152,6 +152,25 @@ export async function updateDinnerField(
   return { success: true };
 }
 
+export async function updateDinnerSeatCap(
+  dinnerId: string,
+  seatCap: number
+): Promise<{ success: boolean; error?: string }> {
+  if (!Number.isInteger(seatCap) || seatCap < 1) {
+    return { success: false, error: "Seat cap must be a whole number of at least 1" };
+  }
+
+  const admin = await createAdminClientForCurrentActor();
+  const { error } = await admin
+    .from("dinners")
+    .update({ seat_cap: seatCap })
+    .eq("id", dinnerId);
+
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/dinners");
+  return { success: true };
+}
+
 export async function searchMembersForSpeaker(
   query: string
 ): Promise<

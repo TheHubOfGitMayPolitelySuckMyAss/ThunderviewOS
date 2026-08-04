@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { formatDinnerDisplay, formatName, getTodayMT, toDateMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
-import { getSeatsSold, SEAT_CAP } from "@/lib/seat-cap";
+import { getSeatsSold } from "@/lib/seat-cap";
 import { H1, Eyebrow } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import PortalForm from "./portal-form";
@@ -123,7 +123,7 @@ export default async function PortalPage({
     // Find the next upcoming dinner
     const { data: nextDinnerForTicket } = await admin
       .from("dinners")
-      .select("id, date, guests_allowed")
+      .select("id, date, guests_allowed, seat_cap")
       .gte("date", todayMT)
       .order("date", { ascending: true })
       .limit(1)
@@ -160,7 +160,7 @@ export default async function PortalPage({
           label: formatDinnerDisplay(nextDinnerForTicket.date),
           isPast: false,
           guestsAllowed: nextDinnerForTicket.guests_allowed,
-          seatsLeft: Math.max(0, SEAT_CAP - seatsSold),
+          seatsLeft: Math.max(0, nextDinnerForTicket.seat_cap - seatsSold),
         };
 
         ticketPurchaseData = {

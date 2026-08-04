@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatDate, formatName, formatStageType, getTodayMT, toDateMT } from "@/lib/format";
 import DinnerTickets from "./dinner-tickets";
 import DinnerVenue from "./dinner-venue";
+import DinnerSeatCap from "./dinner-seat-cap";
 import DinnerDetails from "./dinner-details";
 import PageHeader from "@/components/page-header";
 
@@ -232,6 +233,11 @@ export default async function DinnerDetailPage({
             {(statusCounts["purchased"] || 0) + (statusCounts["fulfilled"] || 0)}
           </p>
         </div>
+        <DinnerSeatCap
+          dinnerId={dinner.id}
+          seatCap={dinner.seat_cap}
+          seatsSold={(statusCounts["purchased"] || 0) + (statusCounts["fulfilled"] || 0)}
+        />
         <div className="rounded-xl border border-border bg-bg px-5 py-4 shadow-xs">
           <p className="tv-eyebrow mb-1">Refunded</p>
           <p className="font-display font-medium text-[28px] text-fg1" style={{ fontVariationSettings: '"opsz" 72' }}>

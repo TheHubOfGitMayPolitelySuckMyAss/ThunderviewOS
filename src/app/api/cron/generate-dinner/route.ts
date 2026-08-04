@@ -17,6 +17,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayMT, firstThursdayOf } from "@/lib/format";
+import { seatCapForMonth } from "@/lib/seat-cap";
 import { logSystemEvent } from "@/lib/system-events";
 
 export async function GET(request: Request) {
@@ -125,7 +126,12 @@ async function runGenerateDinner() {
   const admin = createAdminClient("cron");
   const { data, error } = await admin
     .from("dinners")
-    .upsert({ date: targetDate }, { onConflict: "date", ignoreDuplicates: true })
+    .upsert(
+      // December dinners hold 80 seats; everything else takes the column
+      // default of 45 (passed explicitly so the rule lives in one place).
+      { date: targetDate, seat_cap: seatCapForMonth(targetMonth) },
+      { onConflict: "date", ignoreDuplicates: true }
+    )
     .select("date")
     .single();
 

@@ -1,16 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Hard cap on seats per dinner. A "with guest" ticket occupies 2 seats
- * (tickets.quantity); sold-out is DERIVED live from active tickets rather
- * than stored, so a refund/credit drops the count and reopens sales
- * automatically.
+ * Seat caps are PER DINNER: `dinners.seat_cap` (NOT NULL DEFAULT 45).
+ * Enforcement reads that column — the constants here exist only for the
+ * dinner-generation cron, which sets December dinners to 80 at insert.
+ *
+ * A "with guest" ticket occupies 2 seats (tickets.quantity); sold-out is
+ * DERIVED live from active tickets rather than stored, so a refund/credit
+ * drops the count and reopens sales automatically.
  *
  * Known accepted race: Stripe Checkout sessions already open when the cap
  * is reached can still complete, so the count can overshoot slightly. The
  * webhook does not decline completed payments.
  */
-export const SEAT_CAP = 45;
+export const DEFAULT_SEAT_CAP = 45;
+export const DECEMBER_SEAT_CAP = 80;
+
+export function seatCapForMonth(month: number): number {
+  return month === 12 ? DECEMBER_SEAT_CAP : DEFAULT_SEAT_CAP;
+}
 
 /**
  * Seats sold per dinner, counting purchased + fulfilled tickets weighted by

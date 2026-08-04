@@ -4,7 +4,7 @@ import { findMemberByAnyEmail } from "@/lib/member-lookup";
 import { redirect } from "next/navigation";
 import { formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import { getTicketInfo } from "@/lib/ticket-assignment";
-import { getSeatsSoldByDinner, SEAT_CAP } from "@/lib/seat-cap";
+import { getSeatsSoldByDinner } from "@/lib/seat-cap";
 import { H1, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import TicketPurchase from "./ticket-purchase";
@@ -70,7 +70,7 @@ export default async function TicketSelectionPage() {
   // Most recent past dinner
   const { data: pastDinner } = await admin
     .from("dinners")
-    .select("id, date, guests_allowed")
+    .select("id, date, guests_allowed, seat_cap")
     .lt("date", todayMT)
     .order("date", { ascending: false })
     .limit(1)
@@ -79,7 +79,7 @@ export default async function TicketSelectionPage() {
   // Next 3 upcoming dinners
   const { data: upcomingDinners } = await admin
     .from("dinners")
-    .select("id, date, guests_allowed")
+    .select("id, date, guests_allowed, seat_cap")
     .gte("date", todayMT)
     .order("date", { ascending: true })
     .limit(3);
@@ -101,7 +101,7 @@ export default async function TicketSelectionPage() {
     label: formatDinnerDisplay(d.date),
     isPast: d.isPast,
     guestsAllowed: d.guests_allowed,
-    seatsLeft: Math.max(0, SEAT_CAP - (seatsSoldByDinner.get(d.id) ?? 0)),
+    seatsLeft: Math.max(0, d.seat_cap - (seatsSoldByDinner.get(d.id) ?? 0)),
   }));
 
   if (dinnerOptions.length === 0) {
