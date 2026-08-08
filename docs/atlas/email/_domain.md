@@ -42,6 +42,11 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
 - **2026-07-16** — Label actions act once per (thread, kind), not per
   message — a conversation label arrives as N labeled messages and triple-
   emailed Eric. (51811af)
+- **2026-08-08** — Morning-of email carries a hardcoded venue-tease block
+  (two Fraunces headlines + two photos from the `email-images` bucket:
+  `morning-of-venue-{outside,inside}.jpg`) between the editable template
+  body and Tonight's Attendees. Not template-editable — swap by overwriting
+  the bucket files (same filename = same URL) or editing `sendMorningOfEmail`.
 
 ## Graveyard
 
