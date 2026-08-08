@@ -43,10 +43,12 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
   message — a conversation label arrives as N labeled messages and triple-
   emailed Eric. (51811af)
 - **2026-08-08** — Morning-of email carries a hardcoded venue-tease block
-  (two Fraunces headlines + two photos from the `email-images` bucket:
-  `morning-of-venue-{outside,inside}.jpg`) between the editable template
-  body and Tonight's Attendees. Not template-editable — swap by overwriting
-  the bucket files (same filename = same URL) or editing `sendMorningOfEmail`.
+  (two bold body-text lines styled like the Tonight's Attendees label + two
+  photos from the `email-images` bucket: `morning-of-venue-{outside,inside}.jpg`)
+  between the editable template body and Tonight's Attendees. Not
+  template-editable — swap by overwriting the bucket files (same filename =
+  same URL) or editing `sendMorningOfEmail`. Eric iterated size down from
+  Fraunces h2 24px → settled on the plain label style. (5cee2dc..c957bbc)
 
 ## Graveyard
 
