@@ -24,6 +24,7 @@ single-writer hook):
 
 ## Done
 
+- 2026-08-08 — Email-image uploads rebuilt as direct-to-storage (Vercel 4.5MB body cap was hanging ~4.5MB photos); verified live with a 5.2MB upload on the Monday After draft. (atlas: email/_domain, ea6194d)
 - 2026-08-08 — Morning-of email venue-tease block (2 photos + label-style captions) shipped after 4 style iterations; demo-verified in Eric's inbox. (atlas: email/_domain, 5cee2dc..c957bbc)
 - 2026-08-08 — Aug 6 cap ask expired unanswered: dinner ran at cap 45 with 46 sold (SOLD OUT stood). No action possible now.
 - 2026-08-04 — Atlas renderer at /admin/atlas (ported from knownquantity, no notes inbox) + kit updated to b9fce63 (v7 renderer-default-on ritual).
