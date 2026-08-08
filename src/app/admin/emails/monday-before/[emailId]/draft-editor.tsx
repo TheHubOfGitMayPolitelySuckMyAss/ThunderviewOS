@@ -12,11 +12,14 @@ import {
   saveDraft,
   sendTestEmail,
   sendToAll,
-  uploadEmailImage,
+  createImageUploadUrl,
+  attachUploadedImage,
   deleteEmailImage,
   reorderEmailImages,
 } from "../actions";
 import ImageGroup from "@/components/email-image-group";
+import { createClient } from "@/lib/supabase/client";
+import { validateImageType } from "@/lib/email-image-validate";
 
 const RichTextEditor = dynamic(() => import("@/components/ui/rich-text-editor"), { ssr: false });
 
@@ -102,9 +105,23 @@ export default function DraftEditor({
   const group5Images = images.filter((i) => i.groupNumber === 5).sort((a, b) => a.displayOrder - b.displayOrder);
 
   const handleImageUpload = useCallback(async (groupNumber: number, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const result = await uploadEmailImage(emailId, groupNumber, formData);
+    const typeError = validateImageType(file);
+    if (typeError) return { success: false, error: typeError };
+
+    // Originals go straight to storage via signed URL — Vercel caps
+    // server-action bodies at 4.5MB, so the file must not pass through one.
+    const target = await createImageUploadUrl();
+    if (!target.success || !target.path || !target.token) {
+      return { success: false, error: target.error || "Could not start upload" };
+    }
+
+    const supabase = createClient();
+    const { error: uploadError } = await supabase.storage
+      .from("email-images")
+      .uploadToSignedUrl(target.path, target.token, file);
+    if (uploadError) return { success: false, error: uploadError.message };
+
+    const result = await attachUploadedImage(emailId, groupNumber, target.path);
     if (result.success && result.image) {
       setImages((prev) => [
         ...prev,

@@ -7,7 +7,7 @@ import { EMAIL_FROM } from "@/lib/email";
 import { formatDateFriendly, formatName } from "@/lib/format";
 import { renderMondayBeforeEmail } from "@/lib/email-templates/monday-before";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe";
-import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
+import { createTempUploadTarget, compressFromTemp, isValidTempPath } from "@/lib/email-image-upload";
 import { getMarketingRecipients, isTestingMode } from "@/lib/email-mode";
 import { logSystemEvent } from "@/lib/system-events";
 import { Resend } from "resend";
@@ -133,42 +133,35 @@ export async function saveDraft(
 // Image pipeline
 // ============================================================
 
-export async function uploadEmailImage(
-  emailId: string,
-  groupNumber: number,
-  formData: FormData
-): Promise<{ success: boolean; error?: string; image?: { id: string; public_url: string } }> {
+export async function createImageUploadUrl(): Promise<{
+  success: boolean; error?: string; path?: string; token?: string;
+}> {
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const file = formData.get("file") as File | null;
-  if (!file) return { success: false, error: "No file provided" };
+  const admin = createAdminClient("system-internal");
+  const target = await createTempUploadTarget(admin);
+  if ("error" in target) return { success: false, error: target.error };
+  return { success: true, ...target };
+}
 
-  const typeError = validateImageType(file);
-  if (typeError) return { success: false, error: typeError };
+export async function attachUploadedImage(
+  emailId: string,
+  groupNumber: number,
+  tempPath: string
+): Promise<{ success: boolean; error?: string; image?: { id: string; public_url: string } }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+  if (!isValidTempPath(tempPath)) return { success: false, error: "Invalid upload path" };
 
-  const originalBytes = await file.arrayBuffer();
-  const result = await compressEmailImage(originalBytes);
-  if ("error" in result) return { success: false, error: result.error };
-
-  const outputBuffer = result.buffer;
-
-  // Upload to Supabase Storage
+  const admin = createAdminClient("system-internal");
   const uuid = crypto.randomUUID();
   const storagePath = `monday-before/${emailId}/${groupNumber}/${uuid}.jpg`;
-  const admin = createAdminClient("system-internal");
 
-  const { error: uploadError } = await admin.storage
-    .from("email-images")
-    .upload(storagePath, outputBuffer, {
-      contentType: "image/jpeg",
-      upsert: false,
-    });
+  const result = await compressFromTemp(admin, tempPath, storagePath);
+  if ("error" in result) return { success: false, error: result.error };
 
-  if (uploadError) return { success: false, error: uploadError.message };
-
-  const { data: urlData } = admin.storage.from("email-images").getPublicUrl(storagePath);
-  const publicUrl = urlData.publicUrl;
+  const publicUrl = result.publicUrl;
 
   // Get next display_order
   const { data: maxRow } = await admin

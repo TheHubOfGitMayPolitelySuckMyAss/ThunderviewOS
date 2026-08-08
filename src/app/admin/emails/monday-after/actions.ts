@@ -7,7 +7,7 @@ import { EMAIL_FROM } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { renderMondayAfterEmail } from "@/lib/email-templates/monday-after";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe";
-import { validateImageType, compressEmailImage } from "@/lib/email-image-pipeline";
+import { createTempUploadTarget, compressFromTemp, isValidTempPath } from "@/lib/email-image-upload";
 import { getMarketingRecipients, getMarketingRecipientCount, isTestingMode } from "@/lib/email-mode";
 import { getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
 import { logSystemEvent } from "@/lib/system-events";
@@ -159,35 +159,33 @@ export async function saveDraft(
 // Image pipeline (shared helpers)
 // ============================================================
 
-export async function uploadEmailImage(
-  emailId: string,
-  groupNumber: number,
-  formData: FormData
-): Promise<{ success: boolean; error?: string; image?: { id: string; public_url: string } }> {
+export async function createImageUploadUrl(): Promise<{
+  success: boolean; error?: string; path?: string; token?: string;
+}> {
   const member = await getAuthMember();
   if (!member) return { success: false, error: "Not authenticated" };
 
-  const file = formData.get("file") as File | null;
-  if (!file) return { success: false, error: "No file provided" };
+  const admin = createAdminClient("system-internal");
+  const target = await createTempUploadTarget(admin);
+  if ("error" in target) return { success: false, error: target.error };
+  return { success: true, ...target };
+}
 
-  const typeError = validateImageType(file);
-  if (typeError) return { success: false, error: typeError };
+export async function attachUploadedImage(
+  emailId: string,
+  groupNumber: number,
+  tempPath: string
+): Promise<{ success: boolean; error?: string; image?: { id: string; public_url: string } }> {
+  const member = await getAuthMember();
+  if (!member) return { success: false, error: "Not authenticated" };
+  if (!isValidTempPath(tempPath)) return { success: false, error: "Invalid upload path" };
 
-  const originalBytes = await file.arrayBuffer();
-  const result = await compressEmailImage(originalBytes);
-  if ("error" in result) return { success: false, error: result.error };
-
+  const admin = createAdminClient("system-internal");
   const uuid = crypto.randomUUID();
   const storagePath = `monday-after/${emailId}/${groupNumber}/${uuid}.jpg`;
-  const admin = createAdminClient("system-internal");
 
-  const { error: uploadError } = await admin.storage
-    .from("email-images")
-    .upload(storagePath, result.buffer, { contentType: "image/jpeg", upsert: false });
-
-  if (uploadError) return { success: false, error: uploadError.message };
-
-  const { data: urlData } = admin.storage.from("email-images").getPublicUrl(storagePath);
+  const result = await compressFromTemp(admin, tempPath, storagePath);
+  if ("error" in result) return { success: false, error: result.error };
 
   const { data: maxRow } = await admin
     .from("monday_after_email_images")
@@ -207,7 +205,7 @@ export async function uploadEmailImage(
       group_number: groupNumber,
       display_order: nextOrder,
       storage_path: storagePath,
-      public_url: urlData.publicUrl,
+      public_url: result.publicUrl,
     })
     .select("id, public_url")
     .single();

@@ -42,6 +42,16 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
 - **2026-07-16** — Label actions act once per (thread, kind), not per
   message — a conversation label arrives as N labeled messages and triple-
   emailed Eric. (51811af)
+- **2026-08-08** — Monday Before/After image uploads go browser → storage
+  directly (signed upload URL into `email-images/tmp/`, then an attach
+  action compresses from storage and deletes the temp). Vercel caps request
+  bodies at 4.5MB — verified empirically: 4.3MB POST → 200, 4.7MB → 413 —
+  so originals must never travel through a server action; Eric's ~4.5MB
+  photos sat exactly on the cap and hung the uploader (the 413 rejected the
+  promise, no catch, spinner never cleared). next.config.ts's 5MB
+  `bodySizeLimit` never gets a say. Shared plumbing in
+  `src/lib/email-image-upload.ts`; compression pipeline unchanged (800px,
+  ≤500KB). Uploader now try/catch/finally — failures show, never hang.
 - **2026-08-08** — Morning-of email carries a hardcoded venue-tease block
   (two bold body-text lines styled like the Tonight's Attendees label + two
   photos from the `email-images` bucket: `morning-of-venue-{outside,inside}.jpg`)

@@ -1,20 +1,11 @@
 import sharp from "sharp";
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const QUALITY_STEPS = [85, 75, 65, 55, 45, 40];
 const MAX_SIZE = 500 * 1024; // 500KB
 const TARGET_WIDTH = 800;
 
-/**
- * Validates file type for email image uploads.
- * Returns null if valid, error message string if invalid.
- */
-export function validateImageType(file: File): string | null {
-  if (!ACCEPTED_TYPES.includes(file.type) && !file.name.toLowerCase().endsWith(".heic")) {
-    return "Only JPEG, PNG, WebP, and HEIC images are accepted";
-  }
-  return null;
-}
+// File-type validation moved to email-image-validate.ts (client-safe,
+// no sharp import) — it runs in the draft editors before upload.
 
 /**
  * Compresses an image for email: 800px width, JPEG, iterative quality reduction

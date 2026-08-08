@@ -124,15 +124,18 @@ export default function ImageGroup({
 
     setIsUploading(true);
     setError(null);
-    const result = await onUpload(file);
-    setIsUploading(false);
-
-    if (!result.success) {
-      setError(result.error || "Upload failed");
+    try {
+      const result = await onUpload(file);
+      if (!result.success) {
+        setError(result.error || "Upload failed");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setIsUploading(false);
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-
-    // Reset file input so the same file can be re-selected
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleDelete(imageId: string) {
