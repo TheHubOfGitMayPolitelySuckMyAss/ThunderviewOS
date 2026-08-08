@@ -474,7 +474,7 @@ export async function sendMorningOfEmail(
 
     const imageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL!.trim()}/storage/v1/object/public/email-images`;
     const venueHeadline = (text: string) =>
-      `<h2 style="font-family:Fraunces,Georgia,'Times New Roman',serif;font-weight:600;font-size:20px;line-height:1.3;color:#2B241C;margin:28px 0 16px;">${text}</h2>`;
+      `<h3 style="font-family:Fraunces,Georgia,'Times New Roman',serif;font-weight:600;font-size:18px;line-height:1.3;color:#2B241C;margin:28px 0 16px;">${text}</h3>`;
     const venueImage = (file: string) =>
       `<img src="${imageBase}/${file}" alt="" width="528" style="display:block;width:100%;max-width:528px;height:auto;border-radius:8px;" />`;
     const venueTeaseHtml =
