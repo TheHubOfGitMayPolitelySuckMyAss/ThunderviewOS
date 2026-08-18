@@ -12,7 +12,7 @@ import { logSystemEvent } from "@/lib/system-events";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com").trim();
 
 // ============================================================
 // Auth helper

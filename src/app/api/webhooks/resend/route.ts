@@ -16,7 +16,7 @@
  *
  * Deploy order:
  * 1. Deploy this code
- * 2. Register webhook in Resend dashboard → https://thunderview-os.vercel.app/api/webhooks/resend
+ * 2. Register webhook in Resend dashboard → https://thunderviewceodinners.com/api/webhooks/resend
  *    (select events: email.bounced, email.complained, email.failed)
  * 3. Copy signing secret → add as RESEND_WEBHOOK_SECRET in Vercel Production scope
  * 4. Redeploy so the env var is available

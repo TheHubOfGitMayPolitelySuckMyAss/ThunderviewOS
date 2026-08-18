@@ -20,7 +20,7 @@ type FeedbackEmailOpts = {
 
 export async function sendFeedbackNotification(opts: FeedbackEmailOpts): Promise<void> {
   try {
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com").trim();
     const tag = opts.type === "Bug" ? "[Bug]" : "[Feedback]";
     const subject = `${tag} from ${opts.submitterName}`;
 

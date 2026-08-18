@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com").trim();
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");

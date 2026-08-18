@@ -5,7 +5,7 @@
  */
 
 const CAN_SPAM_ADDRESS = "Thunderview CEO Dinners / 2462 S Acoma St / Denver, CO 80223 / USA";
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com").trim();
 
 interface MondayAfterEmailProps {
   subject: string;

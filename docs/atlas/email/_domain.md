@@ -59,6 +59,19 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
   template-editable — swap by overwriting the bucket files (same filename =
   same URL) or editing `sendMorningOfEmail`. Eric iterated size down from
   Fraunces h2 24px → settled on the plain label style. (5cee2dc..c957bbc)
+- **2026-08-18** — All six transactional templates still linked to the
+  pre-cutover `thunderview-os.vercel.app` host, three months after the
+  2026-05-08 domain move. That host still serves production but is NOT in
+  Supabase's redirect allow-list, so a magic link requested from it has its
+  `redirect_to` silently swapped for Site URL — `/auth/confirm` never runs and
+  the member loops back to the login form. Reported by a new member; found via
+  GoTrue `/otp` logs, where the `referer` field carries the requested
+  redirect_to. Fixed in three places: template bodies rewritten in the DB, the
+  `NEXT_PUBLIC_SITE_URL` fallback constants in `src/` repointed to the apex,
+  and next.config.ts now 308s the whole vercel.app host to the apex (exact
+  host match — preview deploys `thunderview-os-git-*` must not match).
+  **Any new hardcoded host in an email is this bug waiting to happen — use
+  `NEXT_PUBLIC_SITE_URL`.**
 
 ## Graveyard
 

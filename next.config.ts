@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
         destination: "/portal/tickets",
         permanent: true,
       },
+      // The pre-cutover host still resolves to production, and it is NOT in
+      // Supabase's redirect allow-list. A magic link requested from there gets
+      // its redirect_to silently replaced with Site URL, so /auth/confirm never
+      // runs and the user loops back to the login form. Session cookies are
+      // host-scoped too, so this host is logged out even for signed-in members.
+      // Exact host only — preview deploys (thunderview-os-git-*) must not match.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "thunderview-os.vercel.app" }],
+        destination: "https://thunderviewceodinners.com/:path*",
+        permanent: true,
+      },
     ];
   },
 };

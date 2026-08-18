@@ -398,7 +398,7 @@ export async function sendNewApplicationNotification(application: {
   attendeeStagetype: string;
 }): Promise<void> {
   try {
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderview-os.vercel.app").trim();
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com").trim();
     const adminUrl = `${siteUrl}/admin/applications/${application.id}`;
     const approveUrl = `${siteUrl}/application-review?token=${encodeURIComponent(
       generateApplicationActionToken(application.id, "approve")
