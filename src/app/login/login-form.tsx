@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { logMagicLinkRequest } from "./actions";
 import { useState } from "react";
 import Field from "@/components/field";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,9 @@ export default function LoginForm({ redirect }: { redirect?: string }) {
       setError(error.message);
       setLoading(false);
     } else {
+      // Fire-and-forget: the link is already out, and telemetry must never
+      // delay or block the confirmation. The login-stalled cron reads this.
+      void logMagicLinkRequest(email, window.location.origin);
       setSent(true);
       setLoading(false);
     }

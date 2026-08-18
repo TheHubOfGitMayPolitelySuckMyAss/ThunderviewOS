@@ -18,6 +18,7 @@ export const SYSTEM_FEED_INCLUDED_TYPES = [
   "email.no_secondary_available",
   "summary.generated",
   "member.excluded_from_dinner",
+  "auth.login_stalled",
 ];
 
 export function isHumanMeaningful(eventType: string): boolean {

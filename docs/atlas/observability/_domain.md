@@ -35,6 +35,17 @@ visitors get an `anon_id` cookie, bridged to the member once at
 - **2026-05-18** — Page views capture user_agent + IP: users are
   authenticated members, and "which device hung on X's profile" should be
   one query. (548853a)
+- **2026-08-18** — Magic-link requests are logged (`auth.magic_link_requested`,
+  written by `logMagicLinkRequest` from the login form after `signInWithOtp`
+  succeeds), and a 2-minute cron emails Eric when one has no `auth.login`
+  after it for 10 minutes. Rationale: `signInWithOtp` is a browser→Supabase
+  call, so a link that can never work leaves NO trace on our side — no
+  `/auth/confirm` hit, no `auth.login_failed`, nothing. Absence of a success
+  is the only observable. Threshold is Eric's call over a proposed 60m:
+  reaching a stuck person while they're still at their desk beats a quiet
+  inbox, and the email says to re-check whether they got in. Metadata carries
+  `origin` so a non-allow-listed host is visible on the alert itself. Dedupe:
+  one alert per member per 24h.
 
 ## Graveyard
 

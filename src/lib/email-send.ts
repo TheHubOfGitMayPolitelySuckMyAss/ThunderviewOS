@@ -669,3 +669,59 @@ export async function sendSendFailureNotification(opts: {
     console.error("[email] Failed to send failure notification:", err);
   }
 }
+
+/**
+ * Admin alert: someone requested a magic link and never made it in.
+ *
+ * Fired by the login-stalled cron. The point is speed — Eric can reach out
+ * while the person is still at their desk trying — so the email leads with
+ * who and how to reach them, not with diagnosis.
+ */
+export async function sendLoginStalledNotification(opts: {
+  memberId: string;
+  memberName: string;
+  email: string;
+  requestedAt: string;
+  attempts: number;
+  origins: string[];
+  minutesSince: number;
+}): Promise<void> {
+  try {
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com").trim();
+    const memberUrl = `${siteUrl}/admin/members/${opts.memberId}`;
+
+    const bodyText = [
+      `${opts.memberName} asked for a magic link ${opts.minutesSince} minutes ago and still hasn't gotten in.`,
+      ``,
+      `Email: ${opts.email}`,
+      `First requested: ${opts.requestedAt}`,
+      opts.attempts > 1 ? `Attempts: ${opts.attempts}` : null,
+      // Requests from a host outside Supabase's redirect allow-list can never
+      // complete. If this line shows anything but the live site, that's the bug.
+      `Requested from: ${opts.origins.join(", ") || "(unknown)"}`,
+      ``,
+      `They may have gotten in since this was sent — the portal shows their last login.`,
+    ].filter(Boolean).join("\n");
+
+    const viewBtn = `<a href="${memberUrl}" style="display:inline-block;background-color:#9A7A5E;color:#FBF7F0 !important;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px;margin:16px 0 6px;">View Member</a>`;
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ["eric@marcoullier.com"],
+      subject: `Login stuck: ${opts.memberName}`,
+      html: bodyToHtml(bodyText, viewBtn),
+    });
+    await logSystemEvent({
+      event_type: "email.transactional_sent",
+      summary: `Sent login-stalled notification for ${opts.memberName}`,
+      metadata: {
+        template: "admin-login-stalled",
+        recipient: "eric@marcoullier.com",
+        member_id: opts.memberId,
+        about_email: opts.email,
+      },
+    });
+  } catch (err) {
+    console.error("[email] Failed to send login-stalled notification:", err);
+  }
+}
