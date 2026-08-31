@@ -72,6 +72,15 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
   host match — preview deploys `thunderview-os-git-*` must not match).
   **Any new hardcoded host in an email is this bug waiting to happen — use
   `NEXT_PUBLIC_SITE_URL`.**
+- **2026-08-30** — Venue-tease block moved from hardcoded-in-`sendMorningOfEmail`
+  into the `morning-of` template body itself (raw HTML — `bodyToHtml` passes
+  HTML through; precedent: CTA button markup). Eric couldn't see the block in
+  the template editor and wanted it there. Send path now appends only
+  hr + Tonight's Attendees. Side effect fixed: the editor's test-send path
+  never included the hardcoded block, so tests were missing the tease.
+  Image URLs in the body are full Supabase-storage URLs (stable; overwrite the
+  bucket files to swap photos). Deleting those lines from the template silently
+  drops the block — it's editable now, that's the point.
 
 ## Graveyard
 

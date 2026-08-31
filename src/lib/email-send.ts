@@ -472,17 +472,7 @@ export async function sendMorningOfEmail(
         .replace(/\[dinner\.venue\]/g, venue)
         .replace(/\[dinner\.address\]/g, address);
 
-    const imageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL!.trim()}/storage/v1/object/public/email-images`;
-    const venueHeadline = (text: string) =>
-      `<p style="font-weight:600;margin:24px 0 12px;">${text}</p>`;
-    const venueImage = (file: string) =>
-      `<img src="${imageBase}/${file}" alt="" width="528" style="display:block;width:100%;max-width:528px;height:auto;border-radius:8px;" />`;
-    const venueTeaseHtml =
-      venueHeadline("It may look a bit suss from the outside\u2026") +
-      venueImage("morning-of-venue-outside.jpg") +
-      venueHeadline("but it\u2019s really amazing inside.") +
-      venueImage("morning-of-venue-inside.jpg");
-    const appendedHtml = `${venueTeaseHtml}<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight\u2019s Attendees</p>${attendeeHtml}`;
+    const appendedHtml = `<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight\u2019s Attendees</p>${attendeeHtml}`;
     const fullHtml = bodyToHtml(render(template.body), appendedHtml);
 
     await resend.emails.send({
