@@ -451,6 +451,27 @@ export async function sendNewApplicationNotification(application: {
 }
 
 /**
+ * Hardcoded venue-tease block (two headlines + two photos) inserted between
+ * the editable morning-of template body and Tonight's Attendees. Shared by
+ * the real send, the editor's test send, and the editor's on-page preview —
+ * what you see in the preview is byte-for-byte what goes out.
+ * Swap photos by overwriting the bucket files (URLs stable).
+ */
+export function morningOfVenueTeaseHtml(): string {
+  const imageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL!.trim()}/storage/v1/object/public/email-images`;
+  const headline = (text: string) =>
+    `<p style="font-weight:600;margin:24px 0 12px;">${text}</p>`;
+  const image = (file: string) =>
+    `<img src="${imageBase}/${file}" alt="" width="528" style="display:block;width:100%;max-width:528px;height:auto;border-radius:8px;" />`;
+  return (
+    headline("It may look a bit suss from the outside…") +
+    image("morning-of-venue-outside.jpg") +
+    headline("but it’s really amazing inside.") +
+    image("morning-of-venue-inside.jpg")
+  );
+}
+
+/**
  * Send morning-of email to a member (template + attendee section).
  */
 export async function sendMorningOfEmail(
@@ -472,7 +493,7 @@ export async function sendMorningOfEmail(
         .replace(/\[dinner\.venue\]/g, venue)
         .replace(/\[dinner\.address\]/g, address);
 
-    const appendedHtml = `<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight\u2019s Attendees</p>${attendeeHtml}`;
+    const appendedHtml = `${morningOfVenueTeaseHtml()}<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight\u2019s Attendees</p>${attendeeHtml}`;
     const fullHtml = bodyToHtml(render(template.body), appendedHtml);
 
     await resend.emails.send({

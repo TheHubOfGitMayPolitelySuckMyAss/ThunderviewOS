@@ -43,6 +43,7 @@ interface MorningOfEditorProps {
   morningOfSentAt: string | null;
   morningOfSentByName: string | null;
   testingMode: boolean;
+  venueTeaseHtml: string;
 }
 
 export default function MorningOfEditor({
@@ -57,6 +58,7 @@ export default function MorningOfEditor({
   morningOfSentAt,
   morningOfSentByName,
   testingMode,
+  venueTeaseHtml,
 }: MorningOfEditorProps) {
   const [showModal, setShowModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -113,6 +115,20 @@ export default function MorningOfEditor({
         sendTestEmail={sendTestEmail}
         saveTemplate={saveTemplate}
       />
+
+      {/* Venue tease preview — hardcoded in the send path, shown here so the
+          full email is visible on this page. Change via src/lib/email-send.ts
+          (copy) or by overwriting the bucket photos. */}
+      <div className="mt-7 max-w-2xl">
+        <h3 className="mb-1 text-lg font-semibold text-fg1">
+          Venue Tease{" "}
+          <span className="text-sm font-normal text-fg3">(hardcoded, sent between the body above and the attendee list below)</span>
+        </h3>
+        <div
+          className="rounded-lg border border-border bg-bg p-4 text-[15px] leading-relaxed text-fg1"
+          dangerouslySetInnerHTML={{ __html: venueTeaseHtml }}
+        />
+      </div>
 
       {/* Attendee preview section */}
       <div className="mt-7 max-w-2xl">

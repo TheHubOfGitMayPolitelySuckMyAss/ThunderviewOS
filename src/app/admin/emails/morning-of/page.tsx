@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatName, formatDinnerDisplay, getTodayMT } from "@/lib/format";
 import { isTestingMode } from "@/lib/email-mode";
+import { morningOfVenueTeaseHtml } from "@/lib/email-send";
 import MorningOfEditor from "./morning-of-editor";
 
 export default async function MorningOfTemplatePage() {
@@ -169,6 +170,7 @@ export default async function MorningOfTemplatePage() {
         morningOfSentAt={morningOfSentAt}
         morningOfSentByName={morningOfSentByName}
         testingMode={isTestingMode()}
+        venueTeaseHtml={morningOfVenueTeaseHtml()}
       />
     </div>
   );

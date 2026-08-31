@@ -8,6 +8,7 @@ import { EMAIL_FROM, bodyToHtml, renderTemplateVars } from "@/lib/email";
 import { formatDateFriendly, formatName, getTodayMT } from "@/lib/format";
 import { getDinnerAttendees, buildAttendeeHtml } from "@/lib/email-intros-asks";
 import { sendMorningOfToDinner } from "@/lib/morning-of-send";
+import { morningOfVenueTeaseHtml } from "@/lib/email-send";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -70,7 +71,7 @@ export async function sendTestEmail(
   const renderedSubject = renderTemplate(subject, vars);
   const renderedBody = renderTemplate(body, vars);
   const attendeeHtml = buildAttendeeHtml(attendees);
-  const appendedHtml = `<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight’s Attendees</p>${attendeeHtml}`;
+  const appendedHtml = `${morningOfVenueTeaseHtml()}<hr style="border:none;border-top:1px solid #E2D7C1;margin:24px 0;"><p style="font-weight:600;margin:0 0 12px;">Tonight’s Attendees</p>${attendeeHtml}`;
   const fullHtml = bodyToHtml(renderedBody, appendedHtml);
 
   const { error } = await resend.emails.send({
