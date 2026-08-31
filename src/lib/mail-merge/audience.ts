@@ -5,12 +5,15 @@
  * the pure precedence ladder inherited from the retired Streak integration.
  *
  * Bucket semantics for mail merges (per Eric):
- *   - Selectable send groups: investors / attended / approved.
+ *   - Selectable send groups: has_ticket / investors / attended / approved.
+ *     (has_ticket became selectable 2026-08-30, reversing the original
+ *     "ticket-holders are mid-transactional-flow" exclusion. Ladder
+ *     precedence still applies: a ticket-holder is ONLY in has_ticket —
+ *     ticking Attended alone does not reach them.)
  *   - team is ALWAYS included in every merge.
  *   - opted_out and bounced are structurally unreachable (never selectable).
- *   - has_ticket and not_this_one are never merged either — ticket-holders
- *     are mid-transactional-email-flow, exclusions asked not to be contacted.
- *     The buckets stay in the model; there is simply no send path to them.
+ *   - not_this_one is never merged — exclusions asked not to be contacted.
+ *     The bucket stays in the model; there is simply no send path to it.
  *
  * Everything is batch-fetched (4 queries) and computed in memory — 700 members
  * is nothing, and it keeps the ladder in one auditable place instead of
@@ -27,7 +30,12 @@ import {
 } from "@/lib/member-stage";
 
 /** Buckets an admin can tick on a merge. */
-export const SELECTABLE_GROUPS = ["investors", "attended", "approved"] as const;
+export const SELECTABLE_GROUPS = [
+  "has_ticket",
+  "investors",
+  "attended",
+  "approved",
+] as const;
 export type SelectableGroup = (typeof SELECTABLE_GROUPS)[number];
 
 /** Buckets that end up as recipient rows (selectable + always-on team). */

@@ -80,6 +80,13 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
   raw HTML into the editable template body; Eric rejected it hard — no other
   template exposes markup in the textarea. Don't move email markup into
   template bodies; render hardcoded sections as previews on the editor page.
+- **2026-08-31** — `has_ticket` is now a selectable mail-merge group (Eric's
+  call, reversing the launch-time "ticket-holders are mid-transactional-flow"
+  exclusion). One-line engine change: the bucket joined `SELECTABLE_GROUPS`;
+  freeze/drain were already bucket-generic. UI checkbox listed first (ladder
+  order). Gotcha preserved by precedence: a ticket-holder segments ONLY into
+  has_ticket, so "Attended" alone still excludes current ticket-holders —
+  reaching everyone means ticking both.
 
 ## Graveyard
 

@@ -11,6 +11,7 @@ import SendingProgress from "./sending-progress";
 
 const BUCKET_LABELS: Record<string, string> = {
   team: "Team",
+  has_ticket: "Has Ticket",
   investors: "Investors",
   attended: "Attended",
   approved: "Approved",
@@ -141,7 +142,7 @@ async function ResultView({
   }
 
   const isSending = merge.status === "sending";
-  const bucketOrder = ["investors", "attended", "approved", "team"];
+  const bucketOrder = ["has_ticket", "investors", "attended", "approved", "team"];
 
   return (
     <div className="max-w-2xl">

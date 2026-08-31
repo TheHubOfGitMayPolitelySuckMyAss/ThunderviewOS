@@ -12,6 +12,7 @@ import { saveDraft, sendTestEmail, sendMailMerge } from "../actions";
 const RichTextEditor = dynamic(() => import("@/components/ui/rich-text-editor"), { ssr: false });
 
 const SELECTABLE = [
+  { key: "has_ticket", label: "Has Ticket" },
   { key: "investors", label: "Investors" },
   { key: "attended", label: "Attended" },
   { key: "approved", label: "Approved" },
@@ -20,7 +21,6 @@ const SELECTABLE = [
 const SUPPRESSED = [
   { key: "opted_out", label: "Opted Out" },
   { key: "bounced", label: "Bounced" },
-  { key: "has_ticket", label: "Has Ticket" },
   { key: "not_this_one", label: "Not This One" },
 ] as const;
 
