@@ -27,6 +27,7 @@ single-writer hook):
 
 ## Done
 
+- 2026-08-31 — "Has Ticket" is now a selectable mail-merge group (reverses the launch exclusion; Eric's call). Verified live: first checkbox, 39 ticket-holders for Sep 3. Ladder gotcha: ticket-holders are ONLY in has_ticket — Attended alone excludes them. (atlas: email/_domain, 8619eff)
 - 2026-08-30 — Morning-of venue tease now visible on `/admin/emails/morning-of` as a rendered preview (shared `morningOfVenueTeaseHtml()`; test sends include it too — they silently omitted it before). First attempt put raw HTML in the template body; rejected — never expose markup in template textareas. Verified live in browser. (atlas: email/_domain, c6e7c2e+113c67c)
 - 2026-08-18 — Login-stall alerting: `auth.magic_link_requested` logged on send, `/api/cron/login-stalled` (every 2 min) emails Eric when a request has no `auth.login` after 10 min. Threshold is Eric's call over a proposed 60m. (atlas: observability/_domain, 542b6ac)
 - 2026-08-18 — Migration drift closed: the two applied-but-uncommitted files backfilled, repo now describes the DB in both directions. `supabase db push` is unsafe (filenames vs recorded versions are separate numbering universes) — documented in `supabase/migrations/README.md`. (9b0e7bb)
