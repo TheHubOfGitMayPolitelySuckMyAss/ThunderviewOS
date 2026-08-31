@@ -27,6 +27,7 @@ single-writer hook):
 
 ## Done
 
+- 2026-08-30 — Morning-of venue tease now visible on `/admin/emails/morning-of` as a rendered preview (shared `morningOfVenueTeaseHtml()`; test sends include it too — they silently omitted it before). First attempt put raw HTML in the template body; rejected — never expose markup in template textareas. Verified live in browser. (atlas: email/_domain, c6e7c2e+113c67c)
 - 2026-08-18 — Login-stall alerting: `auth.magic_link_requested` logged on send, `/api/cron/login-stalled` (every 2 min) emails Eric when a request has no `auth.login` after 10 min. Threshold is Eric's call over a proposed 60m. (atlas: observability/_domain, 542b6ac)
 - 2026-08-18 — Migration drift closed: the two applied-but-uncommitted files backfilled, repo now describes the DB in both directions. `supabase db push` is unsafe (filenames vs recorded versions are separate numbering universes) — documented in `supabase/migrations/README.md`. (9b0e7bb)
 - 2026-08-18 — Duplicate Phillip Klein merged into the April member (both emails on one record, ptarmigan primary, dinner history intact); the duplicate shell row was deleted.
