@@ -20,8 +20,10 @@ cron sends automatically at 8am MT on dinner day, idempotent via
 
 Post-dinner cron (daily): if yesterday was a dinner, stamps
 `last_dinner_attended` for fulfilled-ticket holders and clears stale
-`excluded_from_dinner_id`. Dinner-day cron `coachingos-attendee-sync`
-pushes first-time attendees (and re-armed no-shows) to CoachingOS.
+`excluded_from_dinner_id`. The `known-quantity-csv` cron runs the same
+morning: it uploads a CSV of everyone who held a fulfilled ticket in the
+last 90 days (`WINDOW_DAYS=90`), one row per person, to Known Quantity's
+tokenised intake URL. Dinners are monthly, so that's a monthly file.
 
 ## Decisions
 
@@ -33,10 +35,22 @@ pushes first-time attendees (and re-armed no-shows) to CoachingOS.
 - **2026-06-21** — No-show loop: DigiEric "Didn't come" sets
   `coachingos_resend_requested`, next dinner's sync re-includes and clears —
   because `last_dinner_attended` stamps no-shows too. (f8cfdff)
+  *Reversed 2026-09-21 — both sides of that loop are deleted.*
 - **2026-08-04** — Per-dinner seat cap on the dinner row; see
   [tickets/seat-cap](../tickets/seat-cap.md). (44c2c71)
 
+- **2026-09-21** — Dinner-day JSON push to CoachingOS replaced by a monthly
+  CSV upload to Known Quantity the morning AFTER each dinner; their inbound
+  webhook was deleted and started 404ing. Rolling 90-day window of everyone
+  who held a fulfilled ticket, not just first-timers, so the no-show re-arm
+  flag lost its purpose and the column was dropped. Kicked-out members ride
+  along with a Membership Status column — Eric's call: the meeting happened,
+  KQ decides what to do with it.
+
 ## Graveyard
 
+- **Quoting newlines inside CSV fields** — RFC 4180 allows it; the KQ intake
+  parser counts an embedded newline as a new record (a correct 2-record file
+  came back `rows: 3`). Every field is flattened to one line instead.
 - **January and July dinners** — off months by program design; the
   generation cron skips them.
