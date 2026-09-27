@@ -12,16 +12,14 @@
  * none of that.
  */
 
-/**
- * From display name used when Gmail's send-as `displayName` is empty. Eric's
- * IS empty (Gmail's own UI falls back to the Google account name; the API
- * doesn't), which shipped every merge as a bare `From: eric@marcoullier.com`.
- */
-export const SENDER_FALLBACK_NAME = "Eric Marcoullier";
-
 export interface SendAsIdentity {
   email: string;
-  /** Resolved From name: send-as name, else SENDER_FALLBACK_NAME. */
+  /**
+   * Gmail's send-as display name, RAW — often empty (Gmail's UI falls back to
+   * the Google account name; the API doesn't). Never put this straight into a
+   * From header: resolve it via resolveSenderFromName (sender-name.ts), which
+   * falls back to the connected account's OWN member name.
+   */
   displayName: string | null;
   /** Gmail signature HTML for this identity, or "" if none configured. */
   signature: string;
@@ -57,7 +55,7 @@ export async function getPrimarySendAs(
     if (!primary) return null;
     return {
       email: primary.sendAsEmail,
-      displayName: resolveFromName(primary.displayName, SENDER_FALLBACK_NAME),
+      displayName: primary.displayName?.trim() || null,
       signature: primary.signature ?? "",
     };
   } catch {
@@ -109,12 +107,44 @@ export function encodeSubject(subject: string): string {
   return `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
 }
 
-/** Send-as name first, else the fallback; whitespace-only counts as empty. */
+/**
+ * From name for the connected Gmail account: its send-as name if set, else
+ * the name of the member who OWNS that address (any of their emails), else
+ * null → bare address. Whoever connected Gmail is the sender — there is no
+ * hardcoded fallback name (an admin/team member other than Eric can connect
+ * their own account). Whitespace-only counts as empty.
+ */
 export function resolveFromName(
   sendAsName: string | null | undefined,
-  fallbackName: string | null | undefined
+  owner: { first_name?: string | null; last_name?: string | null } | null
 ): string | null {
-  return sendAsName?.trim() || fallbackName?.trim() || null;
+  const direct = sendAsName?.trim();
+  if (direct) return direct;
+  if (!owner) return null;
+  const full = [owner.first_name?.trim(), owner.last_name?.trim()]
+    .filter(Boolean)
+    .join(" ");
+  return full || null;
+}
+
+/**
+ * The full resolution ladder with its I/O injected (sender-name.ts wires the
+ * real member lookup + system_events warning): send-as name → owning
+ * member's name → null (bare address, `onMissing` called). Only looks the
+ * owner up when the send-as name is empty.
+ */
+export async function resolveSenderNameWith(
+  sendAs: Pick<SendAsIdentity, "email" | "displayName">,
+  lookupOwner: (
+    email: string
+  ) => Promise<{ first_name?: string | null; last_name?: string | null } | null>,
+  onMissing: () => Promise<void>
+): Promise<string | null> {
+  const direct = resolveFromName(sendAs.displayName, null);
+  if (direct) return direct;
+  const name = resolveFromName(null, await lookupOwner(sendAs.email));
+  if (!name) await onMissing();
+  return name;
 }
 
 /**

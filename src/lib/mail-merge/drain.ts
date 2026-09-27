@@ -42,6 +42,7 @@ import {
   type SendAsIdentity,
 } from "@/lib/gmail/send";
 import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
+import { resolveSenderFromName } from "@/lib/gmail/sender-name";
 import {
   MAIL_MERGE_SENDS_PER_MINUTE,
   MAIL_MERGE_SEND_SPACING_MS,
@@ -122,6 +123,7 @@ export async function runMailMergeDrain(): Promise<{
   // Lazy Gmail setup: only pay for (and only fail on) token + signature work
   // when there is actually a claim to send.
   let sendAs: SendAsIdentity | null = null;
+  let fromName: string | null = null;
   let accessToken: string | null = null;
   const mergeCache = new Map<string, MergeContent>();
 
@@ -153,6 +155,12 @@ export async function runMailMergeDrain(): Promise<{
             "Gmail signature is empty — merges require Eric's sig; configure it in Gmail settings"
           );
         }
+        // Name of whoever owns the connected account. The send-start action
+        // already warned if it resolves to nothing, so stay quiet here.
+        fromName = await resolveSenderFromName(sendAs, {
+          warn: false,
+          context: "mail_merge_drain",
+        });
       } catch (err) {
         fatal = err instanceof Error ? err.message : String(err);
         await releaseClaim(admin, claimed.id);
@@ -189,7 +197,7 @@ export async function runMailMergeDrain(): Promise<{
     const raw = buildRawMessage({
       to: claimed.email,
       fromEmail: sendAs.email,
-      fromName: sendAs.displayName,
+      fromName,
       subject: merge.subject,
       bodyHtml: composeMergeHtml(claimed.first_name, merge.body),
       signatureHtml: sendAs.signature,

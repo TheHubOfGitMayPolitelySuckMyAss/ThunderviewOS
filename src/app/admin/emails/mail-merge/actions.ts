@@ -31,6 +31,7 @@ import {
 } from "@/lib/mail-merge/audience";
 import { composeMergeHtml, runMailMergeDrain } from "@/lib/mail-merge/drain";
 import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
+import { resolveSenderFromName } from "@/lib/gmail/sender-name";
 
 export async function createMailMerge(): Promise<{
   success: boolean;
@@ -105,7 +106,10 @@ export async function sendTestEmail(
     const raw = buildRawMessage({
       to: actor.email,
       fromEmail: sendAs.email,
-      fromName: sendAs.displayName,
+      fromName: await resolveSenderFromName(sendAs, {
+        warn: true,
+        context: "mail_merge_test_send",
+      }),
       subject: merge.subject,
       bodyHtml: composeMergeHtml(actor.firstName, merge.body),
       signatureHtml: sendAs.signature,
@@ -171,6 +175,12 @@ export async function sendMailMerge(mergeId: string): Promise<{
       throw new Error(
         "Gmail signature is empty — configure your signature in Gmail settings first"
       );
+    // Once per merge: warn now if this account would send nameless (the
+    // drain resolves the same name silently on every run).
+    await resolveSenderFromName(sendAs, {
+      warn: true,
+      context: "mail_merge_send_start",
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: `Gmail not ready: ${message}` };
