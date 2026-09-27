@@ -8,6 +8,10 @@ import { computeAudience } from "@/lib/mail-merge/audience";
 import { getGmailConnection } from "@/lib/gmail/auth";
 import DraftEditor from "./draft-editor";
 import SendingProgress from "./sending-progress";
+import {
+  MAIL_MERGE_SENDS_PER_MINUTE,
+  formatDrainDuration,
+} from "@/lib/mail-merge/pacing";
 
 const BUCKET_LABELS: Record<string, string> = {
   team: "Team",
@@ -151,8 +155,9 @@ async function ResultView({
       {isSending ? (
         <div className="rounded-md bg-[rgba(192,150,42,0.1)] border border-[rgba(192,150,42,0.3)] px-4 py-3 text-sm text-fg2 mb-6">
           <strong className="text-fg1">Sending&hellip;</strong> {agg.sent} of{" "}
-          {agg.sent + agg.pending} sent via Gmail (~1/sec). Safe to leave this
-          page — sending continues on the server.
+          {agg.sent + agg.pending} sent via Gmail ({MAIL_MERGE_SENDS_PER_MINUTE}{" "}
+          per minute, {formatDrainDuration(agg.pending)} left). Safe to leave
+          this page — sending continues on the server.
         </div>
       ) : (
         <div className="rounded-md bg-[rgba(91,106,59,0.08)] px-4 py-3 text-sm text-success mb-6">

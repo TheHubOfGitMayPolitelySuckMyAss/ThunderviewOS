@@ -17,9 +17,17 @@ prompt-intro-ask at T-2 days, applied-didnt-convert at T-6 days).
 sent-lock trigger makes sent rows immutable, `audience_snapshot` JSONB
 frozen at send. `NEXT_PUBLIC_EMAIL_MODE=testing` restricts to team.
 
-**Mail merge** (Gmail API, from eric@): personal-looking sends to stage-
-ladder buckets; async queue (`mail_merge_recipients`, claim-one RPC, ~1/sec,
-inline drain + per-minute cron). Live Gmail signature fetched at send.
+**Mail merge** (Gmail API, from `Eric Marcoullier <eric@marcoullier.com>`):
+personal-looking sends to stage-ladder buckets; async queue
+(`mail_merge_recipients`). Throttled to `MAIL_MERGE_SENDS_PER_MINUTE` (5)
+per rolling minute across all merges, enforced atomically by the claim-one
+RPC `claim_mail_merge_recipient_throttled`; each drain run (inline at send
+start, then every per-minute cron fire) sends at most one minute's
+allotment, spaced ~10s apart — 500 recipients ≈ 100 minutes. Every merge
+send carries a one-click `List-Unsubscribe` header pointing at the same
+`/api/unsubscribe` endpoint the Resend marketing footers use (POST = RFC 8058
+one-click, no visible footer). Live Gmail signature fetched at send; From
+name falls back to "Eric Marcoullier" when Gmail's send-as name is empty.
 
 **Inbound ops**: Resend webhook (domain-filtered — the account is shared)
 handles bounces; hard bounce → `email_status='bounced'` + secondary
@@ -87,6 +95,23 @@ TV Opt Out) let Eric run member ops from his inbox via the per-minute cron.
   order). Gotcha preserved by precedence: a ticket-holder segments ONLY into
   has_ticket, so "Attended" alone still excludes current ticket-holders —
   reaching everyone means ticking both.
+- **2026-09-27** — Mail-merge "stop the bleeding" hygiene after
+  deliverability misses, Eric-approved as a set: (1) **From display name** —
+  Eric's Gmail send-as `displayName` is empty, so every merge went out as a
+  bare `From: eric@marcoullier.com`; `getPrimarySendAs` now falls back to
+  `SENDER_FALLBACK_NAME` ("Eric Marcoullier"), and `formatFromHeader` quotes
+  RFC 5322 specials / RFC 2047-encodes non-ASCII (ported from osa's
+  `gmail-send.ts`). (2) **List-Unsubscribe + List-Unsubscribe-Post
+  (one-click)** on merge sends and their test sends only — never on the
+  label-action replies. Reuses the existing HMAC-token `/api/unsubscribe`;
+  its POST now answers 200 text instead of redirecting (mail clients aren't
+  browsers). No `mailto:` — there's no mailbox that routes to the opt-out
+  automatically, and we don't invent one. Still no visible footer. (3)
+  **Throttle**: ~1/sec burst (500 in ~9 min) → 5 per rolling minute via a
+  new advisory-locked claim RPC, so overlapping drainers can't exceed it;
+  claim-one, the 30-min stall reaper and never-retry-stalled all unchanged.
+  **The 5/min rate is the agent's default, not Eric's ruling** — one
+  constant in `src/lib/mail-merge/pacing.ts`.
 
 ## Graveyard
 

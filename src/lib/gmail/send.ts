@@ -12,8 +12,16 @@
  * none of that.
  */
 
+/**
+ * From display name used when Gmail's send-as `displayName` is empty. Eric's
+ * IS empty (Gmail's own UI falls back to the Google account name; the API
+ * doesn't), which shipped every merge as a bare `From: eric@marcoullier.com`.
+ */
+export const SENDER_FALLBACK_NAME = "Eric Marcoullier";
+
 export interface SendAsIdentity {
   email: string;
+  /** Resolved From name: send-as name, else SENDER_FALLBACK_NAME. */
   displayName: string | null;
   /** Gmail signature HTML for this identity, or "" if none configured. */
   signature: string;
@@ -49,7 +57,7 @@ export async function getPrimarySendAs(
     if (!primary) return null;
     return {
       email: primary.sendAsEmail,
-      displayName: primary.displayName || null,
+      displayName: resolveFromName(primary.displayName, SENDER_FALLBACK_NAME),
       signature: primary.signature ?? "",
     };
   } catch {
@@ -101,6 +109,46 @@ export function encodeSubject(subject: string): string {
   return `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
 }
 
+/** Send-as name first, else the fallback; whitespace-only counts as empty. */
+export function resolveFromName(
+  sendAsName: string | null | undefined,
+  fallbackName: string | null | undefined
+): string | null {
+  return sendAsName?.trim() || fallbackName?.trim() || null;
+}
+
+/**
+ * `Name <addr>`, with the name RFC 2047-encoded when non-ASCII and quoted when
+ * it carries RFC 5322 specials (a comma would otherwise split it into two
+ * addresses). No name → the bare address.
+ */
+export function formatFromHeader(
+  email: string,
+  name: string | null | undefined
+): string {
+  const n = name?.trim();
+  if (!n) return email;
+  if (!/^[\x00-\x7F]*$/.test(n)) return `${encodeSubject(n)} <${email}>`;
+  if (/[()<>\[\]:;@\\,."]/.test(n))
+    return `"${n.replace(/["\\]/g, "\\$&")}" <${email}>`;
+  return `${n} <${email}>`;
+}
+
+/**
+ * RFC 2369 List-Unsubscribe + RFC 8058 one-click headers for an https
+ * unsubscribe URL. Bulk sends (mail merges) only — never on one-to-one
+ * replies. Throws on a non-https URL or one that would break the header.
+ */
+export function listUnsubscribeHeaders(url: string): string[] {
+  if (!/^https:\/\/[^\s<>,]+$/.test(url)) {
+    throw new Error(`Invalid List-Unsubscribe URL: ${url}`);
+  }
+  return [
+    `List-Unsubscribe: <${url}>`,
+    "List-Unsubscribe-Post: List-Unsubscribe=One-Click",
+  ];
+}
+
 export interface BuildMessageInput {
   to: string;
   fromEmail: string;
@@ -116,6 +164,11 @@ export interface BuildMessageInput {
   references?: string;
   /** Override the MIME boundary (tests pass a fixed value). */
   boundary?: string;
+  /**
+   * One-click unsubscribe URL (https). When set, List-Unsubscribe and
+   * List-Unsubscribe-Post headers are emitted. Mail merges only.
+   */
+  listUnsubscribeUrl?: string;
 }
 
 /**
@@ -133,10 +186,11 @@ export function buildRawMessage(input: BuildMessageInput): string {
     signatureHtml = "",
     inReplyTo,
     references,
+    listUnsubscribeUrl,
     boundary = `thunderview_${Math.random().toString(36).slice(2)}`,
   } = input;
 
-  const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+  const fromHeader = formatFromHeader(fromEmail, fromName);
 
   const bodyText = htmlToText(bodyHtml);
   const sigText = signatureHtml ? htmlToText(signatureHtml) : "";
@@ -153,6 +207,7 @@ export function buildRawMessage(input: BuildMessageInput): string {
     `Subject: ${encodeSubject(subject)}`,
     ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`] : []),
     ...(references ? [`References: ${references}`] : []),
+    ...(listUnsubscribeUrl ? listUnsubscribeHeaders(listUnsubscribeUrl) : []),
     "MIME-Version: 1.0",
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",

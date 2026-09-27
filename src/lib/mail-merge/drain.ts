@@ -5,12 +5,17 @@
  * so the first chunk goes out the moment Eric clicks Send) and the per-minute
  * /api/cron/mail-merge-drain (which finishes the job and auto-resumes any
  * merge stranded by a crash or deploy). Overlap between the two is safe: each
- * recipient is claimed atomically via claim_mail_merge_recipient()
+ * recipient is claimed atomically via claim_mail_merge_recipient_throttled()
  * (FOR UPDATE SKIP LOCKED), so a row can never be sent twice.
  *
- * Pacing: ~1 email/sec. Gmail's API ceiling is far higher (~60/min), but a
- * mail merge is supposed to look like a human sending one-to-one email —
- * Streak paced about the same. 500 recipients ≈ 9 minutes.
+ * Pacing: MAIL_MERGE_SENDS_PER_MINUTE (pacing.ts) per rolling 60s across all
+ * merges. The claim RPC enforces the cap atomically (advisory lock + count of
+ * claims in the last minute), so the inline drain and a cron fire landing in
+ * the same minute can't add up to more than one minute's allotment. Each run
+ * claims at most that allotment, spaced MAIL_MERGE_SEND_SPACING_MS apart, then
+ * exits; the per-minute cron carries the rest. 500 recipients ≈ 100 minutes.
+ * (Was ~1/sec until 2026-09-27: a 500-person burst in 9 minutes from one
+ * personal mailbox is the bulk-sender pattern the filters punish.)
  *
  * Failure model (loud, never silent):
  *   - Recipient-specific send error → row 'failed' + error.caught, drain
@@ -36,8 +41,12 @@ import {
   GmailFatalError,
   type SendAsIdentity,
 } from "@/lib/gmail/send";
+import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
+import {
+  MAIL_MERGE_SENDS_PER_MINUTE,
+  MAIL_MERGE_SEND_SPACING_MS,
+} from "@/lib/mail-merge/pacing";
 
-const PACE_MS = 1000;
 const STALL_MS = 30 * 60 * 1000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -70,11 +79,17 @@ export function composeMergeHtml(firstName: string, bodyHtml: string): string {
   );
 }
 
-export async function runMailMergeDrain(
-  budgetMs: number
-): Promise<{ processed: number; failed: number; fatal: string | null }> {
+/**
+ * One drain run: at most one minute's allotment, spaced out. Returns when the
+ * allotment is spent, the rolling-minute cap is hit (another drainer already
+ * sent), or the queue is empty.
+ */
+export async function runMailMergeDrain(): Promise<{
+  processed: number;
+  failed: number;
+  fatal: string | null;
+}> {
   const admin = createAdminClient("system-internal");
-  const startedAt = Date.now();
   let processed = 0;
   let failed = 0;
   let fatal: string | null = null;
@@ -110,15 +125,22 @@ export async function runMailMergeDrain(
   let accessToken: string | null = null;
   const mergeCache = new Map<string, MergeContent>();
 
-  while (Date.now() - startedAt < budgetMs) {
+  for (let attempt = 0; attempt < MAIL_MERGE_SENDS_PER_MINUTE; attempt++) {
+    // Spread the allotment across the run instead of bursting it.
+    if (attempt > 0) await sleep(MAIL_MERGE_SEND_SPACING_MS);
+
     const { data: claimed, error: claimError } = await admin
-      .rpc("claim_mail_merge_recipient")
+      .rpc("claim_mail_merge_recipient_throttled", {
+        p_per_minute: MAIL_MERGE_SENDS_PER_MINUTE,
+      })
       .maybeSingle<RecipientRow>();
     if (claimError) {
       fatal = `claim failed: ${claimError.message}`;
       break;
     }
-    if (!claimed) break; // queue drained
+    // Queue drained, or this minute's allotment is already spent (possibly by
+    // an overlapping drainer). Either way the next cron fire picks it up.
+    if (!claimed) break;
 
     // One-time Gmail setup, inside the loop so an idle drain never errors.
     if (!accessToken || !sendAs) {
@@ -171,6 +193,9 @@ export async function runMailMergeDrain(
       subject: merge.subject,
       bodyHtml: composeMergeHtml(claimed.first_name, merge.body),
       signatureHtml: sendAs.signature,
+      // Bulk send → one-click unsubscribe header (RFC 8058). Same endpoint
+      // and token as the Resend marketing emails; no visible footer.
+      listUnsubscribeUrl: buildUnsubscribeUrl(claimed.member_id),
     });
 
     try {
@@ -211,8 +236,6 @@ export async function runMailMergeDrain(
         },
       });
     }
-
-    await sleep(PACE_MS);
   }
 
   if (fatal) {

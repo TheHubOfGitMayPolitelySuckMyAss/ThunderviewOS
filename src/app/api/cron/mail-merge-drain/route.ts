@@ -1,10 +1,12 @@
 /**
  * Per-minute drain for mail-merge send queues.
  *
- * The send action pushes the first chunk out immediately (after()); this cron
- * finishes the job and auto-resumes any merge stranded by a crash or deploy.
- * Overlap with an in-flight after() drain is safe — recipients are claimed
- * atomically (see claim_mail_merge_recipient / drain.ts).
+ * The send action pushes the first minute's allotment out immediately
+ * (after()); this cron sends one minute's allotment per fire (throttle:
+ * src/lib/mail-merge/pacing.ts), finishes the job, and auto-resumes any
+ * merge stranded by a crash or deploy. Overlap with an in-flight after()
+ * drain is safe — recipients are claimed atomically and the rolling-minute
+ * cap is global (see claim_mail_merge_recipient_throttled / drain.ts).
  *
  * HEARTBEAT DEVIATION: unlike the daily crons, this fires 1,440×/day, so the
  * every-fire-emits-a-row convention would flood system_events. It heartbeats
@@ -16,9 +18,6 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logSystemEvent } from "@/lib/system-events";
 import { runMailMergeDrain } from "@/lib/mail-merge/drain";
-
-// Budget 45s of sending per fire; the next fire picks up a minute later.
-const DRAIN_BUDGET_MS = 45_000;
 
 export const maxDuration = 60;
 
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ ran: true, outcome: "idle" });
     }
 
-    const result = await runMailMergeDrain(DRAIN_BUDGET_MS);
+    const result = await runMailMergeDrain();
     await logSystemEvent({
       event_type: "cron.mail_merge_drain",
       actor_label: "cron:mail-merge-drain",

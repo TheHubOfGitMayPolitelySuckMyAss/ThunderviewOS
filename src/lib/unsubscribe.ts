@@ -20,3 +20,16 @@ export function verifyUnsubscribeToken(token: string): string | null {
   if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
   return memberId;
 }
+
+/**
+ * Absolute one-click unsubscribe URL for a member: the same /api/unsubscribe
+ * endpoint (GET = link click, POST = RFC 8058 one-click) the Resend marketing
+ * emails use. Mail merges carry it in the List-Unsubscribe header.
+ */
+export function buildUnsubscribeUrl(
+  memberId: string,
+  siteUrl: string = process.env.NEXT_PUBLIC_SITE_URL || "https://thunderviewceodinners.com"
+): string {
+  const base = siteUrl.trim().replace(/\/+$/, "");
+  return `${base}/api/unsubscribe?token=${encodeURIComponent(generateUnsubscribeToken(memberId))}`;
+}

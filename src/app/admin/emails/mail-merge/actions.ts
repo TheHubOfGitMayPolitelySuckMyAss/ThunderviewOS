@@ -7,8 +7,9 @@
  * with two structural differences:
  *   1. Sends go through Eric's Gmail (src/lib/gmail/), not Resend.
  *   2. Send-to-all is asynchronous: recipients are frozen into
- *      mail_merge_recipients as a queue, the first chunk drains via after(),
- *      and the per-minute cron finishes the rest. The action returns as soon
+ *      mail_merge_recipients as a queue, the first minute's allotment drains
+ *      via after(), and the per-minute cron finishes the rest at the
+ *      throttle rate (src/lib/mail-merge/pacing.ts). The action returns as soon
  *      as the queue is frozen.
  */
 
@@ -29,9 +30,7 @@ import {
   type SelectableGroup,
 } from "@/lib/mail-merge/audience";
 import { composeMergeHtml, runMailMergeDrain } from "@/lib/mail-merge/drain";
-
-/** How long the send action keeps draining after the response returns. */
-const AFTER_DRAIN_BUDGET_MS = 240_000;
+import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
 export async function createMailMerge(): Promise<{
   success: boolean;
@@ -110,6 +109,8 @@ export async function sendTestEmail(
       subject: merge.subject,
       bodyHtml: composeMergeHtml(actor.firstName, merge.body),
       signatureHtml: sendAs.signature,
+      // Same headers the real send carries, so the test is faithful.
+      listUnsubscribeUrl: buildUnsubscribeUrl(actor.memberId),
     });
     await sendMessage(accessToken, raw);
   } catch (err) {
@@ -247,10 +248,10 @@ export async function sendMailMerge(mergeId: string): Promise<{
     },
   });
 
-  // First chunk goes out immediately, after the response is sent; the
-  // per-minute cron picks up whatever's left.
+  // The first minute's allotment goes out right after the response is sent;
+  // the per-minute cron sends the rest at the throttle rate.
   after(async () => {
-    await runMailMergeDrain(AFTER_DRAIN_BUDGET_MS);
+    await runMailMergeDrain();
   });
 
   return { success: true, queued, skipped };

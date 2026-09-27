@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Field from "@/components/field";
 import { saveDraft, sendTestEmail, sendMailMerge } from "../actions";
+import {
+  MAIL_MERGE_SENDS_PER_MINUTE,
+  formatDrainDuration,
+} from "@/lib/mail-merge/pacing";
 
 const RichTextEditor = dynamic(() => import("@/components/ui/rich-text-editor"), { ssr: false });
 
@@ -229,8 +233,10 @@ export default function DraftEditor({
           <code className="text-fg2 bg-bg px-1 py-0.5 rounded">[member.first_name]</code>{" "}
           swapped for their first name, then your live Gmail signature one
           blank line below. Write your own greeting. No Thunderview template,
-          no unsubscribe footer. Sends pace at ~1/sec so it reads as
-          one-to-one email.
+          no unsubscribe footer (a one-click unsubscribe header only, which
+          Gmail and other clients show as an Unsubscribe link). Sends go out{" "}
+          {MAIL_MERGE_SENDS_PER_MINUTE} per minute so the blast doesn&rsquo;t
+          read as bulk mail.
         </p>
       </div>
 
@@ -276,9 +282,9 @@ export default function DraftEditor({
               {SELECTABLE.filter((g) => groups.includes(g.key))
                 .map((g) => g.label)
                 .join(", ")}{" "}
-              + Team). At ~1/sec this takes about{" "}
-              {Math.max(1, Math.round(estimated / 60))} minute
-              {Math.round(estimated / 60) !== 1 ? "s" : ""}.
+              + Team). At {MAIL_MERGE_SENDS_PER_MINUTE} per minute this takes{" "}
+              {formatDrainDuration(estimated)}. You can close the page; sending
+              continues on the server.
             </p>
 
             {message && (
