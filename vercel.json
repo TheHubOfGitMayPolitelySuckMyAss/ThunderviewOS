@@ -21,10 +21,6 @@
       "schedule": "0 15 * * *"
     },
     {
-      "path": "/api/cron/known-quantity-csv",
-      "schedule": "0 15 * * *"
-    },
-    {
       "path": "/api/cron/morning-of",
       "schedule": "0 14 * * *"
     },

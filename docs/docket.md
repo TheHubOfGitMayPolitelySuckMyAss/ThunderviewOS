@@ -18,8 +18,6 @@ single-writer hook):
 
 ## Open — Unanswered
 
-- **ON ERIC:** Two loose ends on the Known Quantity CSV push, both external to this repo. (1) Their intake parser counts a newline inside a quoted CSV field as a new record — a correct 2-record file returned `rows: 3`. We flatten every field to one line so our uploads always reconcile, but any other source that quotes newlines properly will silently over-report to them; relay it or don't. (2) A 200 means "stored whole," not "in the CRM" — their row processing was said to land the week of 2026-09-28. The 2026-09-21 test upload (`upload_id bd7d2417-2f87-4a30-9530-53b60b8244b7`, 79 rows) is the thing to check once it ships. ⚠unverified
-- **ON ERIC:** No-show tracking no longer exists anywhere. `fulfilled` has always meant "we sent the details email," and CoachingOS's "Didn't come" button was the only correction; it's deleted, and `members.coachingos_resend_requested` with it. So the monthly CSV asserts a dinner attendance we can't actually know. Build something internal, or accept the fuzz?
 
 - **ON ERIC:** Homepage says "40 seats. Closes when full." (`this-months-dinner.tsx:153`); actual cap is 45 — reconcile the copy or leave it.
 - **ON ERIC:** Open /admin/atlas and confirm six domain cards render. If it says "No atlas nodes yet," the `outputFileTracingIncludes` tracing failed in the deployed bundle — tell the agent. Unverifiable from outside auth. ⚠unverified
@@ -30,6 +28,7 @@ single-writer hook):
 
 ## Done
 
+- 2026-10-17 — Known Quantity CSV export removed: cron, CSV builder, schedule entry, and `KNOWN_QUANTITY_CSV_URL` (Vercel) all gone. Nothing flows from Thunderview to KQ. The two KQ open loops (their parser quirk; no-show fuzz in the CSV) closed with it. (atlas: dinners/_domain)
 - 2026-09-21 — CoachingOS webhook push replaced by a monthly CSV upload to Known Quantity (`known-quantity-csv` cron, morning after each dinner, rolling 90 days, one row per person). Verified live end-to-end: 79 attendees sent, 79 parsed, `upload_id bd7d2417`. Their parser miscounts newlines inside quoted fields, so every field is flattened to one line. No-show re-arm loop and its column deleted. First scheduled run: 2026-10-02. (atlas: dinners/_domain, 0eb7e4e)
 - 2026-08-31 — "Has Ticket" is now a selectable mail-merge group (reverses the launch exclusion; Eric's call). Verified live: first checkbox, 39 ticket-holders for Sep 3. Ladder gotcha: ticket-holders are ONLY in has_ticket — Attended alone excludes them. (atlas: email/_domain, 8619eff)
 - 2026-08-30 — Morning-of venue tease now visible on `/admin/emails/morning-of` as a rendered preview (shared `morningOfVenueTeaseHtml()`; test sends include it too — they silently omitted it before). First attempt put raw HTML in the template body; rejected — never expose markup in template textareas. Verified live in browser. (atlas: email/_domain, c6e7c2e+113c67c)

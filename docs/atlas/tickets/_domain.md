@@ -36,7 +36,6 @@ cron, not the trigger.
 ## Graveyard
 
 - **Tracking actual attendance** — not built by design; `fulfilled` gates
-  the fulfillment email and nothing else. The monthly Known Quantity CSV
-  ships `fulfilled` as its attendance proxy, no-shows included (confirmed
-  2026-09-21). CoachingOS used to correct this with a "Didn't come" button
-  feeding a resend-request flag; both are deleted, so nothing corrects it now.
+  the fulfillment email and nothing else. CoachingOS used to correct this
+  with a "Didn't come" button feeding a resend-request flag; both are
+  deleted, so nothing corrects it now.

@@ -20,10 +20,8 @@ cron sends automatically at 8am MT on dinner day, idempotent via
 
 Post-dinner cron (daily): if yesterday was a dinner, stamps
 `last_dinner_attended` for fulfilled-ticket holders and clears stale
-`excluded_from_dinner_id`. The `known-quantity-csv` cron runs the same
-morning: it uploads a CSV of everyone who held a fulfilled ticket in the
-last 90 days (`WINDOW_DAYS=90`), one row per person, to Known Quantity's
-tokenised intake URL. Dinners are monthly, so that's a monthly file.
+`excluded_from_dinner_id`. Nothing leaves Thunderview for Known Quantity
+(or anywhere else) after a dinner.
 
 ## Decisions
 
@@ -46,11 +44,13 @@ tokenised intake URL. Dinners are monthly, so that's a monthly file.
   flag lost its purpose and the column was dropped. Kicked-out members ride
   along with a Membership Status column — Eric's call: the meeting happened,
   KQ decides what to do with it.
+  *Reversed 2026-10-17 — export removed entirely; Eric's call.*
+- **2026-10-17** — Known Quantity CSV export deleted (cron, builder, schedule,
+  `KNOWN_QUANTITY_CSV_URL`). No data flows from Thunderview to KQ anymore.
 
 ## Graveyard
 
-- **Quoting newlines inside CSV fields** — RFC 4180 allows it; the KQ intake
-  parser counts an embedded newline as a new record (a correct 2-record file
-  came back `rows: 3`). Every field is flattened to one line instead.
+- **Exporting attendees to Known Quantity** — the monthly CSV push
+  (2026-09-21 → 2026-10-17). Removed at Eric's call.
 - **January and July dinners** — off months by program design; the
   generation cron skips them.
