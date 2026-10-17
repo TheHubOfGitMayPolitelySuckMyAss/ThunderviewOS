@@ -20,37 +20,17 @@ cron sends automatically at 8am MT on dinner day, idempotent via
 
 Post-dinner cron (daily): if yesterday was a dinner, stamps
 `last_dinner_attended` for fulfilled-ticket holders and clears stale
-`excluded_from_dinner_id`. Nothing leaves Thunderview for Known Quantity
-(or anywhere else) after a dinner.
+`excluded_from_dinner_id`.
 
 ## Decisions
 
-- **2026-05-19** — First-time attendees pushed to CoachingOS on dinner day —
-  the only Thunderview→CoachingOS flow. (a7632ea)
 - **2026-06-05** — Morning-of send automated via cron; the admin button
   demoted to fallback. Send helper deliberately in `src/lib/` so it can't be
   POSTed as a public server action. (7da0405)
-- **2026-06-21** — No-show loop: DigiEric "Didn't come" sets
-  `coachingos_resend_requested`, next dinner's sync re-includes and clears —
-  because `last_dinner_attended` stamps no-shows too. (f8cfdff)
-  *Reversed 2026-09-21 — both sides of that loop are deleted.*
 - **2026-08-04** — Per-dinner seat cap on the dinner row; see
   [tickets/seat-cap](../tickets/seat-cap.md). (44c2c71)
 
-- **2026-09-21** — Dinner-day JSON push to CoachingOS replaced by a monthly
-  CSV upload to Known Quantity the morning AFTER each dinner; their inbound
-  webhook was deleted and started 404ing. Rolling 90-day window of everyone
-  who held a fulfilled ticket, not just first-timers, so the no-show re-arm
-  flag lost its purpose and the column was dropped. Kicked-out members ride
-  along with a Membership Status column — Eric's call: the meeting happened,
-  KQ decides what to do with it.
-  *Reversed 2026-10-17 — export removed entirely; Eric's call.*
-- **2026-10-17** — Known Quantity CSV export deleted (cron, builder, schedule,
-  `KNOWN_QUANTITY_CSV_URL`). No data flows from Thunderview to KQ anymore.
-
 ## Graveyard
 
-- **Exporting attendees to Known Quantity** — the monthly CSV push
-  (2026-09-21 → 2026-10-17). Removed at Eric's call.
 - **January and July dinners** — off months by program design; the
   generation cron skips them.

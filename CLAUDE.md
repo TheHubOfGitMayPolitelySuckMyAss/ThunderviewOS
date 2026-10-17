@@ -14,7 +14,7 @@ Next.js 16 + Supabase + Vercel. Replaces a Squarespace/Sheets/Streak stack for a
 - Don't validate, praise, or smooth ambiguity. Disagree when warranted.
 - When Eric points you at a resource (token, file, config) for a task, finding it is implicit authorization to use it. Don't ask permission to proceed.
 - **This doc is for you (Claude), not Eric. He doesn't read it.** Update existing sections when work changes the system's state — don't ask permission, just do it. Don't append "What's done in Sprint N" sections; sprint history is in git log. The doc reflects the system as it is now, not how it got here. **Compress proactively** — every token here is loaded on every turn. Verbose prose gets in your way.
-- Separate from Known Quantity (formerly CoachingOS/DigiEric) — separate repo, separate Supabase project. Don't conflate. No data flows between them (the monthly attendee CSV export was removed 2026-10-17).
+- Separate from Known Quantity (formerly CoachingOS/DigiEric) — separate repo, separate Supabase project. Don't conflate. No data flows between them.
 - The v4 handoff doc (in Eric's chat sessions, not the repo) is the canonical product spec. Eric will paste relevant sections.
 
 ## Cross-cutting invariants
