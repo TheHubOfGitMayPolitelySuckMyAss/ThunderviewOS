@@ -19,6 +19,7 @@ const UNIVERSAL_SKIP_PREFIXES = [
   "/api/",
   "/auth/confirm",
   "/auth/callback",
+  "/auth/sign-in", // URL carries the login token — never log it
   "/admin/operations",
   "/dev/",
 ];

@@ -16,13 +16,36 @@ async function memberIdForEmail(email: string | null): Promise<string | null> {
   }
 }
 
+// The magic-link email points here (Supabase template, unchanged:
+// {{ .RedirectTo }}?token_hash=…&type=email&email=…). A GET must NOT spend the
+// single-use token: corporate link scanners (Microsoft Defender Safe Links)
+// open every emailed link before the member does, and a GET-verify let the
+// scanner's browser consume the login, leaving the member's own click dead
+// (Joe Bonnell, 2026-11-16). So GET only forwards to /auth/sign-in, which
+// shows a "Sign in" button; the button POSTs back here and THAT verifies.
+// Scanners open links; they don't press buttons.
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
-  const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type");
-  // Email param is appended by Supabase email template (manual step:
-  // template uses ...&email={{ .Email }}). May be absent on older links.
-  const emailParam = searchParams.get("email");
+  const url = new URL(`${origin}/auth/sign-in`);
+  for (const key of ["token_hash", "type", "email"]) {
+    const v = searchParams.get(key);
+    if (v) url.searchParams.set(key, v);
+  }
+  return NextResponse.redirect(url);
+}
+
+export async function POST(request: Request) {
+  const { origin } = new URL(request.url);
+  const form = await request.formData();
+  const field = (k: string) => {
+    const v = form.get(k);
+    return typeof v === "string" && v.length > 0 ? v : null;
+  };
+  const token_hash = field("token_hash");
+  const type = field("type");
+  // Email is appended by the Supabase email template (manual step: template
+  // uses ...&email={{ .Email }}) and threaded through the sign-in page.
+  const emailParam = field("email");
 
   if (token_hash && type) {
     const cookieStore = await cookies();
@@ -75,7 +98,8 @@ export async function GET(request: Request) {
       // Only allow relative paths starting with /
       const safePath = redirectPath.startsWith("/") ? redirectPath : "/portal";
 
-      const response = NextResponse.redirect(`${origin}${safePath}`);
+      // 303 so the browser follows with a GET, not a re-POST.
+      const response = NextResponse.redirect(`${origin}${safePath}`, 303);
       cookiesToApply.forEach(({ name, value, options }) =>
         response.cookies.set(name, value, options as Record<string, string>)
       );
@@ -86,8 +110,7 @@ export async function GET(request: Request) {
 
     // Failure — log only when the email param matches a known member_emails row
     // AND the member did NOT just successfully log in. PKCE tokens are
-    // single-use; hitting /auth/confirm again (back-button, double-click,
-    // email-client prefetch) replays an already-consumed token and produces a
+    // single-use; submitting again (back-button, double-click) replays an already-consumed token and produces a
     // non-actionable "Email link is invalid or has expired" error. Suppress
     // those by checking for a recent successful auth.login for the same member.
     const memberId = await memberIdForEmail(emailParam);
@@ -114,7 +137,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(
-    `${new URL(request.url).origin}/login?error=auth`
-  );
+  return NextResponse.redirect(`${origin}/login?error=auth`, 303);
 }

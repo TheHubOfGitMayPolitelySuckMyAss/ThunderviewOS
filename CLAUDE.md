@@ -47,6 +47,7 @@ Wire-them-wrong-if-you-treat-as-ordinary columns:
 
 The flow is standard Supabase magic link. The non-obvious parts:
 
+- **Magic link GET never verifies.** `/auth/confirm` GET only forwards to `/auth/sign-in` (a "Sign in" button page); the button POSTs back to `/auth/confirm`, which runs `verifyOtp`. Corporate link scanners (Microsoft Safe Links) open every emailed link and would otherwise spend the single-use token before the member clicks. Don't move verification back onto GET. `/auth/sign-in` is in the page-view skip list (its URL carries the token).
 - **PKCE uses `/auth/confirm` (token_hash), not `/auth/callback` (code).** Both routes exist; `/auth/callback` is fallback. Both create their own `createServerClient` inline with direct `cookieStore` access — do NOT use `lib/supabase/server.ts` in auth routes (cookies don't propagate on redirects).
 - **Magic link template MUST use `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&email={{ .Email }}`.** Not `{{ .ConfirmationURL }}` (verifies at Supabase's endpoint, never establishes session). Not `{{ .SiteURL }}` (hardcodes production, breaks preview deploys). Configured via Supabase Management API, not dashboard.
 - **Supabase Redirect URLs allow-list needs apex AND www.** When `emailRedirectTo` (`${window.location.origin}/auth/confirm`) doesn't match an allow-list entry, Supabase silently falls back to Site URL — symptom is the magic link landing at `/?token_hash=...` instead of `/auth/confirm`, no auth flow fires. Both `thunderviewceodinners.com/**` AND `www.thunderviewceodinners.com/**` must be listed because either origin can produce the login form. Preview deploys need their vercel.app wildcard too.
@@ -102,7 +103,7 @@ Authenticated and anonymous navigations log `page.viewed` to `system_events`. Au
 - **Marketing feed = `metadata->>anon_id IS NOT NULL`**, not a hardcoded event type. Naturally captures anonymous page views AND the auth.login bridge. The bridge appears in BOTH Marketing and People. Future event types carrying an anon cookie auto-participate.
 - **Marketing UI renders bridged rows as `Visitor xxxxxxxx → Member Name`** in the Actor column. Handle = first 8 hex of UUID, hue derived from same hex (deterministic per visitor). Click chip to scope feed via `?anon=<uuid>`.
 - **`page.viewed` metadata captures path, search params, `user_agent`, `ip` (from `x-forwarded-for`), and `anon_id` (anonymous only).** UA/IP exist so "which browser/device hung on Jeremy's profile?" is one SQL query. Users are authenticated members — no anonymous-tracking concerns that would justify dropping headers. The privacy-strict logger (no UA/no IP) is the VibeClaude extension's design, not this app's.
-- **Skip list:** `/api/*`, `/auth/confirm`, `/auth/callback`, `/admin/operations`, `/dev/*`. Root layout's logger additionally skips `/portal` and `/admin` (those have own layouts; otherwise we'd double-log).
+- **Skip list:** `/api/*`, `/auth/confirm`, `/auth/callback`, `/auth/sign-in`, `/admin/operations`, `/dev/*`. Root layout's logger additionally skips `/portal` and `/admin` (those have own layouts; otherwise we'd double-log).
 
 ## Email systems
 

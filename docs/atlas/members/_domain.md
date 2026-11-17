@@ -18,6 +18,10 @@ application; hard bounce on primary auto-promotes the most recent active
 secondary (`swap_primary_email` RPC). Every address needs its own
 `auth.users` row (`ensureAuthUsersForMember`) or magic-link login fails.
 
+Login: the emailed link opens a "Sign in" page (`/auth/sign-in`); the login
+only happens when the member presses the button (POST to `/auth/confirm`).
+Opening the link alone never logs anyone in.
+
 Segmentation is the stage ladder (`computeStageForMember`,
 `src/lib/member-stage.ts`): 9 buckets, first match wins — team → opted_out →
 bounced → has_ticket → not_this_one → investors → attended → approved.
@@ -39,6 +43,14 @@ and swallowed — the save always completes).
 - **2026-08-01** — Admin delete of a member email is a hard DELETE;
   `email_events.member_email_id` went `ON DELETE SET NULL` so events survive.
   Deleting a bounced address forgets the suppression. (913e951)
+
+- **2026-11-17** — Magic link opens a "Sign in" button page instead of
+  logging in on open. Corporate link scanners (Microsoft Defender Safe Links)
+  open every emailed link first and spent the single-use login before the
+  member could; Joe Bonnell looped login→link→login 3 times on 2026-11-16.
+  Supabase's own documented fix. Considered and rejected: widening the 60s
+  failed-login suppression (only affects logging, never let anyone in) and a
+  home-built reusable link (bigger rewrite for the same result).
 
 ## Graveyard
 
