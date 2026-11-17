@@ -20,6 +20,8 @@ secondary (`swap_primary_email` RPC). Every address needs its own
 
 Login: the emailed link opens a "Sign in" page (`/auth/sign-in`); the login
 only happens when the member presses the button (POST to `/auth/confirm`).
+Page greets the member by first name ("Heya, Joe!"), looked up from the
+email on the link.
 Opening the link alone never logs anyone in.
 
 Segmentation is the stage ladder (`computeStageForMember`,
